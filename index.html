@@ -3310,6 +3310,119 @@
     letter-spacing: 0.5px;
   }
 
+  /* Active-playlist header inside the tracklist (shows current playlist name + Playlists ▾ button) */
+  .music-active-playlist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--lavender-soft);
+    border-bottom: 1px dashed var(--lavender-soft);
+  }
+  .music-active-playlist-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .music-playlists-btn {
+    background: var(--white);
+    border: 1.5px solid var(--lavender);
+    border-radius: 10px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .music-playlists-btn:hover { background: var(--lavender-soft); }
+
+  .music-empty-tracks {
+    padding: 24px 12px;
+    text-align: center;
+    color: var(--ink-light);
+    font-size: 12px;
+  }
+
+  /* Playlist picker overlay — hidden by default; opens over the track list */
+  .music-playlist-picker {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--white);
+    border-radius: 14px;
+    overflow-y: auto;
+    z-index: 5;
+  }
+  .music-playlist-picker.open { display: block; }
+  .music-playlist-picker-head {
+    padding: 10px 12px;
+    border-bottom: 2px dashed var(--lavender-soft);
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--pink-deep);
+    background: var(--bg-3);
+    border-radius: 14px 14px 0 0;
+  }
+  .music-playlist-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px dashed var(--bg-2);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .music-playlist-row:hover { background: var(--bg-3); }
+  .music-playlist-row.active { background: var(--lavender-soft); }
+  .music-playlist-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .music-playlist-count {
+    font-size: 10px;
+    color: var(--ink-light);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .music-playlist-action {
+    background: none;
+    border: none;
+    color: var(--ink-light);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .music-playlist-action:hover { background: var(--bg-2); color: var(--ink); }
+  .music-playlist-action.danger:hover { background: #ffe6ec; color: #b3334e; }
+
+  .music-playlist-create-row {
+    padding: 10px 12px;
+    background: var(--bg-3);
+    border-top: 1px dashed var(--lavender-soft);
+    border-radius: 0 0 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
   .music-add-row {
     padding: 10px 12px;
     background: var(--bg-3);
@@ -3519,6 +3632,10 @@
   <div class="music-tracklist" id="musicTracklist">
     <div class="music-tracklist-head">🎵 Pick a track</div>
     <div id="musicTrackItems"></div>
+    <div class="music-playlist-picker" id="musicPlaylistPicker">
+      <div class="music-playlist-picker-head">📚 Your playlists</div>
+      <div id="musicPlaylistPickerItems"></div>
+    </div>
   </div>
   <div class="music-player-row">
     <div class="music-icon" id="musicIcon" title="Browse tracks">🎵</div>
@@ -7638,13 +7755,13 @@ function renderPokeStrip() {
   }
 
   html += `
-    <div class="poke-char is-self ${shakeClass}" data-uid="${state.user.uid}" data-action="${meIsShaking ? 'ack' : 'self'}">
+    <div class="poke-char is-self ${shakeClass}" data-uid="${state.user.uid}" data-action="${meIsShaking ? 'ack' : 'self'}" title="${meIsShaking ? 'Click to clear pokes' : myMissedCount > 0 ? 'Click to see missed pokes' : 'Click to change your character image'}">
       ${bubbleHtml}
       <div class="poke-char-inner">${myCharImg}</div>
       <div class="poke-online-dot"></div>
       ${meIsShaking ? `<div class="poke-shake-counter">${state.activePokesAtMe.length}</div>` : ''}
       ${myMissedCount > 0 && !meIsShaking ? `<div class="poke-missed-badge">${myMissedCount}</div>` : ''}
-      <div class="poke-name">You${meIsShaking ? ' (click to clear)' : myMissedCount > 0 ? ` (${myMissedCount} missed)` : ''}</div>
+      <div class="poke-name">You${meIsShaking ? ' (click to clear)' : myMissedCount > 0 ? ` (${myMissedCount} missed)` : ' — click to change'}</div>
     </div>
   `;
 
@@ -7658,7 +7775,7 @@ function renderPokeStrip() {
       ? `<img src="${escapeHtml(u.characterUrl)}" alt="${escapeHtml(u.name)}" />`
       : `<div class="letter-fallback">${avatarLetter(u.name)}</div>`;
     html += `
-      <div class="poke-char ${offlineClass} ${waitingClass}" data-uid="${u.uid}" data-action="poke">
+      <div class="poke-char ${offlineClass} ${waitingClass}" data-uid="${u.uid}" data-action="poke" title="Click to send ${escapeHtml(u.name)} a poke">
         <div class="poke-char-inner">${charImg}</div>
         <div class="poke-online-dot"></div>
         ${waitingForThem ? '<div class="poke-waiting-badge">⏳</div>' : ''}
@@ -7674,12 +7791,20 @@ function renderPokeStrip() {
 
   strip.innerHTML = html;
 
-  // Wire clicks
+  // Wire clicks with defensive error handling so any silent failures
+  // surface as a visible alert instead of nothing happening.
   strip.querySelectorAll('.poke-char').forEach(node => {
     const uid = node.dataset.uid;
     const action = node.dataset.action;
     if (!action || action === 'overflow') return;
-    node.addEventListener('click', () => handlePokeCharClick(uid, action));
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        handlePokeCharClick(uid, action);
+      } catch (err) {
+        alert('Could not open: ' + (err && err.message ? err.message : err));
+      }
+    });
   });
 }
 
@@ -8581,36 +8706,62 @@ async function saveRecordingToTask() {
 /* ============================================
    Feature: Music Player (YouTube)
 ============================================ */
-const MUSIC_TRACKS = [
-  { id: 'gjlZvW7suxI', title: 'Deep work... in progress · Boom Bap Jazzy Lo-fi' },
-  { id: '8MUlk3qjByY', title: 'Coding Alone — Chillstep for Late Night Focus' },
-  { id: 'odaPGvr9eU4', title: 'Sleepy Valley — Relaxing Ethereal Sleep Ambient' },
-  { id: 'XmqwB6FVeT8', title: 'Quiet dark fantasy town to study in' },
-  { id: 'vD1Gz2L4v4Y', title: 'i didn\'t realize how far i drifted' },
-  { id: '38pNIsRE0K4', title: 'Floating dark fantasy castle dreams' },
-  { id: 'anYD1n2_4ZE', title: 'FLOW like this · Boom Bap Jazzy Lo-fi' },
-  { id: 'BhY-Vu79VDc', title: 'Put this on and keep moving forward' },
-  { id: 'ESIBptJ5ewc', title: '90s LoFi Vibes — Chill-hop Mix' },
-  { id: 'w82vsY6wcZM', title: 'BLACKOUT — Twilight Sortie · 3 Hour Deep Focus' },
-  { id: 'sl67eNYS7DI', title: 'Put this on and stop wasting time' },
-  { id: 'pEgY0b0xdtE', title: 'Take a moment for yourself, Sir Mouse' },
+const BUILTIN_PLAYLISTS = [
+  {
+    id: 'builtin_default',
+    name: 'Default',
+    builtin: true,
+    tracks: [
+      { id: 'gjlZvW7suxI', title: 'Deep work... in progress · Boom Bap Jazzy Lo-fi' },
+      { id: '8MUlk3qjByY', title: 'Coding Alone — Chillstep for Late Night Focus' },
+      { id: 'odaPGvr9eU4', title: 'Sleepy Valley — Relaxing Ethereal Sleep Ambient' },
+      { id: 'XmqwB6FVeT8', title: 'Quiet dark fantasy town to study in' },
+      { id: 'vD1Gz2L4v4Y', title: 'i didn\'t realize how far i drifted' },
+      { id: '38pNIsRE0K4', title: 'Floating dark fantasy castle dreams' },
+      { id: 'anYD1n2_4ZE', title: 'FLOW like this · Boom Bap Jazzy Lo-fi' },
+      { id: 'BhY-Vu79VDc', title: 'Put this on and keep moving forward' },
+      { id: 'ESIBptJ5ewc', title: '90s LoFi Vibes — Chill-hop Mix' },
+      { id: 'w82vsY6wcZM', title: 'BLACKOUT — Twilight Sortie · 3 Hour Deep Focus' },
+      { id: 'sl67eNYS7DI', title: 'Put this on and stop wasting time' },
+      { id: 'pEgY0b0xdtE', title: 'Take a moment for yourself, Sir Mouse' },
+    ],
+  },
 ];
 
 const music = {
   player: null,
   apiReady: false,
   pendingPlay: false,
-  currentIdx: -1,        // index into the COMBINED list (presets + customs)
+  currentIdx: -1,           // index into the ACTIVE playlist's tracks
   isPlaying: false,
   volume: 25,
   collapsed: true,
   initialized: false,
-  customTracks: [],      // user-added tracks: { id, title, custom: true }
+  playlists: [],            // user-created playlists: { id, name, tracks, builtin: false }
+  activePlaylistId: 'builtin_default',
+  showingPlaylistPicker: false,
 };
 
-// Returns the combined list of tracks (presets first, then customs)
+// Returns the active playlist object (built-in or user-created).
+function getActivePlaylist() {
+  const all = [...BUILTIN_PLAYLISTS, ...music.playlists];
+  return all.find(p => p.id === music.activePlaylistId) || BUILTIN_PLAYLISTS[0];
+}
+
+// Returns the tracks of the active playlist (used everywhere the old
+// getAllTracks() was used — same shape: array of { id, title }).
 function getAllTracks() {
-  return [...MUSIC_TRACKS, ...music.customTracks];
+  return getActivePlaylist().tracks;
+}
+
+// Returns every playlist (built-in + user) for picker rendering.
+function getAllPlaylists() {
+  return [...BUILTIN_PLAYLISTS, ...music.playlists];
+}
+
+// Generate a short unique ID for new user playlists.
+function newPlaylistId() {
+  return 'pl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
 }
 
 // Extract a YouTube video ID from many possible URL formats
@@ -8644,26 +8795,88 @@ function extractYouTubeId(input) {
 
 function loadMusicSettings() {
   try {
-    const idx = parseInt(localStorage.getItem('music_track_idx') || '-1', 10);
     const vol = parseInt(localStorage.getItem('music_volume') || '25', 10);
-    const customsRaw = localStorage.getItem('music_custom_tracks');
-    if (customsRaw) {
+    if (!isNaN(vol) && vol >= 0 && vol <= 100) music.volume = vol;
+
+    // Load user playlists (new format).
+    const playlistsRaw = localStorage.getItem('music_playlists');
+    if (playlistsRaw) {
       try {
-        const parsed = JSON.parse(customsRaw);
-        if (Array.isArray(parsed)) music.customTracks = parsed.filter(t => t && t.id);
+        const parsed = JSON.parse(playlistsRaw);
+        if (Array.isArray(parsed)) {
+          music.playlists = parsed
+            .filter(p => p && p.id && Array.isArray(p.tracks))
+            .map(p => ({
+              id: p.id,
+              name: typeof p.name === 'string' && p.name.trim() ? p.name : 'Untitled',
+              tracks: p.tracks.filter(t => t && t.id).map(t => ({
+                id: t.id,
+                title: typeof t.title === 'string' ? t.title : `Custom — ${t.id}`,
+              })),
+              builtin: false,
+            }));
+        }
       } catch (e) {}
     }
-    if (!isNaN(vol) && vol >= 0 && vol <= 100) music.volume = vol;
-    const total = getAllTracks().length;
-    if (!isNaN(idx) && idx >= 0 && idx < total) music.currentIdx = idx;
+
+    // Migration: if no new-format playlists exist but legacy custom tracks do,
+    // promote them into a "My Tracks" user playlist so users don't lose them.
+    if (music.playlists.length === 0) {
+      const legacyRaw = localStorage.getItem('music_custom_tracks');
+      if (legacyRaw) {
+        try {
+          const parsed = JSON.parse(legacyRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const legacyTracks = parsed
+              .filter(t => t && t.id)
+              .map(t => ({ id: t.id, title: t.title || `Custom — ${t.id}` }));
+            if (legacyTracks.length > 0) {
+              music.playlists.push({
+                id: newPlaylistId(),
+                name: 'My Tracks',
+                tracks: legacyTracks,
+                builtin: false,
+              });
+            }
+          }
+        } catch (e) {}
+        // Don't delete the legacy key — leaves a paper trail in case the
+        // migration ever needs to be re-run. Save the new format below.
+      }
+    }
+
+    // Active playlist
+    const activeId = localStorage.getItem('music_active_playlist');
+    if (activeId && getAllPlaylists().some(p => p.id === activeId)) {
+      music.activePlaylistId = activeId;
+    } else {
+      music.activePlaylistId = 'builtin_default';
+    }
+
+    // Restore current track by VIDEO ID (not index — indexes shift across
+    // playlist switches and migrations).
+    const currentTrackId = localStorage.getItem('music_current_track_id');
+    if (currentTrackId) {
+      const tracks = getAllTracks();
+      const idx = tracks.findIndex(t => t.id === currentTrackId);
+      if (idx >= 0) music.currentIdx = idx;
+    }
+
+    saveMusicSettings();
   } catch (e) {}
 }
 
 function saveMusicSettings() {
   try {
-    localStorage.setItem('music_track_idx', String(music.currentIdx));
     localStorage.setItem('music_volume', String(music.volume));
-    localStorage.setItem('music_custom_tracks', JSON.stringify(music.customTracks));
+    localStorage.setItem('music_playlists', JSON.stringify(music.playlists));
+    localStorage.setItem('music_active_playlist', music.activePlaylistId);
+    const tracks = getAllTracks();
+    if (music.currentIdx >= 0 && music.currentIdx < tracks.length) {
+      localStorage.setItem('music_current_track_id', tracks[music.currentIdx].id);
+    } else {
+      localStorage.removeItem('music_current_track_id');
+    }
   } catch (e) {}
 }
 
@@ -8825,6 +9038,9 @@ function toggleTrackList() {
   const isOpen = list.classList.contains('open');
   if (isOpen) {
     list.classList.remove('open');
+    // Also close the playlist picker if it was open
+    music.showingPlaylistPicker = false;
+    el('musicPlaylistPicker').classList.remove('open');
     return;
   }
   music.collapsed = false;
@@ -8835,27 +9051,33 @@ function toggleTrackList() {
 
 function renderTrackList() {
   const wrap = el('musicTrackItems');
-  const tracks = getAllTracks();
-  const presetCount = MUSIC_TRACKS.length;
+  const playlist = getActivePlaylist();
+  const tracks = playlist.tracks;
+  const isUserPlaylist = !playlist.builtin;
 
   let html = '';
-  // Presets
-  for (let i = 0; i < presetCount; i++) {
-    const t = tracks[i];
-    const isCurrent = i === music.currentIdx;
+
+  // Active-playlist header with name + a "Playlists" button to switch.
+  html += `
+    <div class="music-active-playlist-row">
+      <div class="music-active-playlist-name" title="${escapeHtml(playlist.name)}">
+        ${playlist.builtin ? '🎵' : '🎶'} ${escapeHtml(playlist.name)}
+      </div>
+      <button class="music-playlists-btn" id="musicPlaylistsBtn" title="Switch playlists">
+        Playlists ▾
+      </button>
+    </div>
+  `;
+
+  // Tracks
+  if (tracks.length === 0) {
     html += `
-      <div class="music-track-item ${isCurrent ? 'current' : ''}" data-idx="${i}">
-        <div class="music-track-num">${i + 1}</div>
-        <div class="music-track-title">${escapeHtml(t.title)}</div>
-        ${isCurrent ? `<div class="music-track-playing">${music.isPlaying ? '♪' : '⏸'}</div>` : ''}
+      <div class="music-empty-tracks">
+        ${isUserPlaylist ? 'No tracks yet — paste a YouTube link below to add one.' : 'This playlist is empty.'}
       </div>
     `;
-  }
-
-  // Customs section
-  if (music.customTracks.length > 0) {
-    html += `<div class="music-tracklist-divider">Your tracks</div>`;
-    for (let i = presetCount; i < tracks.length; i++) {
+  } else {
+    for (let i = 0; i < tracks.length; i++) {
       const t = tracks[i];
       const isCurrent = i === music.currentIdx;
       html += `
@@ -8863,22 +9085,24 @@ function renderTrackList() {
           <div class="music-track-num">${i + 1}</div>
           <div class="music-track-title">${escapeHtml(t.title)}</div>
           ${isCurrent ? `<div class="music-track-playing">${music.isPlaying ? '♪' : '⏸'}</div>` : ''}
-          <button class="music-track-remove" data-remove-idx="${i - presetCount}" title="Remove">✕</button>
+          ${isUserPlaylist ? `<button class="music-track-remove" data-remove-idx="${i}" title="Remove from playlist">✕</button>` : ''}
         </div>
       `;
     }
   }
 
-  // Add custom track form
-  html += `
-    <div class="music-add-row">
-      <input type="text" class="music-add-input" id="musicAddUrl" placeholder="Paste YouTube link or video ID..." />
-      <input type="text" class="music-add-input" id="musicAddTitle" placeholder="Track name (optional)" />
-      <div class="music-add-row-buttons">
-        <button class="music-add-btn primary" id="musicAddBtn">+ Add & Play</button>
+  // Add-track form: only on user playlists (built-ins are read-only).
+  if (isUserPlaylist) {
+    html += `
+      <div class="music-add-row">
+        <input type="text" class="music-add-input" id="musicAddUrl" placeholder="Paste YouTube link or video ID..." />
+        <input type="text" class="music-add-input" id="musicAddTitle" placeholder="Track name (optional)" />
+        <div class="music-add-row-buttons">
+          <button class="music-add-btn primary" id="musicAddBtn">+ Add & Play</button>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  }
 
   wrap.innerHTML = html;
 
@@ -8898,91 +9122,257 @@ function renderTrackList() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const removeIdx = parseInt(btn.dataset.removeIdx, 10);
-      removeCustomTrack(removeIdx);
+      removeTrackFromActivePlaylist(removeIdx);
     });
   });
 
-  // Wire add button
-  el('musicAddBtn').addEventListener('click', addCustomTrack);
-  el('musicAddUrl').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addCustomTrack();
-    }
+  // Wire playlists button
+  el('musicPlaylistsBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePlaylistPicker();
   });
-  el('musicAddTitle').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addCustomTrack();
-    }
-  });
+
+  // Wire add-track form (only present on user playlists)
+  if (isUserPlaylist) {
+    el('musicAddBtn').addEventListener('click', addTrackToActivePlaylist);
+    el('musicAddUrl').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addTrackToActivePlaylist(); }
+    });
+    el('musicAddTitle').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addTrackToActivePlaylist(); }
+    });
+  }
+
+  // If the playlist picker was open, re-render it too (its content depends
+  // on which playlist is active for the checkmark).
+  if (music.showingPlaylistPicker) renderPlaylistPicker();
 }
 
-function addCustomTrack() {
+function addTrackToActivePlaylist() {
+  const playlist = getActivePlaylist();
+  if (playlist.builtin) {
+    alert('The Default playlist is read-only. Create your own playlist first.');
+    return;
+  }
   const urlInput = el('musicAddUrl');
   const titleInput = el('musicAddTitle');
   const raw = urlInput.value.trim();
-  if (!raw) {
-    urlInput.focus();
-    return;
-  }
+  if (!raw) { urlInput.focus(); return; }
   const videoId = extractYouTubeId(raw);
   if (!videoId) {
     alert('Could not detect a YouTube video ID. Paste a YouTube URL like https://youtu.be/XXXX or https://youtube.com/watch?v=XXXX');
     return;
   }
-  // Avoid duplicates
-  const allTracks = getAllTracks();
-  const existingIdx = allTracks.findIndex(t => t.id === videoId);
+  // Already in this playlist? Just play it.
+  const existingIdx = playlist.tracks.findIndex(t => t.id === videoId);
   if (existingIdx >= 0) {
-    // Just play it
     playMusicTrack(existingIdx, true);
     el('musicTracklist').classList.remove('open');
     urlInput.value = '';
     titleInput.value = '';
     showToast({
-      title: '🎵 Already added',
-      text: 'That track is already in your list — playing it now.',
+      title: '🎵 Already in this playlist',
+      text: 'Playing it now.',
       kind: 'default',
     });
     return;
   }
 
   const title = titleInput.value.trim() || `Custom — ${videoId}`;
-  music.customTracks.push({ id: videoId, title, custom: true });
+  playlist.tracks.push({ id: videoId, title });
   saveMusicSettings();
 
-  // Play the new track (its index is the last in the combined list)
-  const newIdx = MUSIC_TRACKS.length + music.customTracks.length - 1;
+  const newIdx = playlist.tracks.length - 1;
   urlInput.value = '';
   titleInput.value = '';
   playMusicTrack(newIdx, true);
-  // Re-render the list so the new track shows up
   renderTrackList();
 }
 
-function removeCustomTrack(customIdx) {
-  if (customIdx < 0 || customIdx >= music.customTracks.length) return;
-  if (!confirm('Remove this track from your list?')) return;
-  const removedTrack = music.customTracks[customIdx];
-  const removedCombinedIdx = MUSIC_TRACKS.length + customIdx;
-  music.customTracks.splice(customIdx, 1);
+function removeTrackFromActivePlaylist(idx) {
+  const playlist = getActivePlaylist();
+  if (playlist.builtin) return;
+  if (idx < 0 || idx >= playlist.tracks.length) return;
+  if (!confirm('Remove this track from the playlist?')) return;
+  playlist.tracks.splice(idx, 1);
 
-  // Adjust currentIdx if needed
-  if (music.currentIdx === removedCombinedIdx) {
-    // Was playing the removed track — stop and reset
-    if (music.player) {
-      try { music.player.stopVideo(); } catch (e) {}
-    }
+  if (music.currentIdx === idx) {
+    // Was playing the removed track — stop.
+    if (music.player) { try { music.player.stopVideo(); } catch (e) {} }
     music.currentIdx = -1;
     music.isPlaying = false;
-  } else if (music.currentIdx > removedCombinedIdx) {
+  } else if (music.currentIdx > idx) {
     music.currentIdx--;
   }
 
   saveMusicSettings();
   renderTrackList();
   renderMusicPlayer();
+}
+
+/* ---- Playlist management ---- */
+
+// Switch the active playlist. If the currently playing track exists in the
+// new playlist (same video ID), keep playing and remap currentIdx; otherwise
+// reset to nothing playing.
+function switchPlaylist(playlistId) {
+  if (music.activePlaylistId === playlistId) return;
+  const all = getAllPlaylists();
+  const next = all.find(p => p.id === playlistId);
+  if (!next) return;
+
+  // Try to preserve the currently-playing track if it appears in the new playlist.
+  const tracksNow = getAllTracks();
+  const currentTrackId = (music.currentIdx >= 0 && music.currentIdx < tracksNow.length)
+    ? tracksNow[music.currentIdx].id
+    : null;
+
+  music.activePlaylistId = playlistId;
+
+  if (currentTrackId) {
+    const idxInNext = next.tracks.findIndex(t => t.id === currentTrackId);
+    music.currentIdx = idxInNext >= 0 ? idxInNext : -1;
+  } else {
+    music.currentIdx = -1;
+  }
+
+  saveMusicSettings();
+  renderTrackList();
+  renderMusicPlayer();
+}
+
+function createPlaylist(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
+  const playlist = {
+    id: newPlaylistId(),
+    name: trimmed,
+    tracks: [],
+    builtin: false,
+  };
+  music.playlists.push(playlist);
+  saveMusicSettings();
+  return playlist;
+}
+
+function renamePlaylist(playlistId, newName) {
+  const trimmed = (newName || '').trim();
+  if (!trimmed) return;
+  const pl = music.playlists.find(p => p.id === playlistId);
+  if (!pl) return;
+  pl.name = trimmed;
+  saveMusicSettings();
+}
+
+function deletePlaylist(playlistId) {
+  const idx = music.playlists.findIndex(p => p.id === playlistId);
+  if (idx < 0) return;
+  const pl = music.playlists[idx];
+  if (!confirm(`Delete the playlist "${pl.name}"? Its tracks will be removed.`)) return;
+  music.playlists.splice(idx, 1);
+  // If we just deleted the active playlist, fall back to Default.
+  if (music.activePlaylistId === playlistId) {
+    music.activePlaylistId = 'builtin_default';
+    music.currentIdx = -1;
+    if (music.player) { try { music.player.stopVideo(); } catch (e) {} }
+    music.isPlaying = false;
+  }
+  saveMusicSettings();
+  renderTrackList();
+  renderMusicPlayer();
+}
+
+function togglePlaylistPicker() {
+  music.showingPlaylistPicker = !music.showingPlaylistPicker;
+  const picker = el('musicPlaylistPicker');
+  picker.classList.toggle('open', music.showingPlaylistPicker);
+  if (music.showingPlaylistPicker) renderPlaylistPicker();
+}
+
+function renderPlaylistPicker() {
+  const wrap = el('musicPlaylistPickerItems');
+  const all = getAllPlaylists();
+  let html = '';
+  all.forEach(p => {
+    const isActive = p.id === music.activePlaylistId;
+    const trackCount = p.tracks.length;
+    const canEdit = !p.builtin;
+    html += `
+      <div class="music-playlist-row ${isActive ? 'active' : ''}" data-playlist-id="${p.id}">
+        <div class="music-playlist-name">
+          ${isActive ? '✓ ' : ''}${escapeHtml(p.name)}
+        </div>
+        <div class="music-playlist-count">${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}</div>
+        ${canEdit ? `
+          <button class="music-playlist-action" data-rename="${p.id}" title="Rename">✎</button>
+          <button class="music-playlist-action danger" data-delete="${p.id}" title="Delete">✕</button>
+        ` : ''}
+      </div>
+    `;
+  });
+
+  // Create-new form
+  html += `
+    <div class="music-playlist-create-row">
+      <input type="text" class="music-add-input" id="musicNewPlaylistName" placeholder="New playlist name..." />
+      <button class="music-add-btn primary" id="musicCreatePlaylistBtn">+ Create</button>
+    </div>
+  `;
+
+  wrap.innerHTML = html;
+
+  // Wire row clicks (switch playlist)
+  wrap.querySelectorAll('.music-playlist-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      // Skip if user clicked an action button
+      if (e.target.closest('.music-playlist-action')) return;
+      switchPlaylist(row.dataset.playlistId);
+      togglePlaylistPicker();
+    });
+  });
+
+  // Wire rename
+  wrap.querySelectorAll('[data-rename]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.rename;
+      const pl = music.playlists.find(p => p.id === id);
+      if (!pl) return;
+      const newName = prompt('Rename playlist:', pl.name);
+      if (newName === null) return;
+      renamePlaylist(id, newName);
+      renderPlaylistPicker();
+      renderTrackList();
+    });
+  });
+
+  // Wire delete
+  wrap.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deletePlaylist(btn.dataset.delete);
+      renderPlaylistPicker();
+    });
+  });
+
+  // Wire create
+  const nameInput = el('musicNewPlaylistName');
+  const createBtn = el('musicCreatePlaylistBtn');
+  const handleCreate = () => {
+    const name = nameInput.value.trim();
+    if (!name) { nameInput.focus(); return; }
+    const pl = createPlaylist(name);
+    if (pl) {
+      nameInput.value = '';
+      // Switch to the newly created playlist so the user can start adding to it.
+      switchPlaylist(pl.id);
+      togglePlaylistPicker();
+    }
+  };
+  createBtn.addEventListener('click', handleCreate);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleCreate(); }
+  });
 }
 
 function renderMusicPlayer() {
