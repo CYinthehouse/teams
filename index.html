@@ -6,7 +6,7 @@
 <title>KoreanLearnin Teams</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Quicksand:wght@400;500;600;700&family=Hi+Melody&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   /* ---------- Pastel Kawaii Theme ---------- */
   :root {
@@ -33,8 +33,8 @@
     --radius-sm: 12px;
     --radius: 18px;
     --radius-lg: 26px;
-    --font-display: 'Hi Melody', 'Gaegu', cursive;
-    --font-cute: 'Gaegu', cursive;
+    --font-display: 'Nunito', system-ui, sans-serif;
+    --font-cute: 'Nunito', system-ui, sans-serif;
     --font-body: 'Quicksand', system-ui, sans-serif;
   }
 
@@ -3359,6 +3359,40 @@
     .board-title { font-size: 28px; }
     .column { flex: 0 0 250px; }
   }
+
+  /* ---------- Display-font outline (readability) ---------- */
+  /* 1px outline on smaller display headings (≥18px) */
+  .loading-text,
+  .chat-title,
+  .settings-section h4,
+  .feedback-display-head h5,
+  .archive-day-head,
+  .music-tracklist-head,
+  .feedback-editor h5 {
+    text-shadow:
+      -1px -1px 0 #4a3550,  1px -1px 0 #4a3550,
+      -1px  1px 0 #4a3550,  1px  1px 0 #4a3550,
+      -1px  0   0 #4a3550,  1px  0   0 #4a3550,
+       0  -1px 0 #4a3550,  0   1px 0 #4a3550;
+  }
+
+  /* 2px outline on really big display text (≥26px) — page titles, auth header, etc. */
+  .auth-title,
+  .board-title,
+  .modal-title,
+  .poke-popup-title,
+  .empty-board h3,
+  .brand,
+  .detail-title,
+  .mic-prompt-title {
+    text-shadow:
+      -2px -2px 0 #4a3550,  2px -2px 0 #4a3550,
+      -2px  2px 0 #4a3550,  2px  2px 0 #4a3550,
+      -2px  0   0 #4a3550,  2px  0   0 #4a3550,
+       0  -2px 0 #4a3550,  0   2px 0 #4a3550,
+      -1px -1px 0 #4a3550,  1px -1px 0 #4a3550,
+      -1px  1px 0 #4a3550,  1px  1px 0 #4a3550;
+  }
 </style>
 </head>
 <body>
@@ -3700,7 +3734,7 @@
 </div>
 
 <!-- Edit task modal (Feature 1) -->
-<div id="editTaskModal" class="modal-backdrop hidden">
+<div id="editTaskModal" class="modal-backdrop hidden" style="z-index: 250;">
   <div class="modal">
     <div class="modal-head">
       <div class="modal-title">✏️ Edit Task</div>
@@ -3759,7 +3793,7 @@
 
     <div class="modal-footer">
       <button class="btn-action secondary" onclick="closeTaskDetail()">Close</button>
-      <button class="btn-action secondary" id="taskEditBtn" onclick="openEditTaskModal()" style="display:none;">✏️ Edit</button>
+      <button class="btn-action secondary" id="taskEditBtn" onclick="openEditTaskModal(state.currentTaskId)" style="display:none;">✏️ Edit</button>
       <button class="btn-action primary revive-btn" id="taskReviveBtn" onclick="reviveCurrentTask()" style="display:none;">🌱 Revive Task</button>
       <button class="btn-action primary" id="taskDeleteBtn" onclick="deleteCurrentTask()" style="display:none; background: linear-gradient(135deg, #e75577, #ff8caa);">Delete</button>
     </div>
@@ -3887,6 +3921,7 @@ const state = {
   authMode: 'signin',
   pendingSteps: [],
   currentTaskId: null,
+  editingTaskId: null,
   currentEditingTeamId: null,
   // Stage 2
   currentTab: 'overview',
@@ -4032,7 +4067,7 @@ async function logActivity(taskId, action, details = {}) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
     });
   } catch (err) {
-    console.warn('Activity log failed:', err);
+
   }
 }
 
@@ -4377,6 +4412,18 @@ function signOut() {
   auth.signOut();
 }
 
+// Submit the auth form on Enter from any of its fields.
+['authEmail', 'authPassword', 'signupName'].forEach(id => {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAuthSubmit();
+    }
+  });
+});
+
 /* ============================================
    Auth state observer
 ============================================ */
@@ -4390,6 +4437,7 @@ auth.onAuthStateChanged(async (user) => {
     stopPresence();
     if (state.pokeRepeatInterval) { clearInterval(state.pokeRepeatInterval); state.pokeRepeatInterval = null; }
     if (state.pokeAutoExpireInterval) { clearInterval(state.pokeAutoExpireInterval); state.pokeAutoExpireInterval = null; }
+    if (state.tickInterval) { clearInterval(state.tickInterval); state.tickInterval = null; }
     document.body.classList.remove('poke-glow');
     el('pokeStrip').innerHTML = '';
     el('musicPlayer').classList.add('hidden');
@@ -4489,6 +4537,10 @@ function switchTeam(teamId) {
   if (unsubs.tasks) { unsubs.tasks(); unsubs.tasks = null; }
   // Reset notification de-dup sets when switching teams to avoid replaying stale toasts
   state.initialTaskLoadDone = false;
+  state.notifiedExpired.clear();
+  state.notifiedAssigned.clear();
+  state.notifiedRejected.clear();
+  state.notifiedApproved.clear();
 
   if (teamId) {
     unsubs.tasks = db.collection('tasks')
@@ -5592,7 +5644,7 @@ async function flushNotesSave() {
     }
   } catch (err) {
     if (el('notesStatus')) el('notesStatus').textContent = 'Save failed';
-    console.warn(err);
+
   }
 }
 
@@ -5897,7 +5949,7 @@ async function removeAttachment(index) {
       try {
         await storage.ref().child(att.path).delete();
       } catch (e) {
-        console.warn('Storage delete warning:', e);
+
       }
     }
     // Update Firestore: rebuild array without this index
@@ -6072,9 +6124,22 @@ async function reviveCurrentTask() {
 /* ============================================
    Feature: Task Editing
 ============================================ */
-function openEditTaskModal() {
-  const task = getCurrentTask();
+function openEditTaskModal(taskId) {
+  // Resolve the task ID — accept explicit arg, or fall back to whatever the
+  // detail modal had open. Store it locally so we don't share state with the
+  // detail modal (which gets closed below).
+  const id = taskId || state.currentTaskId;
+  if (!id) return;
+  const task = state.tasks.find(t => t.id === id);
   if (!task) return;
+
+  state.editingTaskId = id;
+
+  // Close the detail modal so only one popup is open at a time. We'll reopen
+  // it on this same task after the user finishes editing (save or cancel).
+  if (!el('taskDetailModal').classList.contains('hidden')) {
+    closeTaskDetail();
+  }
 
   el('editTaskTitle').value = task.title || '';
   el('editTaskDesc').value = task.description || '';
@@ -6086,12 +6151,12 @@ function openEditTaskModal() {
   const team = state.teams.find(t => t.id === task.teamId);
   const memberIds = team ? (team.memberIds || []) : [];
   const allOptionUids = new Set([...memberIds, task.assigneeId].filter(Boolean));
-  allOptionUids.forEach(id => {
-    const u = state.allUsers.find(x => x.uid === id);
+  allOptionUids.forEach(uid => {
+    const u = state.allUsers.find(x => x.uid === uid);
     if (!u) return;
     const opt = document.createElement('option');
     opt.value = u.uid;
-    opt.textContent = u.name + (memberIds.includes(id) ? '' : ' (not on team)');
+    opt.textContent = u.name + (memberIds.includes(uid) ? '' : ' (not on team)');
     sel.appendChild(opt);
   });
   sel.value = task.assigneeId;
@@ -6108,6 +6173,14 @@ function openEditTaskModal() {
 function closeEditTaskModal() {
   hide('editTaskModal');
   state.editPendingSteps = [];
+  // Reopen the task detail modal on the same task so the user lands back
+  // where they were. If the task is gone (e.g., deleted while editing),
+  // just drop them on the board.
+  const id = state.editingTaskId;
+  state.editingTaskId = null;
+  if (id && state.tasks.find(t => t.id === id)) {
+    openTaskDetail(id);
+  }
 }
 
 function addEditStepInput() {
@@ -6139,8 +6212,10 @@ function renderEditStepsList() {
 }
 
 async function saveTaskEdits() {
-  const task = getCurrentTask();
-  if (!task) return;
+  const id = state.editingTaskId;
+  if (!id) { alert('Edit session lost — please reopen.'); return; }
+  const task = state.tasks.find(t => t.id === id);
+  if (!task) { alert('Task no longer available.'); return; }
 
   const newTitle = el('editTaskTitle').value.trim();
   const newDesc = el('editTaskDesc').value.trim();
@@ -6891,7 +6966,7 @@ function subscribeChat() {
       state.chatLoadedOnce.team = true;
       if (state.chatOpen && state.chatChannel === 'team') renderChatMessages();
       updateUnreadBadges();
-    }, err => console.warn('Team chat subscription error:', err));
+    }, () => {});
 
   // Workers-only channel: only subscribe if I have access (Teacher or Support)
   if (canAccessWorkersChannel()) {
@@ -6905,7 +6980,7 @@ function subscribeChat() {
         state.chatLoadedOnce.workers = true;
         if (state.chatOpen && state.chatChannel === 'workers') renderChatMessages();
         updateUnreadBadges();
-      }, err => console.warn('Workers chat subscription error:', err));
+      }, () => {});
   }
 }
 
@@ -7099,7 +7174,7 @@ function renderChatMessage(m) {
   if (reactionEntries.length > 0) {
     reactionsHtml = `<div class="chat-reactions">${reactionEntries.map(([emoji, uids]) => {
       const mineFlag = uids.includes(state.user.uid) ? 'mine' : '';
-      return `<span class="reaction-pill ${mineFlag}" data-msg-id="${m.id}" data-emoji="${escapeHtml(emoji)}">${emoji} <span class="count">${uids.length}</span></span>`;
+      return `<span class="reaction-pill ${mineFlag}" data-msg-id="${m.id}" data-emoji="${escapeHtml(emoji)}">${escapeHtml(emoji)} <span class="count">${uids.length}</span></span>`;
     }).join('')}</div>`;
   }
 
@@ -7169,23 +7244,21 @@ async function toggleReaction(msgId, emoji) {
   const msg = msgs.find(m => m.id === msgId);
   if (!msg) return;
 
-  const reactions = { ...(msg.reactions || {}) };
-  const arr = Array.isArray(reactions[emoji]) ? [...reactions[emoji]] : [];
-  const myIdx = arr.indexOf(state.user.uid);
-  if (myIdx >= 0) {
-    arr.splice(myIdx, 1);
-  } else {
-    arr.push(state.user.uid);
-  }
-  if (arr.length === 0) delete reactions[emoji];
-  else reactions[emoji] = arr;
+  // Use atomic arrayUnion/arrayRemove on the specific emoji field so concurrent
+  // reactions from other users can't clobber each other.
+  const arr = Array.isArray((msg.reactions || {})[emoji]) ? msg.reactions[emoji] : [];
+  const haveMine = arr.includes(state.user.uid);
+  const fieldPath = `reactions.${emoji}`;
+  const op = haveMine
+    ? firebase.firestore.FieldValue.arrayRemove(state.user.uid)
+    : firebase.firestore.FieldValue.arrayUnion(state.user.uid);
 
   try {
     await db.collection('chats').doc(state.activeTeamId).collection(state.chatChannel).doc(msgId).update({
-      reactions,
+      [fieldPath]: op,
     });
   } catch (err) {
-    console.warn('Reaction failed:', err);
+    // Reaction toggle failed — non-critical; rendering will reflect server state on next snapshot.
   }
 }
 
@@ -7350,7 +7423,7 @@ function subscribePokes() {
       state.activePokesIveSent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderPokeStrip();
       updateGlowState();
-    }, err => console.warn('Pokes-sent subscription error:', err));
+    }, () => {});
 
   // Pokes at me (active + missed-not-seen)
   unsubs.pokesAtMe = db.collection('pokes')
@@ -7387,7 +7460,7 @@ function subscribePokes() {
 
       renderPokeStrip();
       updateGlowState();
-    }, err => console.warn('Pokes-at-me subscription error:', err));
+    }, () => {});
 }
 
 function maintainPokeRepeat() {
@@ -7435,7 +7508,7 @@ async function checkExpirePokes() {
         kind: 'default',
       });
     } catch (e) {
-      console.warn('Could not expire poke:', e);
+
     }
   }
 }
@@ -7709,7 +7782,7 @@ async function acknowledgeAllPokes() {
         acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } catch (err) {
-      console.warn('Could not acknowledge poke:', err);
+
     }
   }
 }
@@ -7830,7 +7903,7 @@ async function handleCharacterUpload(targetUid, file) {
       preview.innerHTML = '<div style="color:var(--ink-soft);font-size:11px;">Uploading...</div>';
     }
   } catch (err) {
-    console.warn('Compression failed, using original:', err);
+
     if (file.size > SIZE_LIMIT) {
       alert('Could not compress image and it is over 1 MB. Please try a different image.');
       preview.innerHTML = '<div style="color:#c33;font-size:11px;">Compression failed</div>';
@@ -7994,7 +8067,7 @@ function subscribePokeLog() {
     .onSnapshot(snap => {
       state.pokeLog = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (!el('settingsModal').classList.contains('hidden')) renderPokeLog();
-    }, err => console.warn('Poke log subscription error:', err));
+    }, () => {});
 }
 
 function renderPokeLog() {
@@ -8592,7 +8665,7 @@ function ensureYTPlayer(videoId, autoplay) {
         },
         onError: (e) => {
           // 100 = video removed, 101/150 = embed disabled
-          console.warn('YouTube player error:', e.data);
+
           showToast({
             title: '🎵 Track unavailable',
             text: 'This track can\'t be played. Skipping to next…',
@@ -8611,7 +8684,7 @@ function ensureYTPlayer(videoId, autoplay) {
         music.player.cueVideoById(videoId);
       }
     } catch (e) {
-      console.warn('loadVideoById failed:', e);
+
     }
   }
   return music.player;
@@ -8656,7 +8729,7 @@ function toggleMusicPlay() {
       music.player.playVideo();
     }
   } catch (e) {
-    console.warn('Play/pause failed:', e);
+
   }
 }
 
