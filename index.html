@@ -2274,23 +2274,32 @@
   .chat-msg-actions {
     display: none;
     position: absolute;
-    top: -10px;
+    top: -14px;
     right: 4px;
     background: var(--white);
     border-radius: 14px;
-    padding: 2px 4px;
+    padding: 3px 5px;
     box-shadow: var(--shadow-soft);
     border: 1px solid var(--bg-2);
     gap: 2px;
+    z-index: 5;
+  }
+  /* Own messages sit flush to the right edge of the chat panel — anchor
+     the action row to the LEFT of the bubble so it grows inward rather
+     than risking clipping against the panel's right wall. */
+  .chat-message.mine .chat-msg-actions {
+    right: auto;
+    left: 4px;
   }
   .chat-msg-body:hover .chat-msg-actions { display: flex; }
   .chat-msg-action {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 3px 5px;
+    padding: 4px 6px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 14px;
+    line-height: 1;
   }
   .chat-msg-action:hover { background: var(--bg-2); }
 
@@ -2327,6 +2336,7 @@
 
   .reaction-picker {
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     background: var(--white);
     border: 1px solid var(--bg-2);
@@ -2337,7 +2347,9 @@
     bottom: 100%;
     right: 0;
     margin-bottom: 4px;
-    z-index: 5;
+    z-index: 50;
+    width: max-content;
+    max-width: 240px;
   }
   .reaction-picker button {
     background: none;
@@ -2474,6 +2486,14 @@
     max-width: 70vw;
     z-index: 380;
     pointer-events: none;
+    transition: right 0.3s ease;
+  }
+  /* When the team chat panel is open, slide the poke strip left so it
+     sits flush against the chat panel's left edge instead of being
+     covered by it. The chat panel is 380px wide (max 92vw on narrow
+     screens), so we mirror that with min(). +12px is the visual gap. */
+  body.chat-open .poke-strip {
+    right: calc(min(380px, 92vw) + 12px);
   }
 
   /* Circular character with frame */
@@ -3064,6 +3084,14 @@
     width: 56px;
     overflow: hidden;
   }
+  /* When collapsed, hide everything except the music note icon so the
+     player reads as a single round badge rather than a chopped-off card. */
+  .music-player.collapsed .music-info,
+  .music-player.collapsed .music-btn,
+  .music-player.collapsed .music-volume-row,
+  .music-player.collapsed .music-tracklist {
+    display: none;
+  }
 
   .music-player-row {
     display: flex;
@@ -3369,14 +3397,14 @@
   .archive-day-head,
   .music-tracklist-head,
   .feedback-editor h5 {
-    text-shadow:
-      -1px -1px 0 #4a3550,  1px -1px 0 #4a3550,
-      -1px  1px 0 #4a3550,  1px  1px 0 #4a3550,
-      -1px  0   0 #4a3550,  1px  0   0 #4a3550,
-       0  -1px 0 #4a3550,  0   1px 0 #4a3550;
+    -webkit-text-stroke: 1px #4a3550;
+    paint-order: stroke fill;
   }
 
-  /* 2px outline on really big display text (≥26px) — page titles, auth header, etc. */
+  /* 2px outline on really big display text (≥26px) — page titles, auth header, etc.
+     Uses paint-order: stroke fill so the stroke is drawn UNDER the glyph fill,
+     producing a clean outline rather than the dense layered text-shadow stacks
+     which blob into a solid color at 2px+ thickness. */
   .auth-title,
   .board-title,
   .modal-title,
@@ -3385,13 +3413,8 @@
   .brand,
   .detail-title,
   .mic-prompt-title {
-    text-shadow:
-      -2px -2px 0 #4a3550,  2px -2px 0 #4a3550,
-      -2px  2px 0 #4a3550,  2px  2px 0 #4a3550,
-      -2px  0   0 #4a3550,  2px  0   0 #4a3550,
-       0  -2px 0 #4a3550,  0   2px 0 #4a3550,
-      -1px -1px 0 #4a3550,  1px -1px 0 #4a3550,
-      -1px  1px 0 #4a3550,  1px  1px 0 #4a3550;
+    -webkit-text-stroke: 2px #4a3550;
+    paint-order: stroke fill;
   }
 </style>
 </head>
@@ -3460,7 +3483,7 @@
           <div class="user-role" id="myRole">—</div>
         </div>
       </div>
-      <button class="icon-btn" onclick="signOut()" title="Sign out">⤴</button>
+      <button class="btn-action secondary" onclick="signOut()" title="Sign out" style="padding: 8px 14px; font-size: 13px;">⤴ Sign Out</button>
     </div>
   </div>
 
@@ -3870,6 +3893,10 @@
 
       <div class="settings-section hidden" id="teamMembersSection">
         <h4>🌷 <span id="teamMembersTitle">Team Members</span></h4>
+        <div id="teamRenameRow" style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <input type="text" id="teamRenameInput" class="form-input" placeholder="Team name..." />
+          <button class="btn-action primary" onclick="renameCurrentTeam()" style="padding: 6px 14px; font-size: 12px;">Rename</button>
+        </div>
         <div id="teamMembersList"></div>
         <button class="btn-action secondary" onclick="closeTeamEdit()" style="margin-top: 10px;">Back</button>
       </div>
@@ -4439,6 +4466,7 @@ auth.onAuthStateChanged(async (user) => {
     if (state.pokeAutoExpireInterval) { clearInterval(state.pokeAutoExpireInterval); state.pokeAutoExpireInterval = null; }
     if (state.tickInterval) { clearInterval(state.tickInterval); state.tickInterval = null; }
     document.body.classList.remove('poke-glow');
+    document.body.classList.remove('chat-open');
     el('pokeStrip').innerHTML = '';
     el('musicPlayer').classList.add('hidden');
     hide('app');
@@ -4648,9 +4676,32 @@ function openTeamEdit(teamId) {
   state.currentEditingTeamId = teamId;
   const team = state.teams.find(t => t.id === teamId);
   el('teamMembersTitle').textContent = team ? team.name : 'Team';
+  // Pre-fill the rename input with the current name. Only Boss/Manager can
+  // see the rename row at all (Firestore rules also enforce this).
+  el('teamRenameInput').value = team ? team.name : '';
+  el('teamRenameInput').onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); renameCurrentTeam(); }
+  };
+  el('teamRenameRow').style.display = isBossOrManager(state.profile.role) ? 'flex' : 'none';
   hide('teamsSection');
   show('teamMembersSection');
   renderTeamMembers();
+}
+
+async function renameCurrentTeam() {
+  const teamId = state.currentEditingTeamId;
+  if (!teamId) return;
+  if (!isBossOrManager(state.profile.role)) return;
+  const newName = el('teamRenameInput').value.trim();
+  if (!newName) { alert('Team name cannot be empty.'); return; }
+  const team = state.teams.find(t => t.id === teamId);
+  if (team && team.name === newName) return; // no-op
+  try {
+    await db.collection('teams').doc(teamId).update({ name: newName });
+    el('teamMembersTitle').textContent = newName;
+  } catch (err) {
+    alert('Could not rename team: ' + err.message);
+  }
 }
 
 function closeTeamEdit() {
@@ -6913,8 +6964,8 @@ async function handleBellAssetUpload(kind, file) {
 /* ============================================
    Feature: Tiered Team Chat
 ============================================ */
-const COMMON_EMOJI = ['😊', '😂', '🥰', '😎', '🤔', '😴', '😅', '🙏', '✨', '🌸', '🎉', '💪', '🔥', '👍', '👏', '❤️', '💜', '💚', '☕', '🍵', '🌙', '⭐', '🌷', '🍡', '🍑', '🐰', '🌈', '✅', '❓', '⏰', '📌', '💡'];
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🌸', '🙏'];
+const COMMON_EMOJI = ['😊', '😂', '🥰', '😎', '🤔', '😴', '😅', '🙏', '✨', '🌸', '🎉', '💪', '🔥', '👍', '👏', '❤️', '💜', '💚', '☕', '🍵', '🌙', '⭐', '🌷', '🍡', '🍑', '🐰', '🌈', '✅', '❓', '⏰', '📌', '💡', '💯'];
+const QUICK_REACTIONS = ['😊', '👍', '❓', '💯', '🙏'];
 
 function canAccessWorkersChannel() {
   return state.profile && (state.profile.role === 'Teacher' || state.profile.role === 'Support');
@@ -7042,6 +7093,7 @@ function openChatPanel() {
   state.chatOpen = true;
   el('chatPanel').classList.add('open');
   el('chatBackdrop').classList.add('visible');
+  document.body.classList.add('chat-open');
 
   // Default to team channel
   if (!canAccessWorkersChannel() && state.chatChannel === 'workers') {
@@ -7081,6 +7133,7 @@ function closeChatPanel() {
   state.chatOpen = false;
   el('chatPanel').classList.remove('open');
   el('chatBackdrop').classList.remove('visible');
+  document.body.classList.remove('chat-open');
   el('emojiPicker').style.display = 'none';
   document.removeEventListener('click', closeEmojiPickerOnOutsideClick);
   updateUnreadBadges();
@@ -7142,12 +7195,11 @@ function renderChatMessages() {
     });
   });
 
-  // Wire react/delete buttons on messages
-  wrap.querySelectorAll('.chat-msg-react').forEach(btn => {
+  // Quick-reaction buttons on each message: clicking toggles directly.
+  wrap.querySelectorAll('.chat-msg-quick-react').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const msgId = btn.dataset.msgId;
-      showReactionPicker(btn, msgId);
+      toggleReaction(btn.dataset.msgId, btn.dataset.emoji);
     });
   });
   wrap.querySelectorAll('.chat-msg-delete').forEach(btn => {
@@ -7178,10 +7230,14 @@ function renderChatMessage(m) {
     }).join('')}</div>`;
   }
 
-  // Action buttons (react + delete-mine)
+  // Action buttons: quick-reactions inline + delete-mine. Hovering the
+  // message reveals the row directly — no extra click to open a picker.
+  const quickReactBtns = QUICK_REACTIONS.map(em =>
+    `<button class="chat-msg-action chat-msg-quick-react" data-msg-id="${m.id}" data-emoji="${escapeHtml(em)}" title="React with ${escapeHtml(em)}">${escapeHtml(em)}</button>`
+  ).join('');
   const actionsHtml = `
     <div class="chat-msg-actions">
-      <button class="chat-msg-action chat-msg-react" data-msg-id="${m.id}" title="React">😊</button>
+      ${quickReactBtns}
       ${isMine ? `<button class="chat-msg-action chat-msg-delete" data-msg-id="${m.id}" title="Delete">🗑</button>` : ''}
     </div>
   `;
