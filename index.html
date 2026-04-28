@@ -1285,7 +1285,7 @@
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
-    overflow: hidden;
+    cursor: pointer;
   }
   .bell-btn:hover {
     background: var(--pink-soft);
@@ -1297,6 +1297,25 @@
     object-fit: contain;
     pointer-events: none;
   }
+  .bell-btn .unread-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #ff5577;
+    color: var(--white);
+    border-radius: 10px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(255, 85, 119, 0.4);
+    pointer-events: none;
+  }
+  .bell-btn .unread-badge.visible { display: flex; }
   .bell-btn.pinging {
     animation: bell-shake 0.5s ease;
   }
@@ -2117,6 +2136,102 @@
   }
   .chat-panel.open {
     transform: translateX(0);
+  }
+
+  /* Notifications panel — dropdown anchored to top-right, shorter than chat */
+  .notifications-panel {
+    position: fixed;
+    top: 70px;
+    right: 16px;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    max-height: 70vh;
+    background: var(--white);
+    border: 2.5px solid var(--pink-soft);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(180, 120, 160, 0.25);
+    z-index: 355;
+    display: none;
+    flex-direction: column;
+    animation: fade-in 0.18s ease;
+  }
+  .notifications-panel.open { display: flex; }
+  .notifications-head {
+    padding: 14px 18px;
+    border-bottom: 2px dashed var(--pink-soft);
+    background: var(--bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    border-radius: 16px 16px 0 0;
+  }
+  .notifications-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 80px;
+  }
+  .notifications-list::-webkit-scrollbar { width: 6px; }
+  .notifications-list::-webkit-scrollbar-thumb { background: var(--pink-soft); border-radius: 3px; }
+  .notifications-foot {
+    padding: 10px 14px;
+    border-top: 1px dashed var(--pink-soft);
+    background: var(--bg);
+    border-radius: 0 0 16px 16px;
+    flex-shrink: 0;
+  }
+  .notif-item {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px dashed var(--bg-2);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item:hover { background: var(--bg-3); }
+  .notif-item.morale { background: rgba(184, 236, 213, 0.18); }
+  .notif-item.danger { background: rgba(255, 220, 230, 0.32); }
+  .notif-item.warning { background: rgba(255, 235, 200, 0.32); }
+  .notif-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+    width: 28px;
+    text-align: center;
+  }
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .notif-text {
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+    word-wrap: break-word;
+  }
+  .notif-time {
+    font-size: 10px;
+    color: var(--ink-light);
+    margin-top: 4px;
+  }
+  .notif-empty {
+    padding: 36px 24px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+  .notif-empty-emoji {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+  .notif-empty-sub {
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-top: 8px;
+    line-height: 1.4;
   }
 
   .chat-head {
@@ -3598,9 +3713,10 @@
         💬
         <span class="unread-badge" id="chatUnreadBadge">0</span>
       </button>
-      <button class="bell-btn" id="bellBtn" title="Notifications">
+      <button class="bell-btn" id="bellBtn" title="Notifications" onclick="toggleNotificationsPanel()">
         <img id="bellImg" src="" alt="🔔" style="display:none;" />
         <span id="bellFallback">🔔</span>
+        <span class="unread-badge" id="bellUnreadBadge">0</span>
       </button>
       <button class="icon-btn" id="settingsBtn" onclick="openSettings()" title="Settings">⚙️</button>
       <div class="user-chip">
@@ -3734,6 +3850,18 @@
 
 <!-- Chat backdrop -->
 <div id="chatBackdrop" class="chat-backdrop" onclick="closeChatPanel()"></div>
+
+<!-- Notifications panel (dropdown from bell button) -->
+<div id="notificationsPanel" class="notifications-panel">
+  <div class="notifications-head">
+    <div class="chat-title">🔔 Notifications</div>
+    <button class="modal-close" onclick="toggleNotificationsPanel()">✕</button>
+  </div>
+  <div id="notificationsList" class="notifications-list"></div>
+  <div class="notifications-foot">
+    <button class="btn-action secondary" onclick="clearAllNotifications()" style="width: 100%; padding: 8px; font-size: 12px;">Clear All</button>
+  </div>
+</div>
 
 <!-- Chat panel -->
 <div id="chatPanel" class="chat-panel">
@@ -4129,6 +4257,9 @@ const state = {
   pokeAutoExpireInterval: null, // interval to expire stale pokes
   pokeSoundAudio: null,
   pokeLogRange: '14days',
+  // Notifications
+  notifications: [],          // array of { id, title, text, kind, taskId, ts, read }
+  notificationsOpen: false,
 };
 
 const unsubs = {
@@ -4385,6 +4516,9 @@ function shakeBellButton() {
 
 /* ---- Stage 3: toast notifications ---- */
 function showToast({ title, text, kind = 'default', taskId = null, durationMs = 5500 }) {
+  // Always log to notification history (cap at 50, persist to localStorage).
+  recordNotification({ title, text, kind, taskId });
+
   const stack = el('toastStack');
   if (!stack) return;
 
@@ -4444,6 +4578,144 @@ function dismissToast(toast) {
   }, 220);
 }
 
+/* ---- Notification history ---- */
+
+const NOTIF_LIMIT = 50;
+
+function notifStorageKey() {
+  // Per-user storage so different sign-ins don't share history.
+  const uid = state.user ? state.user.uid : 'anon';
+  return `notifications_${uid}`;
+}
+
+function loadNotifications() {
+  try {
+    if (!state.user) { state.notifications = []; return; }
+    const raw = localStorage.getItem(notifStorageKey());
+    if (!raw) { state.notifications = []; return; }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      state.notifications = parsed.filter(n => n && n.id && n.title);
+    }
+  } catch (e) {
+    state.notifications = [];
+  }
+  updateBellUnreadBadge();
+}
+
+function saveNotifications() {
+  try {
+    if (!state.user) return;
+    localStorage.setItem(notifStorageKey(), JSON.stringify(state.notifications));
+  } catch (e) {}
+}
+
+function recordNotification({ title, text, kind, taskId }) {
+  state.notifications.unshift({
+    id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    title: title || '',
+    text: text || '',
+    kind: kind || 'default',
+    taskId: taskId || null,
+    ts: Date.now(),
+    read: false,
+  });
+  // Cap to NOTIF_LIMIT
+  if (state.notifications.length > NOTIF_LIMIT) {
+    state.notifications.length = NOTIF_LIMIT;
+  }
+  saveNotifications();
+  updateBellUnreadBadge();
+  // If the panel is open, refresh it so the new entry shows immediately.
+  if (state.notificationsOpen) renderNotificationsPanel();
+}
+
+function getUnreadNotifCount() {
+  return state.notifications.filter(n => !n.read).length;
+}
+
+function updateBellUnreadBadge() {
+  const badge = el('bellUnreadBadge');
+  if (!badge) return;
+  const count = getUnreadNotifCount();
+  if (count > 0) {
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+function toggleNotificationsPanel() {
+  state.notificationsOpen = !state.notificationsOpen;
+  const panel = el('notificationsPanel');
+  panel.classList.toggle('open', state.notificationsOpen);
+  if (state.notificationsOpen) {
+    renderNotificationsPanel();
+    // Mark all as read once the panel is opened
+    let changed = false;
+    state.notifications.forEach(n => {
+      if (!n.read) { n.read = true; changed = true; }
+    });
+    if (changed) {
+      saveNotifications();
+      updateBellUnreadBadge();
+    }
+  }
+}
+
+function renderNotificationsPanel() {
+  const wrap = el('notificationsList');
+  if (state.notifications.length === 0) {
+    wrap.innerHTML = `
+      <div class="notif-empty">
+        <div class="notif-empty-emoji">🔔</div>
+        <div>No notifications yet.</div>
+        <div class="notif-empty-sub">When you're assigned a task, get feedback, or finish something, it'll show up here.</div>
+      </div>
+    `;
+    return;
+  }
+  const iconMap = { default: '✨', morale: '🎉', warning: '⏰', danger: '❗' };
+  wrap.innerHTML = state.notifications.map(n => {
+    const icon = iconMap[n.kind] || '✨';
+    return `
+      <div class="notif-item ${n.kind}" data-notif-id="${n.id}" ${n.taskId ? `data-task-id="${escapeHtml(n.taskId)}"` : ''}>
+        <div class="notif-icon">${icon}</div>
+        <div class="notif-body">
+          <div class="notif-title">${escapeHtml(n.title)}</div>
+          <div class="notif-text">${escapeHtml(n.text)}</div>
+          <div class="notif-time">${escapeHtml(formatTime({ toMillis: () => n.ts }))}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  wrap.querySelectorAll('.notif-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const taskId = item.dataset.taskId;
+      if (taskId) {
+        const task = state.tasks.find(t => t.id === taskId);
+        if (task) {
+          openTaskDetail(taskId);
+        } else {
+          findAndOpenTaskAcrossTeams(taskId);
+        }
+        toggleNotificationsPanel();
+      }
+    });
+  });
+}
+
+function clearAllNotifications() {
+  if (state.notifications.length === 0) return;
+  if (!confirm('Clear all notifications?')) return;
+  state.notifications = [];
+  saveNotifications();
+  updateBellUnreadBadge();
+  renderNotificationsPanel();
+}
+
 async function findAndOpenTaskAcrossTeams(taskId) {
   try {
     const snap = await db.collection('tasks').doc(taskId).get();
@@ -4481,18 +4753,14 @@ function subscribeAppSettings() {
 }
 
 function applyBellAssets() {
-  // Update topbar bell image
+  // Topbar bell always shows the 🔔 emoji for clarity. The custom bell
+  // image setting is still respected elsewhere (e.g. notification toasts)
+  // but the topbar icon stays consistent.
   const img = el('bellImg');
   const fallback = el('bellFallback');
-  if (state.appSettings.bellImageUrl) {
-    img.src = state.appSettings.bellImageUrl;
-    img.style.display = 'block';
-    fallback.style.display = 'none';
-  } else {
-    img.src = '';
-    img.style.display = 'none';
-    fallback.style.display = 'inline';
-  }
+  img.src = '';
+  img.style.display = 'none';
+  fallback.style.display = 'inline';
 }
 
 /* ---- Stage 3: audio unlock on first user interaction ---- */
@@ -4600,6 +4868,11 @@ auth.onAuthStateChanged(async (user) => {
     document.body.classList.remove('chat-open');
     el('pokeStrip').innerHTML = '';
     el('musicPlayer').classList.add('hidden');
+    // Close notifications panel and clear in-memory state (history persists in localStorage per user).
+    state.notificationsOpen = false;
+    state.notifications = [];
+    el('notificationsPanel').classList.remove('open');
+    updateBellUnreadBadge();
     hide('app');
     hide('loadingScreen');
     show('authScreen');
@@ -4644,6 +4917,9 @@ auth.onAuthStateChanged(async (user) => {
 
   // Stage 3: app settings (bell sound / image)
   subscribeAppSettings();
+
+  // Notifications history: load from localStorage for this user.
+  loadNotifications();
 
   // Poke system: start presence, subscribe to my pokes, start expire ticker
   startPresence();
@@ -7871,7 +8147,6 @@ function renderPokeStrip() {
 }
 
 function handlePokeCharClick(uid, action) {
-  console.log('[poke-char] click:', { uid, action, missedCount: state.missedPokesAtMe.length });
   if (action === 'poke') {
     // Poke another user
     openPokeCompose(uid);
@@ -7880,10 +8155,8 @@ function handlePokeCharClick(uid, action) {
   } else if (action === 'self') {
     // Click own character when not shaking - open edit char OR show missed
     if (state.missedPokesAtMe.length > 0) {
-      console.log('[poke-char] routing to missed pokes modal');
       showMissedPokesModal();
     } else {
-      console.log('[poke-char] routing to openEditChar()');
       openEditChar();
     }
   }
@@ -8081,24 +8354,13 @@ async function dismissMissedPokes() {
 
 /* --- Edit my character --- */
 function openEditChar(targetUserId) {
-  console.log('[openEditChar] called with:', targetUserId);
   // If targetUserId provided and I'm Boss/Manager, edit that user's char
   // Otherwise edit my own
   const editingOther = targetUserId && targetUserId !== state.user.uid;
-  if (editingOther && !isBossOrManager(state.profile.role)) {
-    console.log('[openEditChar] BAILING — editingOther but not Boss/Manager');
-    return;
-  }
+  if (editingOther && !isBossOrManager(state.profile.role)) return;
 
   const targetUid = editingOther ? targetUserId : state.user.uid;
   const target = state.allUsers.find(u => u.uid === targetUid) || state.profile;
-  console.log('[openEditChar] target:', target);
-
-  const modal = el('editCharModal');
-  console.log('[openEditChar] modal element:', modal,
-    'classes:', modal && modal.className,
-    'computed display:', modal && getComputedStyle(modal).display,
-    'computed z-index:', modal && getComputedStyle(modal).zIndex);
 
   el('editCharTitle').textContent = editingOther
     ? `Edit ${target.name}'s Character`
@@ -8127,11 +8389,6 @@ function openEditChar(targetUserId) {
   el('editCharModal').dataset.targetUid = targetUid;
 
   show('editCharModal');
-  console.log('[openEditChar] after show — modal classes now:', modal.className,
-    'computed display:', getComputedStyle(modal).display,
-    'visibility:', getComputedStyle(modal).visibility,
-    'opacity:', getComputedStyle(modal).opacity,
-    'getBoundingClientRect:', modal.getBoundingClientRect());
 }
 
 function closeEditChar() {
@@ -9589,9 +9846,13 @@ function initMusicPlayer() {
     playerEl.classList.remove('collapsed');
   });
   playerEl.addEventListener('mouseleave', () => {
-    // Only collapse if not playing AND tracklist isn't open
+    // Don't collapse while the user is mid-interaction with playlists or
+    // the create-playlist form. Only collapse if nothing is open and
+    // nothing is playing.
     const listOpen = el('musicTracklist').classList.contains('open');
-    if (!music.isPlaying && !listOpen && music.currentIdx < 0) {
+    const pickerOpen = music.showingPlaylistPicker;
+    const formOpen = music.showingNewPlaylistForm;
+    if (!music.isPlaying && !listOpen && !pickerOpen && !formOpen && music.currentIdx < 0) {
       music.collapsed = true;
       playerEl.classList.add('collapsed');
     }
@@ -9624,6 +9885,19 @@ try {
 } catch (e) {
   console.error('Music player init failed:', e);
 }
+
+// Close the notifications panel on outside click. The bell button itself
+// toggles the panel, so we need to ignore clicks on it (otherwise toggle
+// + close would race and leave the panel closed).
+document.addEventListener('click', (e) => {
+  if (!state.notificationsOpen) return;
+  const panel = el('notificationsPanel');
+  const bell = el('bellBtn');
+  if (panel && !panel.contains(e.target) && bell && !bell.contains(e.target)) {
+    state.notificationsOpen = false;
+    panel.classList.remove('open');
+  }
+});
 </script>
 </body>
 </html>
