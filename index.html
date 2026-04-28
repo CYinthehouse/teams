@@ -10310,28 +10310,76 @@ function renderPlaylistPicker() {
 
   wrap.innerHTML = html;
 
-  // Wire row clicks (switch playlist) — skip "+ New..." and skip when clicking action buttons.
-  wrap.querySelectorAll('.music-playlist-row:not(.music-playlist-new-row)').forEach(row => {
-    row.addEventListener('click', (e) => {
-      if (e.target.closest('.music-playlist-action')) return;
-      switchPlaylist(row.dataset.playlistId);
-      togglePlaylistPicker();
-    });
-  });
-
-  // Wire visibility toggle (per-playlist, on each editable row)
-  wrap.querySelectorAll('[data-toggle-vis]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+  // Wire all picker interactions through ONE delegated click handler on
+  // the wrap container. This is more robust than per-element listeners —
+  // re-rendering doesn't lose handlers, and there's no chance of selector
+  // mismatches sending clicks to the wrong handler.
+  wrap.onclick = async (e) => {
+    // 1. "+ New..." button — expand into create form.
+    const newRow = e.target.closest('#musicShowNewPlaylistBtn');
+    if (newRow) {
       e.stopPropagation();
-      await togglePlaylistVisibility(btn.dataset.toggleVis);
-    });
-  });
+      e.preventDefault();
+      music.showingPlaylistPicker = true;
+      music.showingNewPlaylistForm = true;
+      music.newPlaylistVisibility = 'private';
+      el('musicPlaylistPicker').classList.add('open');
+      renderPlaylistPicker();
+      setTimeout(() => {
+        const input = el('musicNewPlaylistName');
+        if (input) input.focus();
+      }, 0);
+      return;
+    }
 
-  // Wire rename
-  wrap.querySelectorAll('[data-rename]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    // 2. Visibility toggle inside the create form (Private / Public).
+    const visBtn = e.target.closest('.music-vis-btn');
+    if (visBtn) {
       e.stopPropagation();
-      const id = btn.dataset.rename;
+      music.newPlaylistVisibility = visBtn.dataset.vis;
+      renderPlaylistPicker();
+      setTimeout(() => {
+        const input = el('musicNewPlaylistName');
+        if (input) input.focus();
+      }, 0);
+      return;
+    }
+
+    // 3. Cancel button in create form.
+    if (e.target.closest('#musicCreateCancelBtn')) {
+      e.stopPropagation();
+      music.showingNewPlaylistForm = false;
+      renderPlaylistPicker();
+      return;
+    }
+
+    // 4. Create button in create form.
+    if (e.target.closest('#musicCreatePlaylistBtn')) {
+      e.stopPropagation();
+      const nameInput = el('musicNewPlaylistName');
+      const name = (nameInput && nameInput.value || '').trim();
+      if (!name) { if (nameInput) nameInput.focus(); return; }
+      const pl = createPlaylist(name, music.newPlaylistVisibility);
+      if (pl) {
+        if (nameInput) nameInput.value = '';
+        music.showingNewPlaylistForm = false;
+        switchPlaylist(pl.id);
+        togglePlaylistPicker();
+      }
+      return;
+    }
+
+    // 5. Per-row action buttons: visibility toggle, rename, delete.
+    const visToggleBtn = e.target.closest('[data-toggle-vis]');
+    if (visToggleBtn) {
+      e.stopPropagation();
+      await togglePlaylistVisibility(visToggleBtn.dataset.toggleVis);
+      return;
+    }
+    const renameBtn = e.target.closest('[data-rename]');
+    if (renameBtn) {
+      e.stopPropagation();
+      const id = renameBtn.dataset.rename;
       const pl = music.playlists.find(p => p.id === id);
       if (!pl) return;
       const newName = prompt('Rename playlist:', pl.name);
@@ -10339,76 +10387,50 @@ function renderPlaylistPicker() {
       renamePlaylist(id, newName);
       renderPlaylistPicker();
       renderTrackList();
-    });
-  });
-
-  // Wire delete
-  wrap.querySelectorAll('[data-delete]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+      return;
+    }
+    const deleteBtn = e.target.closest('[data-delete]');
+    if (deleteBtn) {
       e.stopPropagation();
-      deletePlaylist(btn.dataset.delete);
+      deletePlaylist(deleteBtn.dataset.delete);
       renderPlaylistPicker();
-    });
-  });
+      return;
+    }
 
-  // Wire "+ New..." row to expand the form
-  const newBtn = el('musicShowNewPlaylistBtn');
-  if (newBtn) {
-    newBtn.addEventListener('click', () => {
-      music.showingNewPlaylistForm = true;
-      music.newPlaylistVisibility = 'private'; // reset to default each time
-      renderPlaylistPicker();
-      setTimeout(() => {
-        const input = el('musicNewPlaylistName');
-        if (input) input.focus();
-      }, 0);
-    });
-  }
+    // 6. Click on a regular playlist row — switch to it. EXPLICITLY exclude
+    // the new-row by checking the class list, so there is zero chance of a
+    // selector quirk sending the click here when the user meant "+ New...".
+    const row = e.target.closest('.music-playlist-row');
+    if (row && !row.classList.contains('music-playlist-new-row') && row.dataset.playlistId) {
+      switchPlaylist(row.dataset.playlistId);
+      togglePlaylistPicker();
+      return;
+    }
+  };
 
-  // Wire visibility toggle inside the create form
-  wrap.querySelectorAll('.music-vis-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      music.newPlaylistVisibility = btn.dataset.vis;
-      renderPlaylistPicker();
-      // Re-focus the name input so the user can keep typing
-      setTimeout(() => {
-        const input = el('musicNewPlaylistName');
-        if (input) input.focus();
-      }, 0);
-    });
-  });
-
-  // Wire create form (only present when expanded)
+  // Keydown handler on the create-form name input (Enter / Escape). This
+  // can't be delegated cleanly (keydown bubbling + composition events get
+  // weird) so we attach it directly when the input is in the DOM.
   const nameInput = el('musicNewPlaylistName');
-  const createBtn = el('musicCreatePlaylistBtn');
-  const cancelBtn = el('musicCreateCancelBtn');
-  if (nameInput && createBtn) {
-    const handleCreate = () => {
-      const name = nameInput.value.trim();
-      if (!name) { nameInput.focus(); return; }
-      const pl = createPlaylist(name, music.newPlaylistVisibility);
-      if (pl) {
-        nameInput.value = '';
-        music.showingNewPlaylistForm = false;
-        switchPlaylist(pl.id);
-        togglePlaylistPicker();
-      }
-    };
-    createBtn.addEventListener('click', handleCreate);
-    nameInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); handleCreate(); }
-      else if (e.key === 'Escape') {
+  if (nameInput) {
+    nameInput.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const name = nameInput.value.trim();
+        if (!name) { nameInput.focus(); return; }
+        const pl = createPlaylist(name, music.newPlaylistVisibility);
+        if (pl) {
+          nameInput.value = '';
+          music.showingNewPlaylistForm = false;
+          switchPlaylist(pl.id);
+          togglePlaylistPicker();
+        }
+      } else if (e.key === 'Escape') {
         e.preventDefault();
         music.showingNewPlaylistForm = false;
         renderPlaylistPicker();
       }
-    });
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', () => {
-        music.showingNewPlaylistForm = false;
-        renderPlaylistPicker();
-      });
-    }
+    };
   }
 }
 
