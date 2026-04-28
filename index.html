@@ -7753,17 +7753,30 @@ function renderChatMessages() {
     });
   });
 
-  // Position the reaction/action bar via fixed positioning on hover.
+  // Position the reaction/action bar via fixed positioning. Works on both
+  // desktop (mouseenter / mouseleave) and mobile (click on bubble toggles).
   // CSS-only :hover with absolute positioning gets clipped by the
   // .chat-messages overflow box, so we use JS + position: fixed to escape it.
   const chatPanel = el('chatPanel');
-  const panelWidth = chatPanel.getBoundingClientRect().width;
+  // Hide any currently-showing bar (e.g. from a previous render).
+  document.querySelectorAll('.chat-msg-actions[data-shown="1"]').forEach(a => {
+    a.style.display = 'none';
+    a.removeAttribute('data-shown');
+  });
+
   wrap.querySelectorAll('.chat-msg-body').forEach(body => {
     const actions = body.querySelector('.chat-msg-actions');
     if (!actions) return;
     const isMine = body.closest('.chat-message').classList.contains('mine');
 
     const showActions = () => {
+      // Hide any other currently-showing bar first (only one at a time).
+      document.querySelectorAll('.chat-msg-actions[data-shown="1"]').forEach(a => {
+        if (a !== actions) {
+          a.style.display = 'none';
+          a.removeAttribute('data-shown');
+        }
+      });
       const r = body.getBoundingClientRect();
       const pr = chatPanel.getBoundingClientRect();
       // Render once with default position so we can measure its width.
@@ -7787,18 +7800,36 @@ function renderChatMessages() {
       const maxLeft = pr.right - barWidth - 8;
       left = Math.max(minLeft, Math.min(maxLeft, left));
       actions.style.left = left + 'px';
+      actions.setAttribute('data-shown', '1');
     };
 
     const hideActions = () => {
       actions.style.display = 'none';
+      actions.removeAttribute('data-shown');
     };
 
+    // Desktop: hover to reveal.
     body.addEventListener('mouseenter', showActions);
     body.addEventListener('mouseleave', hideActions);
     // Keep visible while hovering the bar itself (the bar is fixed-positioned
     // outside the bubble, so without this, moving from bubble to bar triggers leave).
     actions.addEventListener('mouseenter', showActions);
     actions.addEventListener('mouseleave', hideActions);
+
+    // Mobile / tap support: clicking the bubble toggles the bar. We attach
+    // this to the bubble *body* not the bar itself (the bar's own buttons
+    // already have their own click handlers and stopPropagation).
+    body.addEventListener('click', (e) => {
+      // Don't toggle if the user clicked something interactive inside the bar
+      // or a reaction pill — those have their own behavior.
+      if (e.target.closest('.chat-msg-actions')) return;
+      if (e.target.closest('.reaction-pill')) return;
+      if (actions.getAttribute('data-shown') === '1') {
+        hideActions();
+      } else {
+        showActions();
+      }
+    });
   });
 
   // Scroll to bottom
@@ -9889,9 +9920,19 @@ function renderTrackList() {
   // Wire add/search buttons. + Add directly adds (requires URL/ID).
   // 🔍 Search runs a YouTube search. Enter does whichever fits the input
   // (URL → add, text → search) so users don't have to think about it.
+  // IMPORTANT: stop propagation on every interactive button — these
+  // handlers re-render the track list (replacing the original button's
+  // DOM node), and the document-level outside-click handler checks
+  // player.contains(e.target). After re-render the original target is
+  // detached, so the contains() check returns false, and the tracklist
+  // closes incorrectly. Stopping propagation prevents that.
   if (isEditable) {
-    el('musicAddBtn').addEventListener('click', addTrackToActivePlaylist);
-    el('musicSearchBtn').addEventListener('click', () => {
+    el('musicAddBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      addTrackToActivePlaylist();
+    });
+    el('musicSearchBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
       const raw = el('musicAddUrl').value.trim();
       if (!raw) { el('musicAddUrl').focus(); return; }
       searchYouTube(raw);
@@ -10507,10 +10548,17 @@ function initMusicPlayer() {
     setMusicVolume(parseInt(volumeSlider.value, 10));
   });
 
-  // Click outside the tracklist closes it
+  // Click outside the tracklist closes it. We have to be careful here:
+  // if the click target is a node that was REMOVED from the DOM during
+  // the handler (e.g. a button whose handler called renderTrackList and
+  // replaced innerHTML), then player.contains(e.target) returns false —
+  // and we'd close the tracklist incorrectly. Guard with a document-body
+  // containment check: if the target isn't in the document anymore, we
+  // can't trust contains() and should bail.
   document.addEventListener('click', (e) => {
     const list = el('musicTracklist');
     if (!list.classList.contains('open')) return;
+    if (!document.body.contains(e.target)) return; // detached node, bail
     const player = el('musicPlayer');
     if (!player.contains(e.target)) {
       list.classList.remove('open');
@@ -10576,6 +10624,22 @@ document.addEventListener('click', (e) => {
     panel.classList.remove('open');
   }
 });
+
+// Dismiss any open chat reaction/action bar when clicking outside of it
+// or its anchoring message bubble. Handles the touch/mobile case where
+// there's no mouseleave event.
+document.addEventListener('click', (e) => {
+  const shown = document.querySelectorAll('.chat-msg-actions[data-shown="1"]');
+  if (shown.length === 0) return;
+  shown.forEach(actions => {
+    // Don't dismiss if the click was inside this bar OR inside its parent bubble.
+    if (actions.contains(e.target)) return;
+    const body = actions.closest('.chat-msg-body');
+    if (body && body.contains(e.target)) return;
+    actions.style.display = 'none';
+    actions.removeAttribute('data-shown');
+  });
+}, true);  // capture phase so this runs before other handlers
 </script>
 </body>
 </html>
