@@ -3464,6 +3464,59 @@
     font-size: 12px;
   }
 
+  /* Search results inside the track list */
+  .music-search-back-btn {
+    background: var(--white);
+    border: 1.5px solid var(--lavender);
+    border-radius: 10px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .music-search-back-btn:hover { background: var(--lavender-soft); }
+
+  .music-search-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--bg-2);
+    transition: background 0.15s;
+  }
+  .music-search-result:hover { background: var(--bg-3); }
+  .music-search-thumb {
+    width: 56px;
+    height: 42px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: var(--bg-2);
+  }
+  .music-search-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .music-search-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+  }
+  .music-search-meta {
+    font-size: 10px;
+    color: var(--ink-light);
+    margin-top: 2px;
+  }
   /* Playlist picker overlay — hidden by default; opens over the track list */
   .music-playlist-picker {
     display: none;
@@ -3498,9 +3551,21 @@
   }
   .music-playlist-row:hover { background: var(--bg-3); }
   .music-playlist-row.active { background: var(--lavender-soft); }
-  .music-playlist-name {
+  .music-playlist-icon {
+    flex-shrink: 0;
+    font-size: 14px;
+    width: 22px;
+    text-align: center;
+    line-height: 1;
+  }
+  .music-playlist-name-wrap {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .music-playlist-name {
     font-size: 13px;
     font-weight: 600;
     color: var(--ink);
@@ -3508,6 +3573,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .music-playlist-sub {
+    font-size: 10px;
+    color: var(--ink-light);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Legacy class — kept for backward-compatibility but unused after refactor. */
   .music-playlist-count {
     font-size: 10px;
     color: var(--ink-light);
@@ -3527,6 +3601,18 @@
   .music-playlist-action:hover { background: var(--bg-2); color: var(--ink); }
   .music-playlist-action.danger:hover { background: #ffe6ec; color: #b3334e; }
 
+  /* Section divider between built-in / your playlists / shared with team. */
+  .music-playlist-section-head {
+    padding: 8px 12px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ink-light);
+    background: var(--bg-3);
+    border-bottom: 1px dashed var(--bg-2);
+  }
+
   .music-playlist-create-row {
     padding: 10px 12px;
     background: var(--bg-3);
@@ -3535,6 +3621,29 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+  /* Private / Public toggle inside the create form. */
+  .music-visibility-toggle {
+    display: flex;
+    gap: 6px;
+  }
+  .music-vis-btn {
+    flex: 1;
+    background: var(--white);
+    border: 1.5px solid var(--bg-2);
+    border-radius: 10px;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-light);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .music-vis-btn:hover { border-color: var(--lavender); }
+  .music-vis-btn.active {
+    background: var(--lavender-soft);
+    border-color: var(--lavender);
+    color: var(--ink);
   }
 
   /* "+ New..." row at the bottom of the playlist picker — visually
@@ -4188,6 +4297,10 @@ const firebaseConfig = {
 
 const BOSS_EMAIL = "calvin@koreanlearnin.com"; // auto-promoted to Boss on first login
 
+// YouTube Data API v3 key — restricted by referrer to KoreanLearnin domains
+// and locked to YouTube Data API only. Burns ~100 quota units per search.
+const YOUTUBE_API_KEY = "AIzaSyBXTiIo8AJLABiXyP-F9c2MUrMWa400FtI";
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -4276,6 +4389,8 @@ const unsubs = {
   pokesIveSent: null,
   pokesAtMe: null,
   pokeLog: null,
+  // Music
+  sharedPlaylists: null,
 };
 
 /* ============================================
@@ -4873,6 +4988,23 @@ auth.onAuthStateChanged(async (user) => {
     state.notifications = [];
     el('notificationsPanel').classList.remove('open');
     updateBellUnreadBadge();
+    // Clear in-memory user playlists so the next sign-in doesn't see the
+    // previous user's data. Firestore is the source of truth and will
+    // reload on next sign-in.
+    music.playlists = [];
+    music.sharedPlaylists = [];
+    music.activePlaylistId = 'builtin_default';
+    music.currentIdx = -1;
+    if (unsubs.sharedPlaylists) { unsubs.sharedPlaylists(); unsubs.sharedPlaylists = null; }
+    if (music.player) { try { music.player.stopVideo(); } catch (e) {} }
+    music.isPlaying = false;
+    // Also wipe the localStorage cache so a different user on the same
+    // browser doesn't briefly see the previous user's playlists at next sign-in.
+    try {
+      localStorage.removeItem('music_playlists');
+      localStorage.removeItem('music_active_playlist');
+      localStorage.removeItem('music_current_track_id');
+    } catch (e) {}
     hide('app');
     hide('loadingScreen');
     show('authScreen');
@@ -4920,6 +5052,10 @@ auth.onAuthStateChanged(async (user) => {
 
   // Notifications history: load from localStorage for this user.
   loadNotifications();
+
+  // Music playlists: load from Firestore (private to user). Don't await —
+  // the localStorage cache already populated music.playlists at page load.
+  loadPlaylistsFromFirestore();
 
   // Poke system: start presence, subscribe to my pokes, start expire ticker
   startPresence();
@@ -9075,15 +9211,25 @@ const music = {
   volume: 25,
   collapsed: true,
   initialized: false,
-  playlists: [],            // user-created playlists: { id, name, tracks, builtin: false }
+  // The user's own playlists (private + public). Each has a `visibility` field.
+  playlists: [],
+  // Public playlists created by OTHER users — read-only, visible to everyone.
+  // Loaded via a Firestore subscription that filters out our own.
+  sharedPlaylists: [],
+  // Visibility selected in the create-playlist form. Defaults to 'private'.
+  newPlaylistVisibility: 'private',
   activePlaylistId: 'builtin_default',
   showingPlaylistPicker: false,
   showingNewPlaylistForm: false,
+  searchResults: [],          // YouTube search results: [{ id, title, channel, thumbnail, durationSec }]
+  searching: false,           // request in flight
+  searchError: null,          // error message to surface in UI
+  lastSearchQuery: '',
 };
 
-// Returns the active playlist object (built-in or user-created).
+// Returns the active playlist object (built-in, own, or shared).
 function getActivePlaylist() {
-  const all = [...BUILTIN_PLAYLISTS, ...music.playlists];
+  const all = getAllPlaylists();
   return all.find(p => p.id === music.activePlaylistId) || BUILTIN_PLAYLISTS[0];
 }
 
@@ -9093,9 +9239,19 @@ function getAllTracks() {
   return getActivePlaylist().tracks;
 }
 
-// Returns every playlist (built-in + user) for picker rendering.
+// Returns every playlist (built-in + user's own + shared by others).
 function getAllPlaylists() {
-  return [...BUILTIN_PLAYLISTS, ...music.playlists];
+  return [...BUILTIN_PLAYLISTS, ...music.playlists, ...music.sharedPlaylists];
+}
+
+// True if the current user can edit (rename, delete, add/remove tracks,
+// toggle visibility) the given playlist. Built-ins and other users'
+// shared playlists are read-only.
+function canEditPlaylist(p) {
+  if (!p || p.builtin) return false;
+  if (!state.user) return false;
+  // Own playlists: creatorId matches OR no creatorId (legacy localStorage entries)
+  return !p.creatorId || p.creatorId === state.user.uid;
 }
 
 // Generate a short unique ID for new user playlists.
@@ -9137,7 +9293,8 @@ function loadMusicSettings() {
     const vol = parseInt(localStorage.getItem('music_volume') || '25', 10);
     if (!isNaN(vol) && vol >= 0 && vol <= 100) music.volume = vol;
 
-    // Load user playlists (new format).
+    // Load user playlists from localStorage cache (will be overridden by
+    // Firestore once that loads — this just prevents UI flash before then).
     const playlistsRaw = localStorage.getItem('music_playlists');
     if (playlistsRaw) {
       try {
@@ -9179,8 +9336,6 @@ function loadMusicSettings() {
             }
           }
         } catch (e) {}
-        // Don't delete the legacy key — leaves a paper trail in case the
-        // migration ever needs to be re-run. Save the new format below.
       }
     }
 
@@ -9205,7 +9360,191 @@ function loadMusicSettings() {
   } catch (e) {}
 }
 
+// Load all playlists for the signed-in user from Firestore: the private
+// blob doc plus any of their public playlists. Also kicks off a live
+// subscription to OTHER users' public playlists so they appear in the
+// "Shared with team" section.
+async function loadPlaylistsFromFirestore() {
+  if (!state.user) return;
+  try {
+    const myUid = state.user.uid;
+
+    // 1. Private playlists doc (one document containing an array).
+    const privateRef = db.collection('users').doc(myUid)
+      .collection('private').doc('playlists');
+    const privateSnap = await privateRef.get();
+
+    let privateList = [];
+    let activeIdFromCloud = null;
+    if (privateSnap.exists) {
+      const data = privateSnap.data();
+      if (Array.isArray(data.playlists)) {
+        privateList = data.playlists
+          .filter(p => p && p.id && Array.isArray(p.tracks))
+          .map(p => ({
+            id: p.id,
+            name: typeof p.name === 'string' && p.name.trim() ? p.name : 'Untitled',
+            tracks: p.tracks.filter(t => t && t.id).map(t => ({
+              id: t.id,
+              title: typeof t.title === 'string' ? t.title : `Custom — ${t.id}`,
+            })),
+            builtin: false,
+            visibility: 'private',
+            creatorId: myUid,
+          }));
+      }
+      if (typeof data.activePlaylistId === 'string') {
+        activeIdFromCloud = data.activePlaylistId;
+      }
+    }
+
+    // 2. My public playlists (top-level `playlists` collection where I'm the creator).
+    const publicMineSnap = await db.collection('playlists')
+      .where('creatorId', '==', myUid)
+      .get();
+    const publicMineList = publicMineSnap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        name: data.name || 'Untitled',
+        tracks: Array.isArray(data.tracks)
+          ? data.tracks.filter(t => t && t.id).map(t => ({ id: t.id, title: t.title || `Custom — ${t.id}` }))
+          : [],
+        builtin: false,
+        visibility: 'public',
+        creatorId: myUid,
+        creatorName: data.creatorName || (state.profile && state.profile.name) || '—',
+      };
+    });
+
+    // Migration: if Firestore is fully empty but localStorage has playlists
+    // from a previous session, treat them all as private and push them up.
+    const hasAny = privateList.length > 0 || publicMineList.length > 0;
+    if (!hasAny && music.playlists.length > 0) {
+      // Tag each existing local playlist as private/owned-by-me, then save.
+      music.playlists = music.playlists.map(p => ({
+        ...p,
+        visibility: 'private',
+        creatorId: myUid,
+      }));
+      await savePrivatePlaylists();
+    } else {
+      music.playlists = [...privateList, ...publicMineList];
+    }
+
+    if (activeIdFromCloud && getAllPlaylists().some(p => p.id === activeIdFromCloud)) {
+      music.activePlaylistId = activeIdFromCloud;
+    }
+
+    // 3. Subscribe to OTHER users' public playlists (live updates).
+    subscribeSharedPlaylists();
+
+    // Re-render whatever's currently visible so the new playlist data shows.
+    saveMusicSettings(); // sync to localStorage cache
+    if (el('musicTracklist').classList.contains('open')) renderTrackList();
+    renderMusicPlayer();
+  } catch (err) {
+    // Firestore failure (likely rules or offline) — keep localStorage version.
+    console.error('loadPlaylistsFromFirestore failed:', err);
+  }
+}
+
+// Subscribe to all public playlists EXCEPT my own. Live-updates so when
+// teammates add/remove tracks, they appear right away in our picker.
+function subscribeSharedPlaylists() {
+  if (!state.user) return;
+  if (unsubs.sharedPlaylists) { unsubs.sharedPlaylists(); unsubs.sharedPlaylists = null; }
+  unsubs.sharedPlaylists = db.collection('playlists')
+    .onSnapshot(snap => {
+      const myUid = state.user ? state.user.uid : null;
+      music.sharedPlaylists = snap.docs
+        .filter(d => d.data().creatorId !== myUid)
+        .map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.name || 'Untitled',
+            tracks: Array.isArray(data.tracks)
+              ? data.tracks.filter(t => t && t.id).map(t => ({ id: t.id, title: t.title || `Custom — ${t.id}` }))
+              : [],
+            builtin: false,
+            visibility: 'public',
+            creatorId: data.creatorId || null,
+            creatorName: data.creatorName || '—',
+          };
+        });
+      // If user is currently viewing one of these, refresh the track list.
+      if (el('musicTracklist').classList.contains('open')) renderTrackList();
+    }, () => {});
+}
+
+// Debounced save: routes each playlist to its appropriate Firestore home.
+let _playlistSaveTimer = null;
+function schedulePlaylistFirestoreSave() {
+  if (_playlistSaveTimer) clearTimeout(_playlistSaveTimer);
+  _playlistSaveTimer = setTimeout(savePlaylistsToFirestore, 500);
+}
+
+async function savePlaylistsToFirestore() {
+  if (!state.user) return;
+  // Save private playlists as a single doc; save each public playlist separately.
+  await Promise.all([
+    savePrivatePlaylists(),
+    ...music.playlists
+      .filter(p => p.visibility === 'public' && p.creatorId === state.user.uid)
+      .map(p => savePublicPlaylist(p)),
+  ]).catch(err => console.error('savePlaylistsToFirestore failed:', err));
+}
+
+async function savePrivatePlaylists() {
+  if (!state.user) return;
+  try {
+    const ref = db.collection('users').doc(state.user.uid)
+      .collection('private').doc('playlists');
+    const privateOnly = music.playlists.filter(p => p.visibility !== 'public');
+    await ref.set({
+      playlists: privateOnly.map(p => ({
+        id: p.id,
+        name: p.name,
+        tracks: p.tracks.map(t => ({ id: t.id, title: t.title })),
+      })),
+      activePlaylistId: music.activePlaylistId,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error('savePrivatePlaylists failed:', err);
+  }
+}
+
+async function savePublicPlaylist(p) {
+  if (!state.user) return;
+  try {
+    const ref = db.collection('playlists').doc(p.id);
+    await ref.set({
+      name: p.name,
+      tracks: p.tracks.map(t => ({ id: t.id, title: t.title })),
+      creatorId: state.user.uid,
+      creatorName: state.profile ? state.profile.name : '—',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      // createdAt only sets on first save (merge: true preserves it on subsequent writes).
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.error('savePublicPlaylist failed:', err);
+  }
+}
+
+async function deletePublicPlaylistDoc(playlistId) {
+  if (!state.user) return;
+  try {
+    await db.collection('playlists').doc(playlistId).delete();
+  } catch (err) {
+    console.error('deletePublicPlaylistDoc failed:', err);
+  }
+}
+
 function saveMusicSettings() {
+  // Always write to localStorage (fast, used as cache + offline fallback).
   try {
     localStorage.setItem('music_volume', String(music.volume));
     localStorage.setItem('music_playlists', JSON.stringify(music.playlists));
@@ -9217,6 +9556,8 @@ function saveMusicSettings() {
       localStorage.removeItem('music_current_track_id');
     }
   } catch (e) {}
+  // Schedule Firestore sync for the playlist data (debounced).
+  if (state.user) schedulePlaylistFirestoreSave();
 }
 
 // YouTube IFrame API callback (global)
@@ -9377,9 +9718,14 @@ function toggleTrackList() {
   const isOpen = list.classList.contains('open');
   if (isOpen) {
     list.classList.remove('open');
-    // Also close the playlist picker if it was open
+    // Also close the playlist picker if it was open, and clear any search state
+    // so reopening the tracklist starts on the playlist view, not stale results.
     music.showingPlaylistPicker = false;
     el('musicPlaylistPicker').classList.remove('open');
+    music.searchResults = [];
+    music.searching = false;
+    music.searchError = null;
+    music.lastSearchQuery = '';
     return;
   }
   music.collapsed = false;
@@ -9393,51 +9739,96 @@ function renderTrackList() {
   const playlist = getActivePlaylist();
   const tracks = playlist.tracks;
   const isUserPlaylist = !playlist.builtin;
+  // The user can only modify playlists they own; shared playlists are read-only.
+  const isEditable = canEditPlaylist(playlist);
+  const showingSearchResults = music.searchResults.length > 0 || music.searching || music.searchError;
 
   let html = '';
 
   // Active-playlist header with name + a "Playlists" button to switch.
-  html += `
-    <div class="music-active-playlist-row">
-      <div class="music-active-playlist-name" title="${escapeHtml(playlist.name)}">
-        ${playlist.builtin ? '🎵' : '🎶'} ${escapeHtml(playlist.name)}
-      </div>
-      <button class="music-playlists-btn" id="musicPlaylistsBtn" title="Switch playlists">
-        Playlists ▾
-      </button>
-    </div>
-  `;
-
-  // Tracks
-  if (tracks.length === 0) {
+  // When search results are showing, replace the playlist name with a "Back" link.
+  if (showingSearchResults) {
     html += `
-      <div class="music-empty-tracks">
-        ${isUserPlaylist ? 'No tracks yet — paste a YouTube link below to add one.' : 'This playlist is empty.'}
+      <div class="music-active-playlist-row">
+        <button class="music-search-back-btn" id="musicSearchBackBtn" title="Back to playlist">← Back</button>
+        <div class="music-active-playlist-name" style="text-align: right; flex: 1;">
+          🔍 Results for "${escapeHtml(music.lastSearchQuery)}"
+        </div>
       </div>
     `;
   } else {
-    for (let i = 0; i < tracks.length; i++) {
-      const t = tracks[i];
-      const isCurrent = i === music.currentIdx;
-      html += `
-        <div class="music-track-item ${isCurrent ? 'current' : ''}" data-idx="${i}">
-          <div class="music-track-num">${i + 1}</div>
-          <div class="music-track-title">${escapeHtml(t.title)}</div>
-          ${isCurrent ? `<div class="music-track-playing">${music.isPlaying ? '♪' : '⏸'}</div>` : ''}
-          ${isUserPlaylist ? `<button class="music-track-remove" data-remove-idx="${i}" title="Remove from playlist">✕</button>` : ''}
+    html += `
+      <div class="music-active-playlist-row">
+        <div class="music-active-playlist-name" title="${escapeHtml(playlist.name)}">
+          ${playlist.builtin ? '🎵' : '🎶'} ${escapeHtml(playlist.name)}
         </div>
+        <button class="music-playlists-btn" id="musicPlaylistsBtn" title="Switch playlists">
+          Playlists ▾
+        </button>
+      </div>
+    `;
+  }
+
+  // Search results body — replaces track list when active.
+  if (showingSearchResults) {
+    if (music.searching) {
+      html += `<div class="music-empty-tracks">🔍 Searching YouTube...</div>`;
+    } else if (music.searchError) {
+      html += `<div class="music-empty-tracks" style="color: #b3334e;">${escapeHtml(music.searchError)}</div>`;
+    } else if (music.searchResults.length === 0) {
+      html += `<div class="music-empty-tracks">No results found.</div>`;
+    } else {
+      music.searchResults.forEach((r, i) => {
+        html += `
+          <div class="music-search-result" data-result-idx="${i}">
+            <img class="music-search-thumb" src="${escapeHtml(r.thumbnail)}" alt="" />
+            <div class="music-search-info">
+              <div class="music-search-title">${escapeHtml(r.title)}</div>
+              <div class="music-search-meta">
+                ${escapeHtml(r.channel)}${r.durationLabel ? ` · ${escapeHtml(r.durationLabel)}` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+    }
+  } else {
+    // Normal track list view.
+    if (tracks.length === 0) {
+      const emptyMsg = isEditable
+        ? 'No tracks yet — search below or paste a YouTube link.'
+        : (playlist.builtin
+            ? 'This playlist is empty.'
+            : `This is ${playlist.creatorName ? escapeHtml(playlist.creatorName) + "'s" : "a teammate's"} shared playlist.`);
+      html += `
+        <div class="music-empty-tracks">${emptyMsg}</div>
       `;
+    } else {
+      for (let i = 0; i < tracks.length; i++) {
+        const t = tracks[i];
+        const isCurrent = i === music.currentIdx;
+        html += `
+          <div class="music-track-item ${isCurrent ? 'current' : ''}" data-idx="${i}">
+            <div class="music-track-num">${i + 1}</div>
+            <div class="music-track-title">${escapeHtml(t.title)}</div>
+            ${isCurrent ? `<div class="music-track-playing">${music.isPlaying ? '♪' : '⏸'}</div>` : ''}
+            ${isEditable ? `<button class="music-track-remove" data-remove-idx="${i}" title="Remove from playlist">✕</button>` : ''}
+          </div>
+        `;
+      }
     }
   }
 
-  // Add-track form: only on user playlists (built-ins are read-only).
-  if (isUserPlaylist) {
+  // Add-track form: paste a YouTube link OR search YouTube. Only on
+  // playlists the user can edit (own private + own public).
+  if (isEditable) {
     html += `
       <div class="music-add-row">
-        <input type="text" class="music-add-input" id="musicAddUrl" placeholder="Paste YouTube link or video ID..." />
-        <input type="text" class="music-add-input" id="musicAddTitle" placeholder="Track name (optional)" />
+        <input type="text" class="music-add-input" id="musicAddUrl"
+          placeholder="Paste YouTube link or type to search..." />
         <div class="music-add-row-buttons">
-          <button class="music-add-btn primary" id="musicAddBtn">+ Add & Play</button>
+          <button class="music-add-btn secondary" id="musicAddBtn">+ Add</button>
+          <button class="music-add-btn primary" id="musicSearchBtn">🔍 Search</button>
         </div>
       </div>
     `;
@@ -9445,7 +9836,7 @@ function renderTrackList() {
 
   wrap.innerHTML = html;
 
-  // Wire track clicks
+  // Wire track clicks (only when not in search-results view)
   wrap.querySelectorAll('.music-track-item').forEach(item => {
     item.addEventListener('click', (e) => {
       // Avoid triggering when removing
@@ -9465,20 +9856,48 @@ function renderTrackList() {
     });
   });
 
-  // Wire playlists button
-  el('musicPlaylistsBtn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    togglePlaylistPicker();
+  // Wire search result clicks
+  wrap.querySelectorAll('.music-search-result').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.resultIdx, 10);
+      const r = music.searchResults[idx];
+      if (r) addSearchResultToPlaylist(r);
+    });
   });
 
-  // Wire add-track form (only present on user playlists)
-  if (isUserPlaylist) {
-    el('musicAddBtn').addEventListener('click', addTrackToActivePlaylist);
-    el('musicAddUrl').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addTrackToActivePlaylist(); }
+  // Wire "← Back" button
+  const backBtn = el('musicSearchBackBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      music.searchResults = [];
+      music.searching = false;
+      music.searchError = null;
+      music.lastSearchQuery = '';
+      renderTrackList();
     });
-    el('musicAddTitle').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addTrackToActivePlaylist(); }
+  }
+
+  // Wire playlists button (only present when not in search results view)
+  const playlistsBtn = el('musicPlaylistsBtn');
+  if (playlistsBtn) {
+    playlistsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePlaylistPicker();
+    });
+  }
+
+  // Wire add/search buttons. + Add directly adds (requires URL/ID).
+  // 🔍 Search runs a YouTube search. Enter does whichever fits the input
+  // (URL → add, text → search) so users don't have to think about it.
+  if (isEditable) {
+    el('musicAddBtn').addEventListener('click', addTrackToActivePlaylist);
+    el('musicSearchBtn').addEventListener('click', () => {
+      const raw = el('musicAddUrl').value.trim();
+      if (!raw) { el('musicAddUrl').focus(); return; }
+      searchYouTube(raw);
+    });
+    el('musicAddUrl').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); handleSearchOrAdd(); }
     });
   }
 
@@ -9487,14 +9906,149 @@ function renderTrackList() {
   if (music.showingPlaylistPicker) renderPlaylistPicker();
 }
 
+// Decide whether the input is a URL/video ID (paste-add) or a search term,
+// then route accordingly.
+function handleSearchOrAdd() {
+  const input = el('musicAddUrl');
+  const raw = input.value.trim();
+  if (!raw) { input.focus(); return; }
+  // If it parses as a YouTube ID/URL, add directly.
+  if (extractYouTubeId(raw)) {
+    addTrackToActivePlaylist();
+  } else {
+    searchYouTube(raw);
+  }
+}
+
+async function searchYouTube(query) {
+  const playlist = getActivePlaylist();
+  if (playlist.builtin) {
+    alert('The Default playlist is read-only. Create your own playlist first.');
+    return;
+  }
+  music.lastSearchQuery = query;
+  music.searching = true;
+  music.searchError = null;
+  music.searchResults = [];
+  renderTrackList();
+
+  try {
+    // Step 1: search.list to get video IDs and snippets
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search`
+      + `?part=snippet&type=video&maxResults=10`
+      + `&q=${encodeURIComponent(query)}`
+      + `&key=${YOUTUBE_API_KEY}`;
+    const searchResp = await fetch(searchUrl);
+    if (!searchResp.ok) {
+      const errBody = await searchResp.json().catch(() => null);
+      const errMsg = errBody && errBody.error && errBody.error.message
+        ? errBody.error.message
+        : `Search failed (HTTP ${searchResp.status})`;
+      throw new Error(errMsg);
+    }
+    const searchData = await searchResp.json();
+    if (!searchData.items || searchData.items.length === 0) {
+      music.searching = false;
+      music.searchResults = [];
+      renderTrackList();
+      return;
+    }
+
+    // Step 2: videos.list to get durations (search.list doesn't include them)
+    const ids = searchData.items.map(it => it.id.videoId).filter(Boolean);
+    const detailsUrl = `https://www.googleapis.com/youtube/v3/videos`
+      + `?part=contentDetails&id=${ids.join(',')}&key=${YOUTUBE_API_KEY}`;
+    const detailsResp = await fetch(detailsUrl);
+    const detailsData = detailsResp.ok ? await detailsResp.json() : { items: [] };
+    const durationById = {};
+    (detailsData.items || []).forEach(d => {
+      durationById[d.id] = parseISO8601DurationToSeconds(d.contentDetails.duration);
+    });
+
+    music.searchResults = searchData.items.map(it => {
+      const id = it.id.videoId;
+      const sec = durationById[id] || 0;
+      return {
+        id,
+        title: it.snippet.title || '(untitled)',
+        channel: it.snippet.channelTitle || '',
+        thumbnail: (it.snippet.thumbnails && (it.snippet.thumbnails.default || it.snippet.thumbnails.medium) || {}).url || '',
+        durationSec: sec,
+        durationLabel: sec > 0 ? formatDuration(sec) : '',
+      };
+    });
+    music.searching = false;
+    renderTrackList();
+  } catch (err) {
+    music.searching = false;
+    music.searchError = 'Search error: ' + (err.message || 'unknown');
+    renderTrackList();
+  }
+}
+
+// Parse YouTube's ISO 8601 duration string (e.g., "PT3M42S") to seconds.
+function parseISO8601DurationToSeconds(iso) {
+  if (!iso) return 0;
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  const h = parseInt(m[1] || '0', 10);
+  const min = parseInt(m[2] || '0', 10);
+  const s = parseInt(m[3] || '0', 10);
+  return h * 3600 + min * 60 + s;
+}
+
+function formatDuration(totalSec) {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// Add a clicked search result to the active playlist and play it.
+function addSearchResultToPlaylist(result) {
+  const playlist = getActivePlaylist();
+  if (playlist.builtin) {
+    alert('The Default playlist is read-only. Create your own playlist first.');
+    return;
+  }
+  if (!canEditPlaylist(playlist)) {
+    alert('This is a teammate\'s playlist — only the creator can add tracks. Create your own playlist or fork it.');
+    return;
+  }
+  // Already in playlist? Surface a toast so the user knows.
+  const existingIdx = playlist.tracks.findIndex(t => t.id === result.id);
+  if (existingIdx >= 0) {
+    showToast({
+      title: '🎵 Already in playlist',
+      text: result.title,
+      kind: 'default',
+    });
+    return;
+  }
+  playlist.tracks.push({ id: result.id, title: result.title });
+  saveMusicSettings();
+  showToast({
+    title: '✨ Added to playlist',
+    text: result.title,
+    kind: 'default',
+  });
+  // Stay on the search results so the user can pick more tracks at once.
+  // (Re-render so the just-added one's "+ Add" interaction wouldn't double-add — already guarded above.)
+  renderTrackList();
+}
+
 function addTrackToActivePlaylist() {
   const playlist = getActivePlaylist();
   if (playlist.builtin) {
     alert('The Default playlist is read-only. Create your own playlist first.');
     return;
   }
+  if (!canEditPlaylist(playlist)) {
+    alert('This is a teammate\'s playlist — only the creator can add tracks.');
+    return;
+  }
   const urlInput = el('musicAddUrl');
-  const titleInput = el('musicAddTitle');
   const raw = urlInput.value.trim();
   if (!raw) { urlInput.focus(); return; }
   const videoId = extractYouTubeId(raw);
@@ -9508,7 +10062,6 @@ function addTrackToActivePlaylist() {
     playMusicTrack(existingIdx, true);
     el('musicTracklist').classList.remove('open');
     urlInput.value = '';
-    titleInput.value = '';
     showToast({
       title: '🎵 Already in this playlist',
       text: 'Playing it now.',
@@ -9517,13 +10070,12 @@ function addTrackToActivePlaylist() {
     return;
   }
 
-  const title = titleInput.value.trim() || `Custom — ${videoId}`;
+  const title = `Custom — ${videoId}`;
   playlist.tracks.push({ id: videoId, title });
   saveMusicSettings();
 
   const newIdx = playlist.tracks.length - 1;
   urlInput.value = '';
-  titleInput.value = '';
   playMusicTrack(newIdx, true);
   renderTrackList();
 }
@@ -9531,6 +10083,7 @@ function addTrackToActivePlaylist() {
 function removeTrackFromActivePlaylist(idx) {
   const playlist = getActivePlaylist();
   if (playlist.builtin) return;
+  if (!canEditPlaylist(playlist)) return;
   if (idx < 0 || idx >= playlist.tracks.length) return;
   if (!confirm('Remove this track from the playlist?')) return;
   playlist.tracks.splice(idx, 1);
@@ -9575,21 +10128,36 @@ function switchPlaylist(playlistId) {
     music.currentIdx = -1;
   }
 
+  // Clear search results so the new playlist's tracks show up immediately.
+  music.searchResults = [];
+  music.searching = false;
+  music.searchError = null;
+  music.lastSearchQuery = '';
+
   saveMusicSettings();
   renderTrackList();
   renderMusicPlayer();
 }
 
-function createPlaylist(name) {
+function createPlaylist(name, visibility) {
   const trimmed = (name || '').trim();
   if (!trimmed) return null;
+  const vis = visibility === 'public' ? 'public' : 'private';
   const playlist = {
     id: newPlaylistId(),
     name: trimmed,
     tracks: [],
     builtin: false,
+    visibility: vis,
+    creatorId: state.user ? state.user.uid : null,
+    creatorName: state.profile ? state.profile.name : null,
   };
   music.playlists.push(playlist);
+  // If creating a public playlist, write the doc immediately (skipping the
+  // debounce) so it shows up in everyone's shared list right away.
+  if (vis === 'public' && state.user) {
+    savePublicPlaylist(playlist);
+  }
   saveMusicSettings();
   return playlist;
 }
@@ -9598,7 +10166,7 @@ function renamePlaylist(playlistId, newName) {
   const trimmed = (newName || '').trim();
   if (!trimmed) return;
   const pl = music.playlists.find(p => p.id === playlistId);
-  if (!pl) return;
+  if (!pl || !canEditPlaylist(pl)) return;
   pl.name = trimmed;
   saveMusicSettings();
 }
@@ -9607,7 +10175,12 @@ function deletePlaylist(playlistId) {
   const idx = music.playlists.findIndex(p => p.id === playlistId);
   if (idx < 0) return;
   const pl = music.playlists[idx];
-  if (!confirm(`Delete the playlist "${pl.name}"? Its tracks will be removed.`)) return;
+  if (!canEditPlaylist(pl)) return;
+  if (!confirm(`Delete the playlist "${pl.name}"? Its tracks will be removed${pl.visibility === 'public' ? ' for everyone' : ''}.`)) return;
+  // If it was public, delete the public Firestore doc.
+  if (pl.visibility === 'public') {
+    deletePublicPlaylistDoc(playlistId);
+  }
   music.playlists.splice(idx, 1);
   // If we just deleted the active playlist, fall back to Default.
   if (music.activePlaylistId === playlistId) {
@@ -9621,6 +10194,29 @@ function deletePlaylist(playlistId) {
   renderMusicPlayer();
 }
 
+// Flip a playlist between private and public. Owner-only; preserves
+// the playlist id so the active-playlist pointer doesn't break.
+async function togglePlaylistVisibility(playlistId) {
+  const pl = music.playlists.find(p => p.id === playlistId);
+  if (!pl || !canEditPlaylist(pl)) return;
+  const wasPublic = pl.visibility === 'public';
+  const nextVisibility = wasPublic ? 'private' : 'public';
+  if (wasPublic) {
+    if (!confirm(`Make "${pl.name}" private? It will no longer be visible to your team.`)) return;
+  }
+  pl.visibility = nextVisibility;
+  if (wasPublic) {
+    // Remove from the public collection — privatePlaylists save will catch the move.
+    await deletePublicPlaylistDoc(playlistId);
+  } else {
+    // Promote to public collection now (private save will exclude it next sync).
+    await savePublicPlaylist(pl);
+  }
+  saveMusicSettings();
+  renderPlaylistPicker();
+  renderTrackList();
+}
+
 function togglePlaylistPicker() {
   music.showingPlaylistPicker = !music.showingPlaylistPicker;
   // Always start with the new-playlist form closed when the picker opens
@@ -9632,31 +10228,72 @@ function togglePlaylistPicker() {
 
 function renderPlaylistPicker() {
   const wrap = el('musicPlaylistPickerItems');
-  const all = getAllPlaylists();
-  let html = '';
-  all.forEach(p => {
+  const myUid = state.user ? state.user.uid : null;
+
+  // Bucket playlists into three sections.
+  const builtins = BUILTIN_PLAYLISTS;
+  const ownPlaylists = music.playlists.filter(p =>
+    !p.creatorId || p.creatorId === myUid
+  );
+  const sharedPlaylists = music.sharedPlaylists; // already excludes my own
+
+  // Helper to build a single row.
+  const buildRow = (p, opts = {}) => {
     const isActive = p.id === music.activePlaylistId;
     const trackCount = p.tracks.length;
-    const canEdit = !p.builtin;
-    html += `
-      <div class="music-playlist-row ${isActive ? 'active' : ''}" data-playlist-id="${p.id}">
-        <div class="music-playlist-name">
-          ${isActive ? '✓ ' : ''}${escapeHtml(p.name)}
+    const editable = opts.editable !== false && canEditPlaylist(p);
+    const visIcon = p.builtin
+      ? '🎵'
+      : p.visibility === 'public' ? '🌐' : '🔒';
+    const subtitle = p.builtin
+      ? ''
+      : (opts.showCreator && p.creatorName
+          ? `by ${escapeHtml(p.creatorName)} · ${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}`
+          : `${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}`);
+    return `
+      <div class="music-playlist-row ${isActive ? 'active' : ''}" data-playlist-id="${escapeHtml(p.id)}">
+        <div class="music-playlist-icon">${visIcon}</div>
+        <div class="music-playlist-name-wrap">
+          <div class="music-playlist-name">
+            ${isActive ? '✓ ' : ''}${escapeHtml(p.name)}
+          </div>
+          ${subtitle ? `<div class="music-playlist-sub">${subtitle}</div>` : ''}
         </div>
-        <div class="music-playlist-count">${trackCount} ${trackCount === 1 ? 'track' : 'tracks'}</div>
-        ${canEdit ? `
-          <button class="music-playlist-action" data-rename="${p.id}" title="Rename">✎</button>
-          <button class="music-playlist-action danger" data-delete="${p.id}" title="Delete">✕</button>
+        ${editable ? `
+          <button class="music-playlist-action" data-toggle-vis="${escapeHtml(p.id)}" title="${p.visibility === 'public' ? 'Make private' : 'Share with team'}">${p.visibility === 'public' ? '🌐' : '🔒'}</button>
+          <button class="music-playlist-action" data-rename="${escapeHtml(p.id)}" title="Rename">✎</button>
+          <button class="music-playlist-action danger" data-delete="${escapeHtml(p.id)}" title="Delete">✕</button>
         ` : ''}
       </div>
     `;
-  });
+  };
+
+  let html = '';
+
+  // Section 1: Built-in (Default)
+  builtins.forEach(p => { html += buildRow(p); });
+
+  // Section 2: Your playlists
+  if (ownPlaylists.length > 0) {
+    html += `<div class="music-playlist-section-head">Your playlists</div>`;
+    ownPlaylists.forEach(p => { html += buildRow(p); });
+  }
+
+  // Section 3: Shared with team
+  if (sharedPlaylists.length > 0) {
+    html += `<div class="music-playlist-section-head">Shared with team</div>`;
+    sharedPlaylists.forEach(p => { html += buildRow(p, { showCreator: true, editable: false }); });
+  }
 
   // "+ New..." entry: shown by default, expands into the create form when clicked.
   if (music.showingNewPlaylistForm) {
     html += `
       <div class="music-playlist-create-row">
         <input type="text" class="music-add-input" id="musicNewPlaylistName" placeholder="Playlist name..." autofocus />
+        <div class="music-visibility-toggle">
+          <button class="music-vis-btn ${music.newPlaylistVisibility === 'private' ? 'active' : ''}" data-vis="private">🔒 Private</button>
+          <button class="music-vis-btn ${music.newPlaylistVisibility === 'public' ? 'active' : ''}" data-vis="public">🌐 Public</button>
+        </div>
         <div class="music-add-row-buttons">
           <button class="music-add-btn secondary" id="musicCreateCancelBtn">Cancel</button>
           <button class="music-add-btn primary" id="musicCreatePlaylistBtn">+ Create</button>
@@ -9673,13 +10310,20 @@ function renderPlaylistPicker() {
 
   wrap.innerHTML = html;
 
-  // Wire row clicks (switch playlist) — but skip the "+ New..." row, it has its own handler.
+  // Wire row clicks (switch playlist) — skip "+ New..." and skip when clicking action buttons.
   wrap.querySelectorAll('.music-playlist-row:not(.music-playlist-new-row)').forEach(row => {
     row.addEventListener('click', (e) => {
-      // Skip if user clicked an action button
       if (e.target.closest('.music-playlist-action')) return;
       switchPlaylist(row.dataset.playlistId);
       togglePlaylistPicker();
+    });
+  });
+
+  // Wire visibility toggle (per-playlist, on each editable row)
+  wrap.querySelectorAll('[data-toggle-vis]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await togglePlaylistVisibility(btn.dataset.toggleVis);
     });
   });
 
@@ -9712,14 +10356,27 @@ function renderPlaylistPicker() {
   if (newBtn) {
     newBtn.addEventListener('click', () => {
       music.showingNewPlaylistForm = true;
+      music.newPlaylistVisibility = 'private'; // reset to default each time
       renderPlaylistPicker();
-      // Focus the input after render
       setTimeout(() => {
         const input = el('musicNewPlaylistName');
         if (input) input.focus();
       }, 0);
     });
   }
+
+  // Wire visibility toggle inside the create form
+  wrap.querySelectorAll('.music-vis-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      music.newPlaylistVisibility = btn.dataset.vis;
+      renderPlaylistPicker();
+      // Re-focus the name input so the user can keep typing
+      setTimeout(() => {
+        const input = el('musicNewPlaylistName');
+        if (input) input.focus();
+      }, 0);
+    });
+  });
 
   // Wire create form (only present when expanded)
   const nameInput = el('musicNewPlaylistName');
@@ -9729,11 +10386,10 @@ function renderPlaylistPicker() {
     const handleCreate = () => {
       const name = nameInput.value.trim();
       if (!name) { nameInput.focus(); return; }
-      const pl = createPlaylist(name);
+      const pl = createPlaylist(name, music.newPlaylistVisibility);
       if (pl) {
         nameInput.value = '';
         music.showingNewPlaylistForm = false;
-        // Switch to the newly created playlist so the user can start adding to it.
         switchPlaylist(pl.id);
         togglePlaylistPicker();
       }
