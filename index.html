@@ -2273,32 +2273,26 @@
 
   .chat-msg-actions {
     display: none;
-    position: absolute;
-    top: -14px;
-    right: 4px;
+    position: fixed;
     background: var(--white);
     border-radius: 14px;
     padding: 3px 5px;
     box-shadow: var(--shadow-soft);
     border: 1px solid var(--bg-2);
     gap: 2px;
-    z-index: 5;
+    z-index: 360;
+    white-space: nowrap;
   }
-  /* Own messages sit flush to the right edge of the chat panel — anchor
-     the action row to the LEFT of the bubble so it grows inward rather
-     than risking clipping against the panel's right wall. */
-  .chat-message.mine .chat-msg-actions {
-    right: auto;
-    left: 4px;
-  }
-  .chat-msg-body:hover .chat-msg-actions { display: flex; }
+  /* Hover and positioning are now managed by JS (showActions/hideActions
+     in renderChatMessages) so the bar can use position: fixed and escape
+     the .chat-messages overflow clip. */
   .chat-msg-action {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 8px;
-    font-size: 14px;
+    padding: 3px 4px;
+    border-radius: 6px;
+    font-size: 13px;
     line-height: 1;
   }
   .chat-msg-action:hover { background: var(--bg-2); }
@@ -3092,6 +3086,11 @@
   .music-player.collapsed .music-tracklist {
     display: none;
   }
+  /* Center the music note icon within the collapsed badge. */
+  .music-player.collapsed .music-player-row {
+    justify-content: center;
+    padding: 8px;
+  }
 
   .music-player-row {
     display: flex;
@@ -3368,7 +3367,7 @@
     padding: 10px 12px;
     border-bottom: 2px dashed var(--lavender-soft);
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: 18px;
     color: var(--pink-deep);
     background: var(--bg-3);
     border-radius: 14px 14px 0 0;
@@ -3421,6 +3420,20 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  /* "+ New..." row at the bottom of the playlist picker — visually
+     distinct from real playlist rows so it reads as an "add" affordance. */
+  .music-playlist-new-row {
+    color: var(--pink-deep);
+    font-style: italic;
+  }
+  .music-playlist-new-row .music-playlist-name {
+    color: var(--pink-deep);
+    font-weight: 700;
+  }
+  .music-playlist-new-row:hover {
+    background: var(--pink-soft);
   }
 
   .music-add-row {
@@ -3509,6 +3522,7 @@
   .feedback-display-head h5,
   .archive-day-head,
   .music-tracklist-head,
+  .music-playlist-picker-head,
   .feedback-editor h5 {
     -webkit-text-stroke: 1px #4a3550;
     paint-order: stroke fill;
@@ -7327,6 +7341,54 @@ function renderChatMessages() {
     });
   });
 
+  // Position the reaction/action bar via fixed positioning on hover.
+  // CSS-only :hover with absolute positioning gets clipped by the
+  // .chat-messages overflow box, so we use JS + position: fixed to escape it.
+  const chatPanel = el('chatPanel');
+  const panelWidth = chatPanel.getBoundingClientRect().width;
+  wrap.querySelectorAll('.chat-msg-body').forEach(body => {
+    const actions = body.querySelector('.chat-msg-actions');
+    if (!actions) return;
+    const isMine = body.closest('.chat-message').classList.contains('mine');
+
+    const showActions = () => {
+      const r = body.getBoundingClientRect();
+      const pr = chatPanel.getBoundingClientRect();
+      // Render once with default position so we can measure its width.
+      actions.style.display = 'flex';
+      actions.style.position = 'fixed';
+      actions.style.top = (r.top - 30) + 'px';
+      actions.style.left = '0px';
+      actions.style.right = 'auto';
+      const barWidth = actions.offsetWidth;
+      // Clamp within the panel: never extend past pr.left+8 or pr.right-8.
+      let left;
+      if (isMine) {
+        // Anchor to bubble's left edge growing right
+        left = r.left;
+      } else {
+        // Anchor so bar's right edge sits at bubble's right edge growing left
+        left = r.right - barWidth;
+      }
+      // Clamp to panel bounds with a small inset
+      const minLeft = pr.left + 8;
+      const maxLeft = pr.right - barWidth - 8;
+      left = Math.max(minLeft, Math.min(maxLeft, left));
+      actions.style.left = left + 'px';
+    };
+
+    const hideActions = () => {
+      actions.style.display = 'none';
+    };
+
+    body.addEventListener('mouseenter', showActions);
+    body.addEventListener('mouseleave', hideActions);
+    // Keep visible while hovering the bar itself (the bar is fixed-positioned
+    // outside the bubble, so without this, moving from bubble to bar triggers leave).
+    actions.addEventListener('mouseenter', showActions);
+    actions.addEventListener('mouseleave', hideActions);
+  });
+
   // Scroll to bottom
   wrap.scrollTop = wrap.scrollHeight;
 }
@@ -7809,6 +7871,7 @@ function renderPokeStrip() {
 }
 
 function handlePokeCharClick(uid, action) {
+  console.log('[poke-char] click:', { uid, action, missedCount: state.missedPokesAtMe.length });
   if (action === 'poke') {
     // Poke another user
     openPokeCompose(uid);
@@ -7817,8 +7880,10 @@ function handlePokeCharClick(uid, action) {
   } else if (action === 'self') {
     // Click own character when not shaking - open edit char OR show missed
     if (state.missedPokesAtMe.length > 0) {
+      console.log('[poke-char] routing to missed pokes modal');
       showMissedPokesModal();
     } else {
+      console.log('[poke-char] routing to openEditChar()');
       openEditChar();
     }
   }
@@ -8016,13 +8081,24 @@ async function dismissMissedPokes() {
 
 /* --- Edit my character --- */
 function openEditChar(targetUserId) {
+  console.log('[openEditChar] called with:', targetUserId);
   // If targetUserId provided and I'm Boss/Manager, edit that user's char
   // Otherwise edit my own
   const editingOther = targetUserId && targetUserId !== state.user.uid;
-  if (editingOther && !isBossOrManager(state.profile.role)) return;
+  if (editingOther && !isBossOrManager(state.profile.role)) {
+    console.log('[openEditChar] BAILING — editingOther but not Boss/Manager');
+    return;
+  }
 
   const targetUid = editingOther ? targetUserId : state.user.uid;
   const target = state.allUsers.find(u => u.uid === targetUid) || state.profile;
+  console.log('[openEditChar] target:', target);
+
+  const modal = el('editCharModal');
+  console.log('[openEditChar] modal element:', modal,
+    'classes:', modal && modal.className,
+    'computed display:', modal && getComputedStyle(modal).display,
+    'computed z-index:', modal && getComputedStyle(modal).zIndex);
 
   el('editCharTitle').textContent = editingOther
     ? `Edit ${target.name}'s Character`
@@ -8051,6 +8127,11 @@ function openEditChar(targetUserId) {
   el('editCharModal').dataset.targetUid = targetUid;
 
   show('editCharModal');
+  console.log('[openEditChar] after show — modal classes now:', modal.className,
+    'computed display:', getComputedStyle(modal).display,
+    'visibility:', getComputedStyle(modal).visibility,
+    'opacity:', getComputedStyle(modal).opacity,
+    'getBoundingClientRect:', modal.getBoundingClientRect());
 }
 
 function closeEditChar() {
@@ -8740,6 +8821,7 @@ const music = {
   playlists: [],            // user-created playlists: { id, name, tracks, builtin: false }
   activePlaylistId: 'builtin_default',
   showingPlaylistPicker: false,
+  showingNewPlaylistForm: false,
 };
 
 // Returns the active playlist object (built-in or user-created).
@@ -9284,6 +9366,8 @@ function deletePlaylist(playlistId) {
 
 function togglePlaylistPicker() {
   music.showingPlaylistPicker = !music.showingPlaylistPicker;
+  // Always start with the new-playlist form closed when the picker opens
+  music.showingNewPlaylistForm = false;
   const picker = el('musicPlaylistPicker');
   picker.classList.toggle('open', music.showingPlaylistPicker);
   if (music.showingPlaylistPicker) renderPlaylistPicker();
@@ -9311,18 +9395,29 @@ function renderPlaylistPicker() {
     `;
   });
 
-  // Create-new form
-  html += `
-    <div class="music-playlist-create-row">
-      <input type="text" class="music-add-input" id="musicNewPlaylistName" placeholder="New playlist name..." />
-      <button class="music-add-btn primary" id="musicCreatePlaylistBtn">+ Create</button>
-    </div>
-  `;
+  // "+ New..." entry: shown by default, expands into the create form when clicked.
+  if (music.showingNewPlaylistForm) {
+    html += `
+      <div class="music-playlist-create-row">
+        <input type="text" class="music-add-input" id="musicNewPlaylistName" placeholder="Playlist name..." autofocus />
+        <div class="music-add-row-buttons">
+          <button class="music-add-btn secondary" id="musicCreateCancelBtn">Cancel</button>
+          <button class="music-add-btn primary" id="musicCreatePlaylistBtn">+ Create</button>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="music-playlist-row music-playlist-new-row" id="musicShowNewPlaylistBtn">
+        <div class="music-playlist-name">+ New...</div>
+      </div>
+    `;
+  }
 
   wrap.innerHTML = html;
 
-  // Wire row clicks (switch playlist)
-  wrap.querySelectorAll('.music-playlist-row').forEach(row => {
+  // Wire row clicks (switch playlist) — but skip the "+ New..." row, it has its own handler.
+  wrap.querySelectorAll('.music-playlist-row:not(.music-playlist-new-row)').forEach(row => {
     row.addEventListener('click', (e) => {
       // Skip if user clicked an action button
       if (e.target.closest('.music-playlist-action')) return;
@@ -9355,24 +9450,53 @@ function renderPlaylistPicker() {
     });
   });
 
-  // Wire create
+  // Wire "+ New..." row to expand the form
+  const newBtn = el('musicShowNewPlaylistBtn');
+  if (newBtn) {
+    newBtn.addEventListener('click', () => {
+      music.showingNewPlaylistForm = true;
+      renderPlaylistPicker();
+      // Focus the input after render
+      setTimeout(() => {
+        const input = el('musicNewPlaylistName');
+        if (input) input.focus();
+      }, 0);
+    });
+  }
+
+  // Wire create form (only present when expanded)
   const nameInput = el('musicNewPlaylistName');
   const createBtn = el('musicCreatePlaylistBtn');
-  const handleCreate = () => {
-    const name = nameInput.value.trim();
-    if (!name) { nameInput.focus(); return; }
-    const pl = createPlaylist(name);
-    if (pl) {
-      nameInput.value = '';
-      // Switch to the newly created playlist so the user can start adding to it.
-      switchPlaylist(pl.id);
-      togglePlaylistPicker();
+  const cancelBtn = el('musicCreateCancelBtn');
+  if (nameInput && createBtn) {
+    const handleCreate = () => {
+      const name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+      const pl = createPlaylist(name);
+      if (pl) {
+        nameInput.value = '';
+        music.showingNewPlaylistForm = false;
+        // Switch to the newly created playlist so the user can start adding to it.
+        switchPlaylist(pl.id);
+        togglePlaylistPicker();
+      }
+    };
+    createBtn.addEventListener('click', handleCreate);
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); handleCreate(); }
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        music.showingNewPlaylistForm = false;
+        renderPlaylistPicker();
+      }
+    });
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        music.showingNewPlaylistForm = false;
+        renderPlaylistPicker();
+      });
     }
-  };
-  createBtn.addEventListener('click', handleCreate);
-  nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); handleCreate(); }
-  });
+  }
 }
 
 function renderMusicPlayer() {
