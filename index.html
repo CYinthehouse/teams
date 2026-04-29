@@ -866,6 +866,10 @@
     color: var(--ink);
   }
 
+  /* ---------- Light/Dark theme slider toggle ----------
+     A horizontal pill with a sliding ball over a sun/moon scene.
+     Click anywhere on the pill to toggle. The slider position is driven
+     entirely by `body.dark` so it stays in sync with the persisted theme. */
   .icon-btn:hover {
     background: var(--pink-soft);
     transform: scale(1.05);
@@ -4364,7 +4368,7 @@
 <div id="authScreen" class="auth-wrap hidden">
   <div class="auth-card">
     <h1 class="auth-title">Teams</h1>
-    <p class="auth-sub">KoreanLearnin · Stay cute, stay productive ♡</p>
+    <p class="auth-sub">KoreanLearnin</p>
 
     <div class="auth-tabs">
       <button class="auth-tab active" id="tabSignin" onclick="switchAuthTab('signin')">Sign In</button>
@@ -4412,7 +4416,7 @@
       </button>
       <button class="icon-btn" id="fontDecBtn" onclick="adjustFontScale(-1)" title="Decrease text size">A−</button>
       <button class="icon-btn" id="fontIncBtn" onclick="adjustFontScale(1)" title="Increase text size">A+</button>
-      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Light/Dark mode">🌓</button>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Light/Dark mode">🌙</button>
       <button class="icon-btn" id="settingsBtn" onclick="openSettings()" title="Settings">⚙️</button>
       <div class="user-chip">
         <div class="avatar" id="myAvatar">?</div>
@@ -5391,9 +5395,10 @@ function getTheme() {
 function applyTheme(theme) {
   if (theme === 'dark') document.body.classList.add('dark');
   else document.body.classList.remove('dark');
-  // Update the toggle button icon.
+  // Update the toggle button icon. In light mode show 🌙 (clicking takes you
+  // to dark); in dark mode show ☀️ (clicking takes you back to light).
   const btn = el('themeBtn');
-  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌓';
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
 function toggleTheme() {
   const next = getTheme() === 'dark' ? 'light' : 'dark';
