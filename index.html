@@ -38,6 +38,52 @@
     --font-body: 'Quicksand', system-ui, sans-serif;
   }
 
+  /* Dark mode — overrides the kawaii pastel palette to a low-light variant.
+     Same accent colors (pink/lavender/etc.) so the brand stays consistent,
+     but backgrounds flip to dark plum and text flips to soft pink-cream. */
+  body.dark {
+    --bg: #1a1521;
+    --bg-2: #251d2e;
+    --bg-3: #2d2237;
+    --pink: #ffb6d1;
+    --pink-soft: #4a2c3a;
+    --pink-deep: #ff9ec0;
+    --lavender: #b8a7e6;
+    --lavender-soft: #3a2f4d;
+    --mint: #92d4b6;
+    --mint-soft: #2c4438;
+    --peach: #e8b893;
+    --yellow: #d6c98a;
+    --sky: #a3c4e6;
+    --ink: #f5e6f2;
+    --ink-soft: #c8b3c8;
+    --ink-light: #8a7a8e;
+    --white: #2a2032;       /* "white" surfaces (cards, modals) become a lighter dark */
+    --shadow-soft: 0 4px 14px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 6px 18px rgba(0, 0, 0, 0.5);
+    --shadow-deep: 0 10px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Dim the background radial-gradients and sparkle layer in dark mode
+     so the page reads as a calm dark surface, not a colorful one. */
+  body.dark {
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255, 140, 180, 0.08) 0%, transparent 35%),
+      radial-gradient(circle at 88% 12%, rgba(180, 160, 230, 0.08) 0%, transparent 38%),
+      radial-gradient(circle at 50% 90%, rgba(140, 200, 175, 0.06) 0%, transparent 40%);
+  }
+  body.dark::before {
+    opacity: 0.12;
+  }
+
+  /* Font-scale knob set on the body via toggleable classes. We use the
+     `zoom` property which scales the entire UI proportionally (fonts,
+     spacing, images) — much more useful than just font-size, since most
+     of the app uses pixel measurements that wouldn't reflow with rem. */
+  body.font-small  { zoom: 0.9; }
+  body.font-large  { zoom: 1.1; }
+  body.font-xlarge { zoom: 1.25; }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -379,6 +425,18 @@
   }
 
   /* ---------- Attendance Contact popup ---------- */
+  /* Red urgency callout shown under the headline. */
+  .att-contact-callout-red {
+    background: #ffe6ec;
+    border: 2px solid #ff6b8a;
+    color: #b3334e;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    text-align: center;
+  }
   /* The "Saturday · 7:20 PM-8:20 PM · Absolute Beginner · Week 1" chip
      should pop, not be a dim afterthought. Bumped to a high-contrast
      pill with bold pieces and a subtle gradient. */
@@ -799,6 +857,14 @@
     font-size: 16px;
     transition: all 0.2s;
   }
+  /* A-/A+ buttons get a slightly tighter font + bold so the letters
+     look balanced in the same circle as the emoji icons. */
+  #fontDecBtn, #fontIncBtn {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+  }
 
   .icon-btn:hover {
     background: var(--pink-soft);
@@ -882,6 +948,14 @@
     align-items: flex-start;
     min-height: 60vh;
     padding-bottom: 20px;
+    /* Center the column row horizontally within .board-area when there's
+       room. The container sizes to its content (max-content) and gets
+       auto margins, so a few columns sit centered, but with many columns
+       it grows to fill and .board-area's overflow-x:auto kicks in. */
+    width: max-content;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .column {
@@ -2843,30 +2917,42 @@
   .chat-message.mine .chat-msg-time { text-align: right; }
 
   .chat-msg-actions {
-    display: none;
-    position: fixed;
+    /* Always-visible inline action row beside each message bubble.
+       Previously this was a finicky floating bar shown only on hover,
+       which was easy to miss on desktop. Now it sits next to the bubble
+       as a small palette of quick-react + delete buttons. */
+    display: inline-flex;
+    align-items: center;
     background: var(--white);
-    border-radius: 14px;
-    padding: 3px 5px;
+    border-radius: 12px;
+    padding: 2px 4px;
     box-shadow: var(--shadow-soft);
     border: 1px solid var(--bg-2);
-    gap: 2px;
-    z-index: 360;
+    gap: 1px;
     white-space: nowrap;
+    align-self: center;
+    opacity: 0.45;
+    transition: opacity 0.15s, transform 0.15s;
+    flex-shrink: 0;
   }
-  /* Hover and positioning are now managed by JS (showActions/hideActions
-     in renderChatMessages) so the bar can use position: fixed and escape
-     the .chat-messages overflow clip. */
+  .chat-msg-actions:hover,
+  .chat-message:hover .chat-msg-actions {
+    opacity: 1;
+    transform: scale(1.04);
+  }
   .chat-msg-action {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 3px 4px;
+    padding: 2px 4px;
     border-radius: 6px;
     font-size: 13px;
     line-height: 1;
   }
   .chat-msg-action:hover { background: var(--bg-2); }
+  .chat-msg-delete {
+    color: #b3334e;
+  }
 
   .chat-reactions {
     display: flex;
@@ -4251,6 +4337,22 @@
 </style>
 </head>
 <body>
+<!-- Apply persisted theme + font-scale immediately so we don't flash the
+     wrong colors on slow loads. Mirrors getTheme()/getFontScale() in the
+     main script; intentionally minimal so it runs without dependencies. -->
+<script>
+(function () {
+  try {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.body.classList.add('dark');
+    }
+    var fs = parseInt(localStorage.getItem('fontScale') || '0', 10) || 0;
+    if (fs <= -1) document.body.classList.add('font-small');
+    else if (fs === 1) document.body.classList.add('font-large');
+    else if (fs >= 2) document.body.classList.add('font-xlarge');
+  } catch (e) { /* localStorage may be unavailable in private modes */ }
+})();
+</script>
 
 <!-- Loading screen -->
 <div id="loadingScreen" class="loading-screen">
@@ -4308,6 +4410,9 @@
         <span id="bellFallback">🔔</span>
         <span class="unread-badge" id="bellUnreadBadge">0</span>
       </button>
+      <button class="icon-btn" id="fontDecBtn" onclick="adjustFontScale(-1)" title="Decrease text size">A−</button>
+      <button class="icon-btn" id="fontIncBtn" onclick="adjustFontScale(1)" title="Increase text size">A+</button>
+      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Light/Dark mode">🌓</button>
       <button class="icon-btn" id="settingsBtn" onclick="openSettings()" title="Settings">⚙️</button>
       <div class="user-chip">
         <div class="avatar" id="myAvatar">?</div>
@@ -4688,6 +4793,9 @@
       <div class="reminder-popup-headline">
         These students were absent! Contact them now with:<br>
         1) The class recording &nbsp; 2) Their homework assignment.
+      </div>
+      <div class="att-contact-callout-red">
+        ⚠️ Please call them if they are not in class 5 minutes after class begins!
       </div>
       <div id="attContactSubtitle" class="att-contact-subtitle">—</div>
 
@@ -5225,6 +5333,72 @@ function avatarColorFor(name) {
   for (let i = 0; i < (name || '').length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
   const p = palettes[Math.abs(hash) % palettes.length];
   return `linear-gradient(135deg, ${p[0]} 0%, ${p[1]} 100%)`;
+}
+
+/* ============================================
+   Display preferences: font size + light/dark theme
+   Persisted to localStorage; applied immediately on page load by the
+   bootstrap snippet near the bottom (so the page never flashes the
+   wrong theme before JS runs).
+============================================ */
+
+// 5 levels: -2 (xsmall), -1 (small), 0 (normal), 1 (large), 2 (xlarge).
+// Mapped to body classes via FONT_SCALE_CLASSES below.
+const FONT_SCALE_MIN = -1;   // bottom = font-small
+const FONT_SCALE_MAX = 2;    // top    = font-xlarge
+const FONT_SCALE_CLASSES = {
+  '-1': 'font-small',
+  '0': '',          // normal — no class
+  '1': 'font-large',
+  '2': 'font-xlarge',
+};
+
+function getFontScale() {
+  const raw = parseInt(localStorage.getItem('fontScale') || '0', 10);
+  return Math.max(FONT_SCALE_MIN, Math.min(FONT_SCALE_MAX, raw || 0));
+}
+function applyFontScale(scale) {
+  const body = document.body;
+  // Strip all font-* classes first so they don't stack.
+  Object.values(FONT_SCALE_CLASSES).forEach(cls => {
+    if (cls) body.classList.remove(cls);
+  });
+  const cls = FONT_SCALE_CLASSES[String(scale)];
+  if (cls) body.classList.add(cls);
+}
+function adjustFontScale(delta) {
+  const next = Math.max(FONT_SCALE_MIN, Math.min(FONT_SCALE_MAX, getFontScale() + delta));
+  localStorage.setItem('fontScale', String(next));
+  applyFontScale(next);
+  // Update the disabled state on the buttons so users see when they've hit
+  // the floor or ceiling.
+  refreshFontButtons();
+}
+function refreshFontButtons() {
+  const cur = getFontScale();
+  const dec = el('fontDecBtn');
+  const inc = el('fontIncBtn');
+  if (dec) dec.disabled = (cur <= FONT_SCALE_MIN);
+  if (inc) inc.disabled = (cur >= FONT_SCALE_MAX);
+  if (dec) dec.style.opacity = dec.disabled ? '0.4' : '';
+  if (inc) inc.style.opacity = inc.disabled ? '0.4' : '';
+}
+
+function getTheme() {
+  // Default to light. Stored as 'light' or 'dark'.
+  return localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  if (theme === 'dark') document.body.classList.add('dark');
+  else document.body.classList.remove('dark');
+  // Update the toggle button icon.
+  const btn = el('themeBtn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌓';
+}
+function toggleTheme() {
+  const next = getTheme() === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
 }
 
 function escapeHtml(s) {
@@ -10864,84 +11038,8 @@ function renderChatMessages() {
     });
   });
 
-  // Position the reaction/action bar via fixed positioning. Works on both
-  // desktop (mouseenter / mouseleave) and mobile (click on bubble toggles).
-  // CSS-only :hover with absolute positioning gets clipped by the
-  // .chat-messages overflow box, so we use JS + position: fixed to escape it.
-  const chatPanel = el('chatPanel');
-  // Hide any currently-showing bar (e.g. from a previous render).
-  document.querySelectorAll('.chat-msg-actions[data-shown="1"]').forEach(a => {
-    a.style.display = 'none';
-    a.removeAttribute('data-shown');
-  });
-
-  wrap.querySelectorAll('.chat-msg-body').forEach(body => {
-    const actions = body.querySelector('.chat-msg-actions');
-    if (!actions) return;
-    const isMine = body.closest('.chat-message').classList.contains('mine');
-
-    const showActions = () => {
-      // Hide any other currently-showing bar first (only one at a time).
-      document.querySelectorAll('.chat-msg-actions[data-shown="1"]').forEach(a => {
-        if (a !== actions) {
-          a.style.display = 'none';
-          a.removeAttribute('data-shown');
-        }
-      });
-      const r = body.getBoundingClientRect();
-      const pr = chatPanel.getBoundingClientRect();
-      // Render once with default position so we can measure its width.
-      actions.style.display = 'flex';
-      actions.style.position = 'fixed';
-      actions.style.top = (r.top - 30) + 'px';
-      actions.style.left = '0px';
-      actions.style.right = 'auto';
-      const barWidth = actions.offsetWidth;
-      // Clamp within the panel: never extend past pr.left+8 or pr.right-8.
-      let left;
-      if (isMine) {
-        // Anchor to bubble's left edge growing right
-        left = r.left;
-      } else {
-        // Anchor so bar's right edge sits at bubble's right edge growing left
-        left = r.right - barWidth;
-      }
-      // Clamp to panel bounds with a small inset
-      const minLeft = pr.left + 8;
-      const maxLeft = pr.right - barWidth - 8;
-      left = Math.max(minLeft, Math.min(maxLeft, left));
-      actions.style.left = left + 'px';
-      actions.setAttribute('data-shown', '1');
-    };
-
-    const hideActions = () => {
-      actions.style.display = 'none';
-      actions.removeAttribute('data-shown');
-    };
-
-    // Desktop: hover to reveal.
-    body.addEventListener('mouseenter', showActions);
-    body.addEventListener('mouseleave', hideActions);
-    // Keep visible while hovering the bar itself (the bar is fixed-positioned
-    // outside the bubble, so without this, moving from bubble to bar triggers leave).
-    actions.addEventListener('mouseenter', showActions);
-    actions.addEventListener('mouseleave', hideActions);
-
-    // Mobile / tap support: clicking the bubble toggles the bar. We attach
-    // this to the bubble *body* not the bar itself (the bar's own buttons
-    // already have their own click handlers and stopPropagation).
-    body.addEventListener('click', (e) => {
-      // Don't toggle if the user clicked something interactive inside the bar
-      // or a reaction pill — those have their own behavior.
-      if (e.target.closest('.chat-msg-actions')) return;
-      if (e.target.closest('.reaction-pill')) return;
-      if (actions.getAttribute('data-shown') === '1') {
-        hideActions();
-      } else {
-        showActions();
-      }
-    });
-  });
+  // (The action bar is always-visible inline now — no hover/click toggle JS
+  // needed. It sits as a sibling to the bubble inside .chat-message.)
 
   // Scroll to bottom
   wrap.scrollTop = wrap.scrollHeight;
@@ -10979,12 +11077,12 @@ function renderChatMessage(m) {
     <div class="chat-message ${isMine ? 'mine' : ''}">
       <div class="chat-msg-avatar" style="background: ${avatarColorFor(m.userName || '?')}">${avatarLetter(m.userName || '?')}</div>
       <div class="chat-msg-body">
-        ${actionsHtml}
         ${!isMine ? `<div class="chat-msg-author">${escapeHtml(m.userName || '—')}</div>` : ''}
         <div class="chat-msg-text">${escapeHtml(m.text || '')}</div>
         <div class="chat-msg-time" title="${escapeHtml(fullTime)}">${escapeHtml(time)}</div>
         ${reactionsHtml}
       </div>
+      ${actionsHtml}
     </div>
   `;
 }
@@ -13782,6 +13880,18 @@ try {
   console.error('Music player init failed:', e);
 }
 
+// Apply persisted display preferences and update button visual state.
+// The pre-script in <body> already added the body classes for theme/font
+// before this point, so the page rendered correctly; here we just sync
+// the button icons (e.g. ☀️ vs 🌓) and disabled flags (A−/A+ floors).
+try {
+  applyTheme(getTheme());
+  applyFontScale(getFontScale());
+  refreshFontButtons();
+} catch (e) {
+  console.error('Display prefs init failed:', e);
+}
+
 // Close the notifications panel on outside click. The bell button itself
 // toggles the panel, so we need to ignore clicks on it (otherwise toggle
 // + close would race and leave the panel closed).
@@ -13798,18 +13908,8 @@ document.addEventListener('click', (e) => {
 // Dismiss any open chat reaction/action bar when clicking outside of it
 // or its anchoring message bubble. Handles the touch/mobile case where
 // there's no mouseleave event.
-document.addEventListener('click', (e) => {
-  const shown = document.querySelectorAll('.chat-msg-actions[data-shown="1"]');
-  if (shown.length === 0) return;
-  shown.forEach(actions => {
-    // Don't dismiss if the click was inside this bar OR inside its parent bubble.
-    if (actions.contains(e.target)) return;
-    const body = actions.closest('.chat-msg-body');
-    if (body && body.contains(e.target)) return;
-    actions.style.display = 'none';
-    actions.removeAttribute('data-shown');
-  });
-}, true);  // capture phase so this runs before other handlers
+// (No longer needed — the action bar is always-visible inline now and
+// doesn't have an open/closed state to dismiss.)
 </script>
 </body>
 </html>
