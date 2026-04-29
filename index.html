@@ -9235,9 +9235,11 @@ function subscribeReminderPrograms() {
 function subscribeReminderTestRequests() {
   if (!state.user) return;
   if (unsubs.reminderTestRequests) { unsubs.reminderTestRequests(); unsubs.reminderTestRequests = null; }
+  console.info('[test-listener] subscribing for uid', state.user.uid);
   unsubs.reminderTestRequests = db.collection('reminder_test_requests')
     .where('assigneeId', '==', state.user.uid)
     .onSnapshot(snap => {
+      console.info('[test-listener] snapshot, docs:', snap.size);
       // Process the OLDEST first so multiple queued tests fire in order.
       const docs = snap.docs.slice().sort((a, b) => {
         const aMs = (a.data().createdAt && a.data().createdAt.toMillis) ? a.data().createdAt.toMillis() : 0;
@@ -9246,11 +9248,20 @@ function subscribeReminderTestRequests() {
       });
       // Skip if any reminder popup is already showing — we'll come back
       // when it dismisses (the dismiss handler re-subscribes).
-      if (state.pendingReminder || state.pendingAttContact) return;
+      if (state.pendingReminder || state.pendingAttContact) {
+        console.info('[test-listener] popup already showing, will retry on dismiss');
+        return;
+      }
       const doc = docs[0];
-      if (!doc) return;
+      if (!doc) {
+        console.info('[test-listener] no test requests pending');
+        return;
+      }
+      console.info('[test-listener] dispatching request', doc.id, 'type:', doc.data().type);
       handleIncomingTestRequest(doc.id, doc.data());
-    }, () => {});
+    }, err => {
+      console.error('[test-listener] snapshot error:', err.code, err.message);
+    });
 }
 
 async function handleIncomingTestRequest(requestId, data) {
@@ -9313,7 +9324,9 @@ async function handleIncomingTestRequest(requestId, data) {
 // Special-case: if there are zero real absentees, we fabricate a couple
 // of demo absentees from the class roster so the assignee can see the UI.
 async function handleIncomingTestAttContact(requestId, data) {
+  console.info('[test-attcontact] handling request', requestId, data);
   if (!state.taAccessReady) {
+    console.warn('[test-attcontact] no TA access; firing demo-only popup');
     showAttendanceContactPopup({
       testMode: true,
       testRequestId: requestId,
@@ -9332,24 +9345,25 @@ async function handleIncomingTestAttContact(requestId, data) {
     return;
   }
   try {
+    console.info('[test-attcontact] looking up class', data.classId);
     const classDoc = await taDb.collection('scheduler_classes').doc(data.classId).get();
     if (!classDoc.exists) {
+      console.warn('[test-attcontact] class doc missing; cleaning up request');
       try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
       return;
     }
     const cls = { id: classDoc.id, ...classDoc.data() };
     const week = data.week || 1;
+    console.info('[test-attcontact] class loaded', { day: cls.day, time: cls.time, level: cls.level, students: (cls.students || []).length });
 
-    // Pull real absentees for this (class, week). If zero, fall back to
-    // a synthetic demo list so the test still demonstrates the UI.
     const studentRefs = Array.isArray(cls.students) ? cls.students : [];
     let absentList = [];
     if (studentRefs.length > 0) {
       absentList = await collectAbsentStudents(cls, week, studentRefs);
+      console.info('[test-attcontact] real absentees:', absentList.length);
     }
     if (absentList.length === 0 && studentRefs.length > 0) {
-      // Fabricate 1–2 demo entries from the actual roster (so the recipient
-      // sees real names/discords, but it's clearly labeled as a test).
+      console.info('[test-attcontact] no real absentees; sampling roster for demo');
       const sample = studentRefs.slice(0, Math.min(2, studentRefs.length));
       const ids = sample.map(s => s.id).filter(Boolean);
       const fullStudents = {};
@@ -9358,7 +9372,9 @@ async function handleIncomingTestAttContact(requestId, data) {
           const qSnap = await taDb.collection('scheduler_students')
             .where(firebase.firestore.FieldPath.documentId(), 'in', ids).get();
           qSnap.docs.forEach(d => { fullStudents[d.id] = d.data(); });
-        } catch (e) {}
+        } catch (e) {
+          console.warn('[test-attcontact] roster fetch failed:', e);
+        }
       }
       absentList = sample.map(s => {
         const full = fullStudents[s.id] || {};
@@ -9371,13 +9387,14 @@ async function handleIncomingTestAttContact(requestId, data) {
       });
     }
     if (absentList.length === 0) {
-      // Last resort: pure synthetic students.
+      console.info('[test-attcontact] using synthetic demo students');
       absentList = [
         { studentId: 'demo1', name: 'Test Student A', discord: 'student_a', phone: '555-0100' },
         { studentId: 'demo2', name: 'Test Student B', discord: 'student_b', phone: '555-0101' },
       ];
     }
 
+    console.info('[test-attcontact] firing popup with', absentList.length, 'students');
     showAttendanceContactPopup({
       testMode: true,
       testRequestId: requestId,
@@ -9392,7 +9409,7 @@ async function handleIncomingTestAttContact(requestId, data) {
       absentStudents: absentList,
     });
   } catch (err) {
-    console.error('handleIncomingTestAttContact failed:', err);
+    console.error('[test-attcontact] handler failed:', err.code, err.message, err);
   }
 }
 
