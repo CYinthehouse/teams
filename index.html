@@ -2878,6 +2878,19 @@
     border-top-left-radius: 14px;
     border-top-right-radius: 4px;
   }
+  /* Dark mode: bubbles need their own treatment because the light-mode
+     pink gradient looks washed out on a dark surface. Theirs gets a
+     lighter dark plum so it stands out from the page bg; mine gets a
+     deeper pink-tinted plum so it still reads as "my color". */
+  body.dark .chat-msg-body {
+    background: #2d2237;
+  }
+  body.dark .chat-message.mine .chat-msg-body {
+    background: linear-gradient(135deg, #4a2c3a 0%, #3a2330 100%);
+  }
+  body.dark .chat-msg-time {
+    color: var(--ink-light);
+  }
   .chat-msg-author {
     font-weight: 700;
     font-size: 11px;
@@ -2903,10 +2916,10 @@
   .chat-message.mine .chat-msg-time { text-align: right; }
 
   .chat-msg-actions {
-    /* Always-visible inline action row beside each message bubble.
-       Previously this was a finicky floating bar shown only on hover,
-       which was easy to miss on desktop. Now it sits next to the bubble
-       as a small palette of quick-react + delete buttons. */
+    /* Hidden by default; revealed when the user hovers the message
+       (desktop) or long-presses the bubble (mobile, via JS-toggled
+       .chat-msg-actions-show class). The bar sits as a sibling next to
+       the bubble inside a row-flex .chat-message. */
     display: inline-flex;
     align-items: center;
     background: var(--white);
@@ -2917,14 +2930,24 @@
     gap: 1px;
     white-space: nowrap;
     align-self: center;
-    opacity: 0.45;
-    transition: opacity 0.15s, transform 0.15s;
     flex-shrink: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.96);
+    transition: opacity 0.13s ease, transform 0.13s ease;
   }
-  .chat-msg-actions:hover,
-  .chat-message:hover .chat-msg-actions {
+  /* Desktop: reveal on hover of the parent message row. */
+  .chat-message:hover .chat-msg-actions,
+  .chat-msg-actions:hover {
     opacity: 1;
-    transform: scale(1.04);
+    pointer-events: auto;
+    transform: scale(1);
+  }
+  /* Mobile: long-press toggles this class via JS. */
+  .chat-msg-actions.chat-msg-actions-show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
   }
   .chat-msg-action {
     background: none;
@@ -11025,8 +11048,40 @@ function renderChatMessages() {
     });
   });
 
-  // (The action bar is always-visible inline now — no hover/click toggle JS
-  // needed. It sits as a sibling to the bubble inside .chat-message.)
+  // Mobile long-press to reveal the action bar (the desktop version
+  // uses CSS :hover; touch devices don't have hover, so we toggle a
+  // class on long-press). Tap-anywhere-else dismisses it.
+  wrap.querySelectorAll('.chat-message').forEach(msgEl => {
+    const actions = msgEl.querySelector('.chat-msg-actions');
+    if (!actions) return;
+    let pressTimer = null;
+    let pressed = false;
+
+    const startPress = () => {
+      pressed = false;
+      pressTimer = setTimeout(() => {
+        pressed = true;
+        // Hide any other open bars first.
+        document.querySelectorAll('.chat-msg-actions-show').forEach(a => {
+          if (a !== actions) a.classList.remove('chat-msg-actions-show');
+        });
+        actions.classList.add('chat-msg-actions-show');
+      }, 400);
+    };
+    const cancelPress = () => {
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = null;
+    };
+
+    // Use the bubble (.chat-msg-body) as the press target so the user
+    // can long-press the message itself, not a tiny invisible action area.
+    const body = msgEl.querySelector('.chat-msg-body');
+    if (!body) return;
+    body.addEventListener('touchstart', startPress, { passive: true });
+    body.addEventListener('touchend', cancelPress);
+    body.addEventListener('touchmove', cancelPress);
+    body.addEventListener('touchcancel', cancelPress);
+  });
 
   // Scroll to bottom
   wrap.scrollTop = wrap.scrollHeight;
@@ -13877,6 +13932,20 @@ try {
 } catch (e) {
   console.error('Music player init failed:', e);
 }
+
+// Dismiss any mobile-revealed chat action bar when tapping outside it.
+// (Only for the long-press case — desktop uses CSS :hover and doesn't
+// need this.)
+document.addEventListener('click', (e) => {
+  const open = document.querySelectorAll('.chat-msg-actions-show');
+  if (open.length === 0) return;
+  open.forEach(actions => {
+    if (actions.contains(e.target)) return;
+    const msg = actions.closest('.chat-message');
+    if (msg && msg.contains(e.target)) return;
+    actions.classList.remove('chat-msg-actions-show');
+  });
+});
 
 // Apply persisted display preferences and update button visual state.
 // The pre-script in <body> already added the body classes for theme/font
