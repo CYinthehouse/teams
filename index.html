@@ -5453,7 +5453,20 @@ function roleRank(role) {
 /* ---- Stage 2 helpers ---- */
 function formatTime(ts) {
   if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  // Accept Firestore Timestamps (.toDate / .toMillis), Date objects, or
+  // raw ms-epoch numbers. Fall back to '' on anything unparseable so we
+  // never render "Invalid Date" in the UI.
+  let d;
+  if (ts instanceof Date) {
+    d = ts;
+  } else if (ts && typeof ts.toDate === 'function') {
+    d = ts.toDate();
+  } else if (ts && typeof ts.toMillis === 'function') {
+    d = new Date(ts.toMillis());
+  } else {
+    d = new Date(ts);
+  }
+  if (!d || isNaN(d.getTime())) return '';
   const now = new Date();
   const diff = (now - d) / 1000; // seconds
   if (diff < 45) return 'just now';
@@ -5468,7 +5481,17 @@ function formatTime(ts) {
 
 function formatTimeFull(ts) {
   if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  let d;
+  if (ts instanceof Date) {
+    d = ts;
+  } else if (ts && typeof ts.toDate === 'function') {
+    d = ts.toDate();
+  } else if (ts && typeof ts.toMillis === 'function') {
+    d = new Date(ts.toMillis());
+  } else {
+    d = new Date(ts);
+  }
+  if (!d || isNaN(d.getTime())) return '';
   return d.toLocaleString(undefined, {
     month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit'
@@ -5814,7 +5837,7 @@ function renderNotificationsPanel() {
         <div class="notif-body">
           <div class="notif-title">${escapeHtml(n.title)}</div>
           <div class="notif-text">${escapeHtml(n.text)}</div>
-          <div class="notif-time">${escapeHtml(formatTime({ toMillis: () => n.ts }))}</div>
+          <div class="notif-time">${escapeHtml(formatTime(n.ts))}</div>
         </div>
       </div>
     `;
