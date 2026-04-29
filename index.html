@@ -175,6 +175,70 @@
     margin-left: 4px;
   }
 
+  /* Private-task checkbox row inside create/edit task modals. The whole
+     label is clickable and grays out when disabled (e.g. on multi-assignee). */
+  .private-toggle-label {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0 !important;
+    margin-left: 0 !important;
+    padding: 10px 12px;
+    background: var(--bg-3);
+    border: 1.5px solid var(--bg-2);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500 !important;
+    color: var(--ink-soft) !important;
+  }
+  .private-toggle-label:hover {
+    border-color: var(--lavender);
+    background: var(--lavender-soft);
+  }
+  .private-toggle-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--pink-deep);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .private-toggle-label.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--bg-2);
+  }
+  .private-toggle-label.disabled:hover {
+    border-color: var(--bg-2);
+    background: var(--bg-2);
+  }
+  .private-toggle-label.disabled input[type="checkbox"] {
+    cursor: not-allowed;
+  }
+  .private-toggle-label span {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  /* 🔒 badge shown on private task cards (board view) and detail headers. */
+  .private-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--lavender-soft);
+    color: var(--ink);
+    border: 1px solid var(--lavender);
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 6px;
+  }
+  .task-card .private-badge {
+    margin-left: 0;
+    margin-bottom: 6px;
+  }
+
   .form-input {
     width: 100%;
     padding: 13px 16px;
@@ -3660,11 +3724,36 @@
     background: var(--pink-soft);
   }
 
-  .music-add-row {
+  /* Edit-mode bar at the bottom of the track list. Contains either
+     a single "Add Tracks" entry-button (off mode) or a header + the
+     add-track form (on mode). */
+  .music-edit-mode-bar {
     padding: 10px 12px;
     background: var(--bg-3);
     border-top: 1px dashed var(--lavender-soft);
     border-radius: 0 0 14px 14px;
+  }
+  .music-edit-mode-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .music-edit-mode-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--pink-deep);
+  }
+  .music-edit-mode-head .music-add-btn {
+    flex: 0 0 auto;
+    padding: 4px 12px;
+    font-size: 10px;
+  }
+  .music-edit-enter-btn {
+    width: 100%;
+  }
+  .music-add-row {
+    /* Used inside edit-mode bar — no border/padding/background of its own. */
   }
   .music-add-input {
     width: 100%;
@@ -4096,6 +4185,12 @@
         <label>Assign to</label>
         <select id="taskAssignee" class="form-input"></select>
       </div>
+      <div class="form-group">
+        <label class="private-toggle-label" id="newTaskPrivateLabel" title="Only the assigner and the assignee can see private tasks. Boss and Managers can also see them.">
+          <input type="checkbox" id="newTaskPrivate" />
+          <span>🔒 <strong>Private task</strong> — only visible to you, the assignee, Boss & Managers</span>
+        </label>
+      </div>
       <div class="form-group" id="newTaskTimerWrap">
         <label>⏰ Time Estimate <span style="color:var(--ink-light);font-weight:500;">(Boss/Manager only)</span></label>
         <div class="timer-mode-tabs">
@@ -4143,6 +4238,12 @@
       <div class="form-group" id="editAssigneeWrap">
         <label>Assign to <span style="color:var(--ink-light);font-weight:500;" id="editAssigneeNote"></span></label>
         <select id="editTaskAssignee" class="form-input"></select>
+      </div>
+      <div class="form-group">
+        <label class="private-toggle-label" id="editTaskPrivateLabel" title="Only the assigner and the assignee can see private tasks. Boss and Managers can also see them.">
+          <input type="checkbox" id="editTaskPrivate" />
+          <span>🔒 <strong>Private task</strong> — only visible to you, the assignee, Boss & Managers</span>
+        </label>
       </div>
       <div class="form-group">
         <label>Checklist Steps</label>
@@ -4317,6 +4418,10 @@ const state = {
   activeTeamId: null,
   activeTeam: null,
   tasks: [],
+  // For non-Boss/Manager users we run two queries (public + private-i-can-see)
+  // and merge them. These hold each query's last snapshot, deduped into state.tasks.
+  _tasksPublicCache: [],
+  _tasksPrivateCache: [],
   authMode: 'signin',
   pendingSteps: [],
   currentTaskId: null,
@@ -4379,6 +4484,7 @@ const unsubs = {
   users: null,
   teams: null,
   tasks: null,
+  tasksPrivate: null,        // second listener for non-Boss/Mgr private-tasks-I-participate-in
   comments: null,
   activity: null,
   appSettings: null,
@@ -4998,6 +5104,8 @@ auth.onAuthStateChanged(async (user) => {
     if (unsubs.sharedPlaylists) { unsubs.sharedPlaylists(); unsubs.sharedPlaylists = null; }
     if (music.player) { try { music.player.stopVideo(); } catch (e) {} }
     music.isPlaying = false;
+    // Allow the privacy-field migration to run again on next Boss sign-in.
+    _migrationRan = false;
     // Also wipe the localStorage cache so a different user on the same
     // browser doesn't briefly see the previous user's playlists at next sign-in.
     try {
@@ -5057,6 +5165,14 @@ auth.onAuthStateChanged(async (user) => {
   // the localStorage cache already populated music.playlists at page load.
   loadPlaylistsFromFirestore();
 
+  // One-time migration: backfill `private: false` and `participants` on
+  // legacy tasks that pre-date the privacy feature. Only Boss runs this
+  // (writes are gated by the same rules everyone else uses; Boss has the
+  // broadest read access, and we only want one writer to avoid contention).
+  if (state.profile && state.profile.role === 'Boss') {
+    migrateTasksAddPrivacyFields();
+  }
+
   // Poke system: start presence, subscribe to my pokes, start expire ticker
   startPresence();
   subscribePokes();
@@ -5104,8 +5220,13 @@ function switchTeam(teamId) {
   state.activeTeamId = teamId;
   state.activeTeam = state.teams.find(t => t.id === teamId) || null;
 
-  // Re-subscribe to tasks for this team
+  // Re-subscribe to tasks for this team. Tear down BOTH listeners so we
+  // start clean on the new team.
   if (unsubs.tasks) { unsubs.tasks(); unsubs.tasks = null; }
+  if (unsubs.tasksPrivate) { unsubs.tasksPrivate(); unsubs.tasksPrivate = null; }
+  state._tasksPublicCache = [];
+  state._tasksPrivateCache = [];
+
   // Reset notification de-dup sets when switching teams to avoid replaying stale toasts
   state.initialTaskLoadDone = false;
   state.notifiedExpired.clear();
@@ -5114,70 +5235,35 @@ function switchTeam(teamId) {
   state.notifiedApproved.clear();
 
   if (teamId) {
-    unsubs.tasks = db.collection('tasks')
-      .where('teamId', '==', teamId)
-      .onSnapshot(snap => {
-        // Stage 3: detect changes for notifications
-        const previousTasks = state.tasks;
-        const previousById = new Map(previousTasks.map(t => [t.id, t]));
-
-        state.tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        if (state.initialTaskLoadDone) {
-          // Compare each new/changed task vs previous to trigger toasts
-          state.tasks.forEach(t => {
-            const prev = previousById.get(t.id);
-            if (!prev) {
-              // New task created
-              if (t.assigneeId === state.user.uid && t.creatorId !== state.user.uid) {
-                showToast({
-                  title: '✨ New task assigned to you',
-                  text: t.title,
-                  kind: 'default',
-                  taskId: t.id,
-                });
-              }
-            } else {
-              // Task assignment changed and it now points to me (and didn't before)
-              if (prev.assigneeId !== t.assigneeId &&
-                  t.assigneeId === state.user.uid &&
-                  t.status !== 'approved') {
-                showToast({
-                  title: '✨ Task assigned to you',
-                  text: t.title,
-                  kind: 'default',
-                  taskId: t.id,
-                });
-              }
-              // Status: pending_approval → in_progress AND I am assignee = rejection
-              if (prev.status === 'pending_approval' && t.status === 'in_progress' &&
-                  t.assigneeId === state.user.uid) {
-                showToast({
-                  title: '🌧 Task sent back',
-                  text: `"${t.title}" needs more work — see feedback in Notes/Comments`,
-                  kind: 'danger',
-                  taskId: t.id,
-                });
-              }
-              // Approval: any status → approved AND I am the creator = morale ping for everyone
-              if (prev.status !== 'approved' && t.status === 'approved') {
-                showToast({
-                  title: '🎉 Task completed!',
-                  text: `"${t.title}" was approved. Great work team!`,
-                  kind: 'morale',
-                  taskId: t.id,
-                });
-              }
-            }
-          });
-        }
-
-        // Always check expired tasks
-        checkExpiredTasksForNotifications();
-
-        renderBoard();
-        state.initialTaskLoadDone = true;
-      });
+    const isPrivileged = isBossOrManager(state.profile.role);
+    if (isPrivileged) {
+      // Boss/Manager: a single query reads ALL tasks (public + private) for
+      // the team. Firestore rules let them through. Simplest path.
+      unsubs.tasks = db.collection('tasks')
+        .where('teamId', '==', teamId)
+        .onSnapshot(snap => {
+          state._tasksPublicCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          mergeAndApplyTaskSnapshots();
+        });
+    } else {
+      // Teacher/Support: two listeners, results merged.
+      // (1) public tasks for the team
+      unsubs.tasks = db.collection('tasks')
+        .where('teamId', '==', teamId)
+        .where('private', '==', false)
+        .onSnapshot(snap => {
+          state._tasksPublicCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          mergeAndApplyTaskSnapshots();
+        });
+      // (2) private tasks where I'm a participant
+      unsubs.tasksPrivate = db.collection('tasks')
+        .where('teamId', '==', teamId)
+        .where('participants', 'array-contains', state.user.uid)
+        .onSnapshot(snap => {
+          state._tasksPrivateCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          mergeAndApplyTaskSnapshots();
+        });
+    }
   } else {
     state.tasks = [];
   }
@@ -5186,6 +5272,76 @@ function switchTeam(teamId) {
 
   // Re-subscribe to chat for the new team
   subscribeChat();
+}
+
+// Combine the latest public and private task snapshots into state.tasks,
+// dedupe by id, then run the original notification + render pipeline.
+// Called whenever EITHER underlying listener fires.
+function mergeAndApplyTaskSnapshots() {
+  const previousTasks = state.tasks;
+  const previousById = new Map(previousTasks.map(t => [t.id, t]));
+
+  // Dedupe by id (the participants-contains query may include public tasks
+  // I happen to be a participant in, so they could appear in both caches).
+  const byId = new Map();
+  state._tasksPublicCache.forEach(t => byId.set(t.id, t));
+  state._tasksPrivateCache.forEach(t => byId.set(t.id, t));
+  state.tasks = Array.from(byId.values());
+
+  if (state.initialTaskLoadDone) {
+    // Compare each new/changed task vs previous to trigger toasts
+    state.tasks.forEach(t => {
+      const prev = previousById.get(t.id);
+      if (!prev) {
+        // New task created
+        if (t.assigneeId === state.user.uid && t.creatorId !== state.user.uid) {
+          showToast({
+            title: '✨ New task assigned to you',
+            text: t.title,
+            kind: 'default',
+            taskId: t.id,
+          });
+        }
+      } else {
+        // Task assignment changed and it now points to me (and didn't before)
+        if (prev.assigneeId !== t.assigneeId &&
+            t.assigneeId === state.user.uid &&
+            t.status !== 'approved') {
+          showToast({
+            title: '✨ Task assigned to you',
+            text: t.title,
+            kind: 'default',
+            taskId: t.id,
+          });
+        }
+        // Status: pending_approval → in_progress AND I am assignee = rejection
+        if (prev.status === 'pending_approval' && t.status === 'in_progress' &&
+            t.assigneeId === state.user.uid) {
+          showToast({
+            title: '🌧 Task sent back',
+            text: `"${t.title}" needs more work — see feedback in Notes/Comments`,
+            kind: 'danger',
+            taskId: t.id,
+          });
+        }
+        // Approval: any status → approved AND I am the creator = morale ping for everyone
+        if (prev.status !== 'approved' && t.status === 'approved') {
+          showToast({
+            title: '🎉 Task completed!',
+            text: `"${t.title}" was approved. Great work team!`,
+            kind: 'morale',
+            taskId: t.id,
+          });
+        }
+      }
+    });
+  }
+
+  // Always check expired tasks
+  checkExpiredTasksForNotifications();
+
+  renderBoard();
+  state.initialTaskLoadDone = true;
 }
 
 async function createTeam() {
@@ -5565,7 +5721,13 @@ function buildTaskCard(task) {
     iconsHtml += '</div>';
   }
 
+  // 🔒 Private-task badge (rendered above the title for visibility).
+  const privateBadgeHtml = task.private
+    ? `<div class="private-badge" title="Only visible to participants and Boss/Manager">🔒 Private</div>`
+    : '';
+
   card.innerHTML = `
+    ${privateBadgeHtml}
     <div class="task-title">${escapeHtml(task.title)}</div>
     ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
     ${stepsHtml}
@@ -5647,6 +5809,9 @@ async function handleTaskDrop(taskId, dropType, userId) {
     if (task.assigneeId === userId && task.status === 'in_progress') return;
     updates.assigneeId = userId;
     updates.status = 'in_progress';
+    // Keep participants array in sync (used by Firestore rules + queries
+    // for private-task visibility). Always [creator, assignee] de-duplicated.
+    updates.participants = Array.from(new Set([task.creatorId, userId].filter(Boolean)));
     if (task.assigneeId !== userId) {
       activityAction = 'assignee_changed';
       activityDetails = {
@@ -5705,6 +5870,9 @@ function openTaskModal() {
   });
   // Default: assign to self if I'm a member, else first member
   if (memberIds.includes(state.user.uid)) sel.value = state.user.uid;
+  // Reset the 🔒 private toggle for each fresh form open. Default = public.
+  // (Single-assignee form, so no need to gate the toggle on this modal.)
+  el('newTaskPrivate').checked = false;
   renderStepsList();
   show('taskModal');
 }
@@ -5743,6 +5911,7 @@ async function saveTask() {
   const title = el('taskTitle').value.trim();
   const desc = el('taskDesc').value.trim();
   const assigneeId = el('taskAssignee').value;
+  const isPrivate = !!el('newTaskPrivate').checked;
   if (!title) { alert('Please enter a title.'); return; }
   if (!assigneeId) { alert('Please pick an assignee.'); return; }
 
@@ -5751,6 +5920,9 @@ async function saveTask() {
     .map(s => ({ text: s.text.trim(), done: false }));
 
   // Stage 3: timer fields (Boss/Manager only)
+  // participants: used by Firestore rules + queries to scope private tasks.
+  // Always populated (even on public tasks) so the array-contains query
+  // works uniformly. For public tasks it's just informational.
   const taskData = {
     teamId: state.activeTeamId,
     title,
@@ -5762,6 +5934,8 @@ async function saveTask() {
     notes: '',
     attachmentCount: 0,
     commentCount: 0,
+    private: isPrivate,
+    participants: Array.from(new Set([state.user.uid, assigneeId].filter(Boolean))),
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
@@ -5908,7 +6082,7 @@ function renderDetailHead(task) {
   else if (task.status === 'approved') statusLabel = 'Approved';
 
   head.innerHTML = `
-    <div class="detail-title">${escapeHtml(task.title)}</div>
+    <div class="detail-title">${escapeHtml(task.title)}${task.private ? '<span class="private-badge" title="Only visible to participants and Boss/Manager">🔒 Private</span>' : ''}</div>
     <div class="detail-meta">
       <span class="status-pill ${task.status}">${statusLabel}</span>
       &nbsp;<strong>Assignee:</strong> ${escapeHtml(assignee ? assignee.name : '—')}
@@ -6642,6 +6816,14 @@ function formatActivity(a) {
       }
       return { icon: '✏️', text: `${who} edited the task` };
     }
+    case 'privacy_changed': {
+      const wentPrivate = d.to === 'private';
+      const icon = wentPrivate ? '🔒' : '🌐';
+      const text = wentPrivate
+        ? `${who} made this task <strong>private</strong> (only participants and Boss/Manager can see it)`
+        : `${who} made this task <strong>public</strong> (visible to the whole team)`;
+      return { icon, text };
+    }
     case 'sent_back': {
       const benefitsCount = (d.benefits || []).length;
       const improvementsCount = (d.improvements || []).length;
@@ -6758,6 +6940,19 @@ function openEditTaskModal(taskId) {
 
   el('editAssigneeNote').textContent = canChangeAssignee ? '' : '(Boss/Manager only)';
 
+  // 🔒 private toggle: reflect current state and disable for non-creators
+  // (only the original creator can flip private/public after creation, so a
+  // teammate can't either expose your private task or hide their public one
+  // from you). Boss/Manager can always toggle.
+  const canTogglePrivate = task.creatorId === state.user.uid || isBossOrManager(state.profile.role);
+  const privCheckbox = el('editTaskPrivate');
+  privCheckbox.checked = !!task.private;
+  privCheckbox.disabled = !canTogglePrivate;
+  el('editTaskPrivateLabel').classList.toggle('disabled', !canTogglePrivate);
+  el('editTaskPrivateLabel').title = canTogglePrivate
+    ? 'Only the assigner and the assignee can see private tasks. Boss and Managers can also see them.'
+    : 'Only the task creator (or Boss/Manager) can change a task between public and private.';
+
   state.editPendingSteps = (task.steps || []).map(s => ({ text: s.text, done: !!s.done }));
   renderEditStepsList();
 
@@ -6861,6 +7056,37 @@ async function saveTaskEdits() {
     });
   }
 
+  // 🔒 Privacy toggle. Only creator (or Boss/Manager) can flip it. Updating
+  // private also requires keeping `participants` in sync — for a private
+  // task the array is [creator, assignee], for a public task we leave it
+  // as-is (still useful for queries; doesn't affect visibility).
+  const canTogglePrivate = task.creatorId === state.user.uid || isBossOrManager(state.profile.role);
+  const newPrivate = !!el('editTaskPrivate').checked;
+  if (canTogglePrivate && newPrivate !== !!task.private) {
+    updates.private = newPrivate;
+    changes.push({
+      field: 'privacy',
+      from: task.private ? 'private' : 'public',
+      to: newPrivate ? 'private' : 'public',
+    });
+  }
+
+  // If the assignee changed (or privacy was toggled), recompute participants
+  // so the array always contains [creator, currentAssignee]. Use the new
+  // assignee if it changed, else the existing one.
+  const effectiveAssigneeId = updates.assigneeId !== undefined
+    ? updates.assigneeId
+    : task.assigneeId;
+  const newParticipants = Array.from(new Set(
+    [task.creatorId, effectiveAssigneeId].filter(Boolean)
+  ));
+  const oldParticipants = Array.isArray(task.participants) ? task.participants : [];
+  const participantsChanged = newParticipants.length !== oldParticipants.length
+    || newParticipants.some(p => !oldParticipants.includes(p));
+  if (participantsChanged) {
+    updates.participants = newParticipants;
+  }
+
   const oldStepTexts = (task.steps || []).map(s => s.text);
   const newStepTexts = newSteps.map(s => s.text);
   const stepsChanged = oldStepTexts.length !== newStepTexts.length ||
@@ -6884,6 +7110,11 @@ async function saveTaskEdits() {
         await logActivity(task.id, 'assignee_changed', {
           fromName: c.fromName,
           toName: c.toName,
+        });
+      } else if (c.field === 'privacy') {
+        await logActivity(task.id, 'privacy_changed', {
+          from: c.from,
+          to: c.to,
         });
       } else {
         await logActivity(task.id, 'task_edited', { field: c.field, from: c.from, to: c.to });
@@ -7336,6 +7567,55 @@ function renderTeamMembers() {
 /* ============================================
    Stage 3: Expiry notifications + tick
 ============================================ */
+// One-time migration: backfill `private: false` and `participants` on any
+// task created before the privacy feature shipped. Idempotent — safe to
+// run on every Boss sign-in. Reads cheaply (only fetches docs missing the
+// `private` field), batches writes 400 at a time. Logs progress so we
+// know if it's run before in this session.
+let _migrationRan = false;
+async function migrateTasksAddPrivacyFields() {
+  if (_migrationRan) return;
+  _migrationRan = true;
+  try {
+    // Only docs where `private` doesn't exist need migration. Firestore
+    // doesn't have a "field-does-not-exist" filter, so we fetch all tasks
+    // and filter client-side. For a small team this is fine; for huge
+    // datasets we'd add a `schemaVersion` field instead.
+    const snap = await db.collection('tasks').get();
+    const needsMigration = snap.docs.filter(d => {
+      const data = d.data();
+      return data.private === undefined
+          || !Array.isArray(data.participants)
+          || data.participants.length === 0;
+    });
+    if (needsMigration.length === 0) {
+      return; // nothing to do
+    }
+    console.info(`[migration] backfilling privacy fields on ${needsMigration.length} task(s)`);
+
+    // Batch in groups of 400 (Firestore batch limit is 500; leave headroom).
+    const CHUNK = 400;
+    for (let i = 0; i < needsMigration.length; i += CHUNK) {
+      const chunk = needsMigration.slice(i, i + CHUNK);
+      const batch = db.batch();
+      chunk.forEach(doc => {
+        const data = doc.data();
+        const participants = Array.from(new Set(
+          [data.creatorId, data.assigneeId].filter(Boolean)
+        ));
+        batch.update(doc.ref, {
+          private: data.private === true ? true : false,
+          participants,
+        });
+      });
+      await batch.commit();
+    }
+    console.info('[migration] done');
+  } catch (err) {
+    console.error('migrateTasksAddPrivacyFields failed:', err);
+  }
+}
+
 function checkExpiredTasksForNotifications() {
   const now = Date.now();
   state.tasks.forEach(t => {
@@ -9256,6 +9536,7 @@ const music = {
   searching: false,           // request in flight
   searchError: null,          // error message to surface in UI
   lastSearchQuery: '',
+  editMode: false,            // when true, show add-tracks form + per-track delete buttons
 };
 
 // Returns the active playlist object (built-in, own, or shared).
@@ -9757,6 +10038,7 @@ function toggleTrackList() {
     music.searching = false;
     music.searchError = null;
     music.lastSearchQuery = '';
+    music.editMode = false;
     return;
   }
   music.collapsed = false;
@@ -9838,31 +10120,51 @@ function renderTrackList() {
       for (let i = 0; i < tracks.length; i++) {
         const t = tracks[i];
         const isCurrent = i === music.currentIdx;
+        // Trash icon only appears when editMode is on AND the playlist is editable.
+        const showTrash = isEditable && music.editMode;
         html += `
           <div class="music-track-item ${isCurrent ? 'current' : ''}" data-idx="${i}">
             <div class="music-track-num">${i + 1}</div>
             <div class="music-track-title">${escapeHtml(t.title)}</div>
             ${isCurrent ? `<div class="music-track-playing">${music.isPlaying ? '♪' : '⏸'}</div>` : ''}
-            ${isEditable ? `<button class="music-track-remove" data-remove-idx="${i}" title="Remove from playlist">✕</button>` : ''}
+            ${showTrash ? `<button class="music-track-remove" data-remove-idx="${i}" title="Remove from playlist">🗑</button>` : ''}
           </div>
         `;
       }
     }
   }
 
-  // Add-track form: paste a YouTube link OR search YouTube. Only on
-  // playlists the user can edit (own private + own public).
-  if (isEditable) {
-    html += `
-      <div class="music-add-row">
-        <input type="text" class="music-add-input" id="musicAddUrl"
-          placeholder="Paste YouTube link or type to search..." />
-        <div class="music-add-row-buttons">
-          <button class="music-add-btn secondary" id="musicAddBtn">+ Add</button>
-          <button class="music-add-btn primary" id="musicSearchBtn">🔍 Search</button>
+  // Edit-mode bottom bar: shows the Add/Search form ONLY when editMode is on.
+  // When editMode is off, show a single "✏️ Add Tracks" button the user
+  // taps to enter edit mode. When on, show the form + a "Done" button to exit.
+  // Search-results view skips this (the back button replaces it).
+  if (isEditable && !showingSearchResults) {
+    if (music.editMode) {
+      html += `
+        <div class="music-edit-mode-bar">
+          <div class="music-edit-mode-head">
+            <span class="music-edit-mode-label">✏️ Editing playlist</span>
+            <button class="music-add-btn secondary" id="musicEditDoneBtn">Done</button>
+          </div>
+          <div class="music-add-row">
+            <input type="text" class="music-add-input" id="musicAddUrl"
+              placeholder="Paste YouTube link or type to search..." />
+            <div class="music-add-row-buttons">
+              <button class="music-add-btn secondary" id="musicAddBtn">+ Add</button>
+              <button class="music-add-btn primary" id="musicSearchBtn">🔍 Search</button>
+            </div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      html += `
+        <div class="music-edit-mode-bar">
+          <button class="music-add-btn primary music-edit-enter-btn" id="musicEditEnterBtn">
+            ✏️ Add Tracks
+          </button>
+        </div>
+      `;
+    }
   }
 
   wrap.innerHTML = html;
@@ -9917,27 +10219,63 @@ function renderTrackList() {
     });
   }
 
+  // Wire the "✏️ Add Tracks" button (shown when NOT in edit mode) — flips
+  // editMode on. Re-rendering will produce the form.
+  const editEnterBtn = el('musicEditEnterBtn');
+  if (editEnterBtn) {
+    editEnterBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      music.editMode = true;
+      renderTrackList();
+      setTimeout(() => {
+        const input = el('musicAddUrl');
+        if (input) input.focus();
+      }, 0);
+    });
+  }
+
+  // Wire the "Done" button (shown when in edit mode) — flips editMode off,
+  // also clearing any in-progress search results since we're leaving edit mode.
+  const editDoneBtn = el('musicEditDoneBtn');
+  if (editDoneBtn) {
+    editDoneBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      music.editMode = false;
+      music.searchResults = [];
+      music.searching = false;
+      music.searchError = null;
+      music.lastSearchQuery = '';
+      renderTrackList();
+    });
+  }
+
   // Wire add/search buttons. + Add directly adds (requires URL/ID).
   // 🔍 Search runs a YouTube search. Enter does whichever fits the input
   // (URL → add, text → search) so users don't have to think about it.
+  // These elements only exist when editMode is on, so we guard with el()
+  // null-check (not just isEditable) — playlist may be editable but not
+  // currently in edit mode.
   // IMPORTANT: stop propagation on every interactive button — these
   // handlers re-render the track list (replacing the original button's
   // DOM node), and the document-level outside-click handler checks
   // player.contains(e.target). After re-render the original target is
   // detached, so the contains() check returns false, and the tracklist
   // closes incorrectly. Stopping propagation prevents that.
-  if (isEditable) {
-    el('musicAddBtn').addEventListener('click', (e) => {
+  const addBtn = el('musicAddBtn');
+  const searchBtn = el('musicSearchBtn');
+  const addUrlInput = el('musicAddUrl');
+  if (addBtn && searchBtn && addUrlInput) {
+    addBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       addTrackToActivePlaylist();
     });
-    el('musicSearchBtn').addEventListener('click', (e) => {
+    searchBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const raw = el('musicAddUrl').value.trim();
-      if (!raw) { el('musicAddUrl').focus(); return; }
+      const raw = addUrlInput.value.trim();
+      if (!raw) { addUrlInput.focus(); return; }
       searchYouTube(raw);
     });
-    el('musicAddUrl').addEventListener('keydown', (e) => {
+    addUrlInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); handleSearchOrAdd(); }
     });
   }
@@ -10174,6 +10512,7 @@ function switchPlaylist(playlistId) {
   music.searching = false;
   music.searchError = null;
   music.lastSearchQuery = '';
+  music.editMode = false;
 
   saveMusicSettings();
   renderTrackList();
