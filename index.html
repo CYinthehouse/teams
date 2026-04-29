@@ -379,6 +379,60 @@
   }
 
   /* ---------- Attendance Contact popup ---------- */
+  /* The "Saturday · 7:20 PM-8:20 PM · Absolute Beginner · Week 1" chip
+     should pop, not be a dim afterthought. Bumped to a high-contrast
+     pill with bold pieces and a subtle gradient. */
+  .att-contact-subtitle {
+    margin-bottom: 14px;
+  }
+  .att-contact-classchip {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, var(--lavender-soft), var(--bg-3));
+    border: 2px solid var(--lavender);
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  }
+  .att-contact-classchip-day {
+    color: var(--pink-deep);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 13px;
+  }
+  .att-contact-classchip-time {
+    font-variant-numeric: tabular-nums;
+  }
+  .att-contact-classchip-level {
+    color: var(--ink);
+  }
+  .att-contact-classchip-week {
+    background: var(--pink-deep);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .att-contact-classchip-sep {
+    color: var(--ink-light);
+    font-weight: 400;
+  }
+  .att-contact-testbanner {
+    background: #e7e0ff;
+    border: 1px solid #b89aff;
+    color: #4a3370;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
   .att-contact-students-wrap {
     display: flex;
     flex-direction: column;
@@ -484,50 +538,98 @@
     padding: 10px 14px;
   }
 
-  /* ---------- Class Contacts list ---------- */
-  .class-contact-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  /* ---------- Class Contacts column (board) ---------- */
+  /* Sits next to "Finished" on the main board. Visible to everyone.
+     Cards are collapsible <details> entries listing recent
+     attendance-contact signoffs. */
+  .column.class-contacts {
+    background: linear-gradient(180deg, var(--lavender-soft) 0%, var(--white) 100%);
+    border: 2px dashed var(--lavender);
   }
-  .class-contact-row {
-    background: var(--bg-3);
+  .contact-card {
+    background: var(--white);
     border: 1.5px solid var(--bg-2);
-    border-radius: 10px;
+    border-radius: 14px;
     padding: 0;
+    margin-bottom: 8px;
     overflow: hidden;
+    box-shadow: var(--shadow-card);
+    transition: transform 0.12s, box-shadow 0.12s;
   }
-  .class-contact-row summary {
+  .contact-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  .contact-card summary {
     list-style: none;
     cursor: pointer;
     padding: 10px 12px;
     user-select: none;
   }
-  .class-contact-row summary::-webkit-details-marker { display: none; }
-  .class-contact-row[open] summary {
+  .contact-card summary::-webkit-details-marker { display: none; }
+  .contact-card[open] summary {
     border-bottom: 1px dashed var(--bg-2);
   }
-  .class-contact-summary-line1 {
-    font-size: 12px;
+  .contact-card-line1 {
+    font-size: 13px;
     color: var(--ink);
+    margin-bottom: 2px;
   }
-  .class-contact-summary-line2 {
+  .contact-card-line2 {
     font-size: 11px;
-    color: var(--ink-light);
-    margin-top: 2px;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
   }
-  .class-contact-details {
-    padding: 10px 12px;
-    background: var(--bg-2);
-    font-size: 12px;
+  .contact-card-line3 {
+    font-size: 11px;
     color: var(--ink);
+    margin-bottom: 2px;
   }
-  .class-contact-detail-line {
+  .contact-card-line4 {
+    font-size: 10px;
+    color: var(--ink-light);
+  }
+  .contact-card-details {
+    padding: 10px 12px;
+    background: var(--bg-3);
+    font-size: 11px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .contact-card-detail {
     margin-bottom: 4px;
     word-break: break-word;
   }
-  .class-contact-detail-line:last-child { margin-bottom: 0; }
-  .class-contact-detail-line a { color: var(--ink); text-decoration: underline; }
+  .contact-card-detail:last-child { margin-bottom: 0; }
+  .contact-card-detail a { color: var(--ink); text-decoration: underline; }
+  /* Kind badge inline next to the day/time (Attendance vs End-of-Program) */
+  .contact-kind-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    vertical-align: middle;
+  }
+  .contact-kind-badge.att {
+    background: var(--lavender-soft);
+    color: var(--ink);
+    border: 1px solid var(--lavender);
+  }
+  .contact-kind-badge.eop {
+    background: #fff0db;
+    color: #8b5a00;
+    border: 1px solid #f0c884;
+  }
+  .contact-card-eop {
+    border-color: #f0c884;
+  }
+  .contact-card-eop:hover {
+    border-color: #d8a655;
+  }
 
   .form-input {
     width: 100%;
@@ -4587,7 +4689,7 @@
         These students were absent! Contact them now with:<br>
         1) The class recording &nbsp; 2) Their homework assignment.
       </div>
-      <div id="attContactSubtitle" style="font-size: 12px; color: var(--ink-light); margin-bottom: 12px;">—</div>
+      <div id="attContactSubtitle" class="att-contact-subtitle">—</div>
 
       <div id="attContactStudentList" class="att-contact-students-wrap"></div>
 
@@ -4640,6 +4742,78 @@
   </div>
 </div>
 
+<!-- End of Program Contact popup. Same shape as attendance-contact: two
+     views inside one modal (info + signoff). Different headline, no Loom
+     or Homework buttons; instead has "View Canned Message". -->
+<div id="progContactModal" class="modal-backdrop hidden" style="z-index: 480;">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-head">
+      <div class="modal-title">🎓 End of Program — Contact Students</div>
+    </div>
+
+    <!-- VIEW 1: info / call to action -->
+    <div id="progContactInfoView" class="modal-body">
+      <div class="reminder-popup-headline">
+        Their 6 week program has ended! Contact them now on text message and Discord.
+      </div>
+      <div id="progContactSubtitle" class="att-contact-subtitle">—</div>
+
+      <div id="progContactStudentList" class="att-contact-students-wrap"></div>
+
+      <div class="att-contact-buttons">
+        <button class="btn-action secondary" onclick="openProgContactCannedMessage()">📋 View &amp; Copy Canned Message</button>
+        <button class="btn-action primary" onclick="showProgContactSignoffView()">✍️ Sign Off and Close</button>
+      </div>
+    </div>
+
+    <!-- VIEW 2: signoff form -->
+    <div id="progContactSignoffView" class="modal-body" style="display:none;">
+      <div class="reminder-popup-instruction">
+        Confirm you've contacted each student on Discord and via text. All boxes
+        must be checked, and you must type your name below to sign off.
+      </div>
+      <table class="att-contact-signoff-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Student</th>
+            <th style="text-align:center;">Discord ✓</th>
+            <th style="text-align:center;">Texted ✓</th>
+          </tr>
+        </thead>
+        <tbody id="progContactSignoffRows"></tbody>
+      </table>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Type your name to sign</label>
+        <input type="text" id="progContactSignName" class="form-input" placeholder="Your full name…" />
+      </div>
+      <div style="display:flex; gap:8px; justify-content:space-between; margin-top:8px;">
+        <button class="btn-action secondary" onclick="backToProgContactInfoView()">← Back</button>
+        <button class="btn-action primary" id="progContactSubmitBtn" onclick="submitProgContactSignoff()" disabled>✍️ Submit &amp; Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Canned message sub-modal (opened from "View & Copy Canned Message"). -->
+<div id="progCannedMessageSubModal" class="modal-backdrop hidden" style="z-index: 490;">
+  <div class="modal" style="max-width: 540px;">
+    <div class="modal-head">
+      <div class="modal-title">📋 End-of-Program Message</div>
+      <button class="modal-close" onclick="hide('progCannedMessageSubModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 12px; color: var(--ink-soft); margin-top: 0;">
+        Fill in the student's name where it says "Hi !" and paste this into Discord and/or text.
+      </p>
+      <div id="progCannedMessageBox" class="reminder-popup-message"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="hide('progCannedMessageSubModal')">Close</button>
+      <button class="btn-action primary" id="progCannedCopyBtn" onclick="copyProgCannedMessage()">📋 Copy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
 <!-- Test Reminder modal — Boss/Mgr picks day + time + recipient,
      fires a one-off test popup on the recipient's device -->
@@ -4662,6 +4836,7 @@
         <select id="testReminderType" class="form-input">
           <option value="class_10min_before">📢 Class reminder (10 min before)</option>
           <option value="class_end_attendance_contact">📞 Attendance contact (after class)</option>
+          <option value="class_end_program_contact">🎓 End-of-program contact (final class)</option>
         </select>
       </div>
       <div class="form-group">
@@ -4794,10 +4969,6 @@
            renderReminderHistorySection() populates this. -->
       <div class="settings-section" id="reminderHistoryWrap" style="display:none;"></div>
 
-      <!-- Class Contacts — visible to EVERYONE. Shows recent attendance
-           contact signoffs so the team can see who reached out about
-           absent students. renderClassContactsSection() populates this. -->
-      <div class="settings-section" id="classContactsWrap" style="display:none;"></div>
 
       <div class="settings-section" id="appSettingsSection">
         <h4>🔔 Notification Bell</h4>
@@ -4967,6 +5138,10 @@ const state = {
   pendingAttContact: null,     // currently-displayed attendance-contact popup, if any
   attContactSignoffStudents: [], // working state for the signoff form: [{studentId, name, contactedDiscord, contactedText}]
   attContactsHistory: [],      // last N signoff docs (for the Class Contacts view)
+  // End of Program contact reminder (third type)
+  progContactsFired: new Set(),     // in-memory dedupe (prog__classId__week)
+  pendingProgContact: null,         // currently-displayed end-of-program popup
+  progContactSignoffStudents: [],   // signoff working state, mirrors attContact
   // Stage 4
   feedbackBenefits: [''],
   feedbackImprovements: [''],
@@ -5676,6 +5851,16 @@ auth.onAuthStateChanged(async (user) => {
     if (!el('attHomeworkSubModal').classList.contains('hidden')) {
       hide('attHomeworkSubModal');
     }
+    // End-of-program contact cleanup
+    state.progContactsFired = new Set();
+    state.pendingProgContact = null;
+    state.progContactSignoffStudents = [];
+    if (!el('progContactModal').classList.contains('hidden')) {
+      hide('progContactModal');
+    }
+    if (!el('progCannedMessageSubModal').classList.contains('hidden')) {
+      hide('progCannedMessageSubModal');
+    }
     // Also wipe the localStorage cache so a different user on the same
     // browser doesn't briefly see the previous user's playlists at next sign-in.
     try {
@@ -5762,6 +5947,7 @@ auth.onAuthStateChanged(async (user) => {
   setTimeout(() => {
     checkAndFireReminders();
     checkAndFireAttendanceContacts();
+    checkAndFireProgramContacts();
   }, 3000);
 
   // Stage 3: start periodic tick (1 minute) to refresh timer pills and detect expiries
@@ -5776,6 +5962,8 @@ auth.onAuthStateChanged(async (user) => {
     checkAndFireReminders();
     // Check whether any attendance contact reminder is due (15 min after class end).
     checkAndFireAttendanceContacts();
+    // Check whether any end-of-program contact reminder is due (30 min after final class).
+    checkAndFireProgramContacts();
   }, 30 * 1000); // every 30 seconds
 
   // Subscribe to teams I'm on (or all teams if Boss)
@@ -6087,6 +6275,7 @@ function renderBoard() {
   });
   columns.appendChild(buildPendingColumn());
   columns.appendChild(buildFinishedColumn());
+  columns.appendChild(buildClassContactsColumn());
 
   root.innerHTML = '';
   root.appendChild(columns);
@@ -6241,6 +6430,90 @@ function buildFinishedColumn() {
       openArchive();
     });
   }
+
+  return col;
+}
+
+// Class Contacts column: visible to everyone, sits next to Finished on
+// the board. Shows recent attendance-contact signoffs (latest 50 from
+// state.attContactsHistory). Each card is collapsible for details.
+function buildClassContactsColumn() {
+  const col = document.createElement('div');
+  col.className = 'column class-contacts';
+
+  const items = state.attContactsHistory || [];
+  const total = items.length;
+
+  let bodyHtml = '';
+  if (total === 0) {
+    bodyHtml = `<div class="empty-col"><span class="emoji">📞</span>No contact signoffs yet</div>`;
+  } else {
+    bodyHtml = items.map(c => {
+      const when = c.signedAt && c.signedAt.toMillis
+        ? new Date(c.signedAt.toMillis()).toLocaleString(undefined, {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+          })
+        : '—';
+      const levelName = ({
+        absolute: 'Absolute Beginner', novice: 'Novice',
+        beginner: 'Beginner', advanced: 'Advanced Beginner',
+      })[c.classLevel] || c.classLevel || '—';
+      const studentsList = (c.students || []).map(s => {
+        const tags = [];
+        if (s.contactedDiscord) tags.push('🎮');
+        if (s.contactedText) tags.push('📱');
+        return `${escapeHtml(s.name)} ${tags.join('')}`;
+      }).join(', ');
+      const studentsCount = (c.students || []).length;
+      const isEOP = c.kind === 'end_of_program';
+      const headerIcon = isEOP ? '🎓' : '📞';
+      const kindLabel = isEOP
+        ? `<span class="contact-kind-badge eop">End of Program</span>`
+        : `<span class="contact-kind-badge att">Attendance</span>`;
+      // Body block differs between the two kinds (EOP has no Loom/HW lines).
+      const hwLabel = c.homeworkKind === 'pdf' ? 'Absolute HW PDF'
+        : c.homeworkKind === 'discord' ? 'Discord chat HW'
+        : 'no HW link';
+      const detailsBody = isEOP
+        ? `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
+           <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`
+        : `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
+           <div class="contact-card-detail"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(c.homeworkUrl) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
+           <div class="contact-card-detail"><strong>Loom:</strong> <a href="${escapeHtml(c.loomUrl || '#')}" target="_blank" rel="noopener">link</a></div>
+           <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`;
+      return `
+        <details class="contact-card${isEOP ? ' contact-card-eop' : ''}">
+          <summary>
+            <div class="contact-card-line1">
+              ${headerIcon} <strong>${escapeHtml(c.classDay || '')} · ${escapeHtml(c.classTime || '')}</strong> ${kindLabel}
+            </div>
+            <div class="contact-card-line2">${escapeHtml(levelName)} · Wk ${c.week}</div>
+            <div class="contact-card-line3">
+              ✓ <strong>${escapeHtml(c.signedByName || '—')}</strong> · ${studentsCount} student${studentsCount === 1 ? '' : 's'}
+            </div>
+            <div class="contact-card-line4">${escapeHtml(when)}</div>
+          </summary>
+          <div class="contact-card-details">
+            ${detailsBody}
+          </div>
+        </details>
+      `;
+    }).join('');
+  }
+
+  col.innerHTML = `
+    <div class="col-head">
+      <div class="col-avatar" style="background: linear-gradient(135deg, var(--lavender), var(--pink));">📞</div>
+      <div class="col-info">
+        <div class="col-name">Class Contacts</div>
+        <div class="col-meta">${total} signoff${total === 1 ? '' : 's'}</div>
+      </div>
+      <div class="col-count">${total}</div>
+    </div>
+    <div class="col-tasks">
+      ${bodyHtml}
+    </div>
+  `;
 
   return col;
 }
@@ -8049,8 +8322,6 @@ function renderSettings() {
   // Reminders (Boss/Manager) — programs list + history
   renderReminderProgramsSection();
   renderReminderHistorySection();
-  // Class Contacts (everyone) — list of attendance contact signoffs
-  renderClassContactsSection();
 
   // People
   const peopleWrap = el('peopleList');
@@ -8315,6 +8586,29 @@ const ATT_CONTACT_GRACE_MIN = 15;
 // How long after the target time we'll still fire a missed contact reminder.
 // Long window because signoffs are once-per-class and may be opened a day late.
 const ATT_CONTACT_LATE_WINDOW_MIN = 24 * 60; // 24 hours
+
+/* ============================================
+   End of Program contact reminder
+   - Fires 30 min after the class ends (start + 90 min for normal classes,
+     start + 60 + 30 = start + 90 min for 1-hour classes — same effective
+     fire time in both cases).
+   - Only fires on the FINAL session of the program (current week ===
+     final week, where final week comes from the class.totalWeeks/CLASS_TYPE_WEEKS
+     mapping; defaults to 6).
+   - Lists ALL students in the class (not just absentees), since the
+     program ended for everyone.
+*/
+const PROG_CONTACT_FIRE_OFFSET_MIN = 30; // minutes after class end
+const PROG_CONTACT_LATE_WINDOW_MIN = 24 * 60;
+// Default total weeks per program. Matches the slot manager's
+// CLASS_TYPE_WEEKS default of 6 for all levels.
+const PROG_DEFAULT_WEEKS = 6;
+
+// The verbatim canned message Calvin specified. Kept as one generic block;
+// the assignee will fill in the student's name manually when copying.
+const END_OF_PROGRAM_CANNED_MESSAGE =
+`Hi ! Your 6 week program has officially ended! If you’d like to continue in the academy and keep improving your Korean, we’d love to have you stay with us.  You'll have access to Tuesday classes every week for $50/month. Or, you can have access to Tuesday and Friday classes every week for $75/month. With either option, you'll also be able to enroll in our next level of 6 week programs for free.  Please type YES if you’d like to continue your KoreanLearnin journey. Please type NO if you do not want to continue.`;
+
 
 
 // Returns the JS Date representing `nowMs` interpreted in New York time as
@@ -8717,6 +9011,7 @@ async function checkAndFireAttendanceContacts() {
   if (!state.taAccessReady) return;
   if (state.pendingReminder) return;       // existing class reminder showing
   if (state.pendingAttContact) return;     // already showing one of these
+  if (state.pendingProgContact) return;    // end-of-program popup showing
 
   // Find programs of the new type assigned to me.
   const myPrograms = state.reminderPrograms.filter(p =>
@@ -8798,6 +9093,124 @@ async function checkAndFireAttendanceContacts() {
     });
     return; // one popup at a time
   }
+}
+
+// End-of-program contact engine. Mirrors checkAndFireAttendanceContacts
+// but with three differences:
+//   1. Fires 30 minutes after class end (not 15)
+//   2. Only fires on the FINAL week of the program (week 6 by default)
+//   3. Lists ALL students in the class, not just absentees
+async function checkAndFireProgramContacts() {
+  if (!state.user || !state.profile) return;
+  if (!state.taAccessReady) return;
+  if (state.pendingReminder) return;
+  if (state.pendingAttContact) return;
+  if (state.pendingProgContact) return;
+
+  const myPrograms = state.reminderPrograms.filter(p =>
+    p.active && p.type === 'class_end_program_contact' && p.assigneeId === state.user.uid
+  );
+  if (myPrograms.length === 0) return;
+
+  let classes;
+  try {
+    const snap = await taDb.collection('scheduler_classes')
+      .where('status', '==', 'active').get();
+    classes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('checkAndFireProgramContacts: classes read failed:', err);
+    return;
+  }
+  if (classes.length === 0) return;
+
+  const now = Date.now();
+  const todayNy = nyParts(new Date(now));
+  const yesterdayNy = nyParts(new Date(now - 24 * 3600 * 1000));
+
+  for (const cls of classes) {
+    let useDate = null;
+    if (cls.day === todayNy.weekday) useDate = todayNy;
+    else if (cls.day === yesterdayNy.weekday) useDate = yesterdayNy;
+    else continue;
+
+    const range = parseClassTimeRange(cls.time);
+    if (!range) continue;
+    const startMs = nyDateTimeToUtcMs(useDate.year, useDate.month, useDate.day, range.startStr);
+    if (!startMs) continue;
+    const endMs = startMs + range.durationMin * 60 * 1000;
+    const targetMs = endMs + PROG_CONTACT_FIRE_OFFSET_MIN * 60 * 1000;
+    const lateBy = now - targetMs;
+    if (lateBy < 0) continue;
+    if (lateBy > PROG_CONTACT_LATE_WINDOW_MIN * 60 * 1000) continue;
+
+    const week = getClassCurrentWeek(cls);
+    if (!week || week < 1) continue;
+
+    // Only fire on the final week of the program. Use class.totalWeeks if
+    // the slot manager wrote it; else fall back to the default of 6.
+    const finalWeek = (typeof cls.totalWeeks === 'number' && cls.totalWeeks > 0)
+      ? cls.totalWeeks : PROG_DEFAULT_WEEKS;
+    if (week !== finalWeek) continue;
+
+    const occKey = `prog__${cls.id}__${week}`;
+    if (state.progContactsFired.has(occKey)) continue;
+    state.progContactsFired.add(occKey);
+
+    // Persistent dedup: signoff doc already written?
+    let alreadySigned = false;
+    try {
+      const sigDoc = await db.collection('attendance_contact_signoffs').doc(occKey).get();
+      if (sigDoc.exists) alreadySigned = true;
+    } catch (e) {}
+    if (alreadySigned) continue;
+
+    const studentRefs = Array.isArray(cls.students) ? cls.students : [];
+    if (studentRefs.length === 0) continue;
+
+    // Pull full student docs (name/discord/phone) for the entire roster.
+    const fullList = await fetchFullStudents(studentRefs);
+    if (fullList.length === 0) continue;
+
+    showProgramContactPopup({
+      classId: cls.id,
+      classLevel: cls.level,
+      classDay: cls.day,
+      classTime: cls.time,
+      week,
+      occKey,
+      programId: myPrograms[0].id,
+      students: fullList,
+    });
+    return;
+  }
+}
+
+// Fetch full student docs for a list of {id} refs from cls.students.
+// Returns [{studentId, name, discord, phone}, ...] in the same order.
+async function fetchFullStudents(studentRefs) {
+  const ids = studentRefs.map(s => s.id).filter(Boolean);
+  if (ids.length === 0) return [];
+  const fullStudents = {};
+  const CHUNK = 30;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    try {
+      const qSnap = await taDb.collection('scheduler_students')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+      qSnap.docs.forEach(d => { fullStudents[d.id] = d.data(); });
+    } catch (e) {
+      console.warn('fetchFullStudents chunk failed:', e);
+    }
+  }
+  return studentRefs.map(s => {
+    const full = fullStudents[s.id] || {};
+    return {
+      studentId: s.id,
+      name: full.name || s.name || '—',
+      discord: (full.discord || full.discordName || '').trim() || null,
+      phone: (full.phone || full.phoneNumber || '').trim() || null,
+    };
+  });
 }
 
 // For a class + week, look up scheduler_attendance docs and figure out
@@ -8907,14 +9320,25 @@ function renderAttContactInfoView() {
       : '📞 Class Contact Required';
   }
 
-  // Subtitle gets a test-banner if applicable.
+  // Build the prominent class-info chip — same in both modes.
+  const classChip =
+    `<div class="att-contact-classchip">` +
+      `<span class="att-contact-classchip-day">${escapeHtml(payload.classDay)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-time">${escapeHtml(payload.classTime)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-level">${escapeHtml(levelName)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-week">Week ${payload.week}</span>` +
+    `</div>`;
+
+  // Subtitle: optional test banner above the class chip.
   if (payload.testMode) {
     el('attContactSubtitle').innerHTML =
-      `<div style="background:#e7e0ff;border:1px solid #b89aff;color:#4a3370;padding:8px 12px;border-radius:8px;font-weight:600;margin-bottom:8px;">🧪 Test sent by ${escapeHtml(payload.testSenderName || '—')}. Submitting won't write a real signoff.</div>` +
-      `${escapeHtml(payload.classDay)} · ${escapeHtml(payload.classTime)} · ${escapeHtml(levelName)} · Week ${payload.week}`;
+      `<div class="att-contact-testbanner">🧪 Test sent by ${escapeHtml(payload.testSenderName || '—')}. Submitting won't write a real signoff.</div>` +
+      classChip;
   } else {
-    el('attContactSubtitle').textContent =
-      `${payload.classDay} · ${payload.classTime} · ${levelName} · Week ${payload.week}`;
+    el('attContactSubtitle').innerHTML = classChip;
   }
 
   // Per-student rows.
@@ -8983,7 +9407,7 @@ function openAttContactHomework() {
   } else if (hw.kind === 'discord') {
     titleEl.textContent = '📚 Homework — Discord';
     bodyEl.innerHTML = `
-      <p>For ${escapeHtml(hw.day)} Novice/Beginner classes, this week's homework lives in the Discord chat:</p>
+      <p>For ${escapeHtml(hw.day)} Novice classes, this week's homework lives in the Discord chat:</p>
       <div class="att-homework-link">
         <a href="${escapeHtml(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
       </div>
@@ -9116,12 +9540,238 @@ async function submitAttContactSignoff() {
     // After dismissal, give the test-request listener a chance to deliver
     // any queued tests. Re-subscribing forces a fresh snapshot evaluation.
     setTimeout(() => {
-      if (!state.pendingReminder && !state.pendingAttContact && unsubs.reminderTestRequests) {
+      if (!state.pendingReminder && !state.pendingAttContact && !state.pendingProgContact
+          && unsubs.reminderTestRequests) {
         subscribeReminderTestRequests();
       }
     }, 100);
   } catch (err) {
     console.error('attendance contact signoff failed:', err);
+    alert('Could not save signoff: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '✍️ Submit & Close';
+  }
+}
+
+/* ============================================
+   End of Program contact popup
+   - Visually similar to attendance contact, but: no Loom button,
+     no Homework button, has a "View Canned Message" sub-modal,
+     different headline.
+   - Same signoff form (Discord / Text checkboxes + typed name).
+   - Saves to the same `attendance_contact_signoffs` collection but
+     with a `kind: 'end_of_program'` discriminator so the Class
+     Contacts column can label them differently.
+============================================ */
+
+function showProgramContactPopup(payload) {
+  state.pendingProgContact = payload;
+  // Same per-student signoff state shape as attendance contact.
+  state.progContactSignoffStudents = payload.students.map(s => ({
+    studentId: s.studentId,
+    name: s.name,
+    discord: s.discord,
+    phone: s.phone,
+    contactedDiscord: false,
+    contactedText: false,
+  }));
+
+  renderProgContactInfoView();
+  show('progContactModal');
+
+  // Same alarm behavior as the other popups.
+  startReminderAlarm();
+  if (document.hasFocus()) stopReminderAlarmLoop();
+  window.addEventListener('focus', stopReminderAlarmLoop, { once: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) stopReminderAlarmLoop();
+  }, { once: true });
+}
+
+function renderProgContactInfoView() {
+  const payload = state.pendingProgContact;
+  if (!payload) return;
+  el('progContactInfoView').style.display = '';
+  el('progContactSignoffView').style.display = 'none';
+
+  const levelName = ({
+    absolute: 'Absolute Beginner', novice: 'Novice',
+    beginner: 'Beginner', advanced: 'Advanced Beginner',
+  })[payload.classLevel] || payload.classLevel || '—';
+
+  const titleEl = document.querySelector('#progContactModal .modal-title');
+  if (titleEl) {
+    titleEl.textContent = payload.testMode
+      ? '🧪 TEST · 🎓 End of Program — Contact Students'
+      : '🎓 End of Program — Contact Students';
+  }
+
+  const classChip =
+    `<div class="att-contact-classchip">` +
+      `<span class="att-contact-classchip-day">${escapeHtml(payload.classDay)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-time">${escapeHtml(payload.classTime)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-level">${escapeHtml(levelName)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-week">Week ${payload.week} (final)</span>` +
+    `</div>`;
+
+  if (payload.testMode) {
+    el('progContactSubtitle').innerHTML =
+      `<div class="att-contact-testbanner">🧪 Test sent by ${escapeHtml(payload.testSenderName || '—')}. Submitting won't write a real signoff.</div>` +
+      classChip;
+  } else {
+    el('progContactSubtitle').innerHTML = classChip;
+  }
+
+  // Per-student rows — same pattern as attendance.
+  const listEl = el('progContactStudentList');
+  listEl.innerHTML = state.progContactSignoffStudents.map(s => {
+    const discordLabel = s.discord
+      ? `🎮 <span class="att-contact-copy" data-copy="${escapeHtml(s.discord)}" title="Click to copy">${escapeHtml(s.discord)}</span>`
+      : `<span style="color: var(--ink-light); font-style: italic;">no Discord</span>`;
+    const phoneLabel = s.phone
+      ? `📱 <span class="att-contact-copy" data-copy="${escapeHtml(s.phone)}" title="Click to copy">${escapeHtml(s.phone)}</span>`
+      : `<span style="color: var(--ink-light); font-style: italic;">no phone</span>`;
+    return `
+      <div class="att-contact-student">
+        <div class="att-contact-student-name">${escapeHtml(s.name)}</div>
+        <div class="att-contact-student-meta">${discordLabel} &nbsp;·&nbsp; ${phoneLabel}</div>
+      </div>
+    `;
+  }).join('');
+
+  listEl.querySelectorAll('.att-contact-copy').forEach(span => {
+    span.addEventListener('click', () => {
+      const text = span.dataset.copy;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = span.textContent;
+        span.textContent = '✓ Copied!';
+        setTimeout(() => { span.textContent = orig; }, 1200);
+      }).catch(() => {});
+    });
+  });
+}
+
+// View / copy the canned end-of-program message.
+function openProgContactCannedMessage() {
+  el('progCannedMessageBox').textContent = END_OF_PROGRAM_CANNED_MESSAGE;
+  show('progCannedMessageSubModal');
+}
+
+async function copyProgCannedMessage() {
+  try {
+    await navigator.clipboard.writeText(END_OF_PROGRAM_CANNED_MESSAGE);
+    const btn = el('progCannedCopyBtn');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  } catch (e) {
+    alert('Could not copy. Select the message manually and copy.');
+  }
+}
+
+function showProgContactSignoffView() {
+  el('progContactInfoView').style.display = 'none';
+  el('progContactSignoffView').style.display = '';
+  el('progContactSignName').value = '';
+  renderProgContactSignoffTable();
+  updateProgContactSubmitButton();
+}
+
+function backToProgContactInfoView() {
+  renderProgContactInfoView();
+}
+
+function renderProgContactSignoffTable() {
+  const tbody = el('progContactSignoffRows');
+  tbody.innerHTML = state.progContactSignoffStudents.map((s, i) => `
+    <tr>
+      <td>${escapeHtml(s.name)}</td>
+      <td style="text-align:center;">
+        <input type="checkbox" data-idx="${i}" data-field="discord" ${s.contactedDiscord ? 'checked' : ''} />
+      </td>
+      <td style="text-align:center;">
+        <input type="checkbox" data-idx="${i}" data-field="text" ${s.contactedText ? 'checked' : ''} />
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      const field = cb.dataset.field;
+      if (field === 'discord') state.progContactSignoffStudents[idx].contactedDiscord = cb.checked;
+      else if (field === 'text') state.progContactSignoffStudents[idx].contactedText = cb.checked;
+      updateProgContactSubmitButton();
+    });
+  });
+  el('progContactSignName').addEventListener('input', updateProgContactSubmitButton);
+}
+
+function updateProgContactSubmitButton() {
+  const allChecked = state.progContactSignoffStudents.every(
+    s => s.contactedDiscord && s.contactedText
+  );
+  const nameOk = (el('progContactSignName').value || '').trim().length > 0;
+  el('progContactSubmitBtn').disabled = !(allChecked && nameOk);
+}
+
+async function submitProgContactSignoff() {
+  const payload = state.pendingProgContact;
+  if (!payload) return;
+  const allChecked = state.progContactSignoffStudents.every(
+    s => s.contactedDiscord && s.contactedText
+  );
+  const typedName = (el('progContactSignName').value || '').trim();
+  if (!allChecked || !typedName) return;
+
+  const submitBtn = el('progContactSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+  try {
+    if (payload.testMode) {
+      if (payload.testRequestId) {
+        try {
+          await db.collection('reminder_test_requests').doc(payload.testRequestId).delete();
+        } catch (e) {}
+      }
+    } else {
+      await db.collection('attendance_contact_signoffs').doc(payload.occKey).set({
+        kind: 'end_of_program',
+        classId: payload.classId,
+        classLevel: payload.classLevel,
+        classDay: payload.classDay,
+        classTime: payload.classTime,
+        week: payload.week,
+        programId: payload.programId,
+        signedBy: state.user.uid,
+        signedByName: state.profile.name || '—',
+        signedNameTyped: typedName,
+        signedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        students: state.progContactSignoffStudents.map(s => ({
+          studentId: s.studentId,
+          name: s.name,
+          discord: s.discord,
+          phone: s.phone,
+          contactedDiscord: !!s.contactedDiscord,
+          contactedText: !!s.contactedText,
+        })),
+      });
+    }
+    state.pendingProgContact = null;
+    state.progContactSignoffStudents = [];
+    stopReminderAlarmLoop();
+    hide('progContactModal');
+    setTimeout(() => {
+      if (!state.pendingReminder && !state.pendingAttContact && !state.pendingProgContact
+          && unsubs.reminderTestRequests) {
+        subscribeReminderTestRequests();
+      }
+    }, 100);
+  } catch (err) {
+    console.error('end-of-program signoff failed:', err);
     alert('Could not save signoff: ' + err.message);
   } finally {
     submitBtn.disabled = false;
@@ -9139,72 +9789,9 @@ function subscribeAttContactsHistory() {
     .orderBy('signedAt', 'desc').limit(50)
     .onSnapshot(snap => {
       state.attContactsHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (!el('settingsModal').classList.contains('hidden')) {
-        renderClassContactsSection();
-      }
+      // Re-render the board so the Class Contacts column reflects new data.
+      renderBoard();
     }, () => {});
-}
-
-function renderClassContactsSection() {
-  const wrap = el('classContactsWrap');
-  if (!wrap) return;
-  // Visible to everyone — no role gating.
-  wrap.style.display = '';
-
-  const items = state.attContactsHistory || [];
-  if (items.length === 0) {
-    wrap.innerHTML = `
-      <h4>📞 Class Contacts</h4>
-      <div class="reminder-empty">No class contact signoffs yet.</div>
-    `;
-    return;
-  }
-
-  const rowsHtml = items.map(c => {
-    const when = c.signedAt && c.signedAt.toMillis
-      ? new Date(c.signedAt.toMillis()).toLocaleString(undefined, {
-          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-        })
-      : '—';
-    const levelName = ({
-      absolute: 'Absolute Beginner', novice: 'Novice',
-      beginner: 'Beginner', advanced: 'Advanced Beginner',
-    })[c.classLevel] || c.classLevel || '—';
-    const studentsList = (c.students || []).map(s => {
-      const tags = [];
-      if (s.contactedDiscord) tags.push('🎮');
-      if (s.contactedText) tags.push('📱');
-      return `${escapeHtml(s.name)} ${tags.join('')}`;
-    }).join(', ');
-    const hwLabel = c.homeworkKind === 'pdf' ? 'Absolute HW PDF'
-      : c.homeworkKind === 'discord' ? 'Discord chat HW'
-      : 'no HW link';
-    return `
-      <details class="class-contact-row">
-        <summary>
-          <div class="class-contact-summary-line1">
-            <strong>${escapeHtml(c.classDay || '')} · ${escapeHtml(c.classTime || '')} · ${escapeHtml(levelName)} · Wk ${c.week}</strong>
-          </div>
-          <div class="class-contact-summary-line2">
-            ✓ <strong>${escapeHtml(c.signedByName || '—')}</strong> ·
-            ${(c.students || []).length} student${(c.students || []).length === 1 ? '' : 's'} ·
-            ${escapeHtml(when)}
-          </div>
-        </summary>
-        <div class="class-contact-details">
-          <div class="class-contact-detail-line"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
-          <div class="class-contact-detail-line"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(c.homeworkUrl) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
-          <div class="class-contact-detail-line"><strong>Loom:</strong> <a href="${escapeHtml(c.loomUrl || '#')}" target="_blank" rel="noopener">link</a></div>
-          <div class="class-contact-detail-line"><strong>Students contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>
-        </div>
-      </details>
-    `;
-  }).join('');
-
-  wrap.innerHTML = `
-    <h4>📞 Class Contacts</h4>
-    <div class="class-contact-list">${rowsHtml}</div>
-  `;
 }
 
 
@@ -9248,7 +9835,7 @@ function subscribeReminderTestRequests() {
       });
       // Skip if any reminder popup is already showing — we'll come back
       // when it dismisses (the dismiss handler re-subscribes).
-      if (state.pendingReminder || state.pendingAttContact) {
+      if (state.pendingReminder || state.pendingAttContact || state.pendingProgContact) {
         console.info('[test-listener] popup already showing, will retry on dismiss');
         return;
       }
@@ -9270,6 +9857,9 @@ async function handleIncomingTestRequest(requestId, data) {
   const requestType = data.type || 'class_10min_before';
   if (requestType === 'class_end_attendance_contact') {
     return handleIncomingTestAttContact(requestId, data);
+  }
+  if (requestType === 'class_end_program_contact') {
+    return handleIncomingTestProgContact(requestId, data);
   }
   // Otherwise: original 10-min-before class-reminder test flow.
   if (!state.taAccessReady) {
@@ -9419,6 +10009,74 @@ async function handleIncomingTestAttContact(requestId, data) {
   }
 }
 
+// Test-mode equivalent for end-of-program contact. Pulls the FULL class
+// roster (no attendance filtering). Falls back to demo students if the
+// class has no roster.
+async function handleIncomingTestProgContact(requestId, data) {
+  console.info('[test-progcontact] handling request', requestId, data);
+  if (!state.taAccessReady) {
+    console.warn('[test-progcontact] no TA access; firing demo-only popup');
+    showProgramContactPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      classId: data.classId,
+      classLevel: 'absolute',
+      classDay: data.day || 'Saturday',
+      classTime: data.time || '6:30 PM',
+      week: data.week || PROG_DEFAULT_WEEKS,
+      occKey: `__test__${requestId}`,
+      programId: '__test__',
+      students: [
+        { studentId: 'demo1', name: 'Demo Student (no class data)', discord: 'demo#1234', phone: '555-0100' },
+      ],
+    });
+    return;
+  }
+  try {
+    console.info('[test-progcontact] looking up class', data.classId);
+    const classDoc = await taDb.collection('scheduler_classes').doc(data.classId).get();
+    if (!classDoc.exists) {
+      console.warn('[test-progcontact] class doc missing; cleaning up request');
+      try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
+      return;
+    }
+    const cls = { id: classDoc.id, ...classDoc.data() };
+    const week = data.week || PROG_DEFAULT_WEEKS;
+
+    const studentRefs = Array.isArray(cls.students) ? cls.students : [];
+    let fullList = await fetchFullStudents(studentRefs);
+    if (fullList.length === 0) {
+      console.info('[test-progcontact] empty roster; using synthetic demo students');
+      fullList = [
+        { studentId: 'demo1', name: 'Test Student A', discord: 'student_a', phone: '555-0100' },
+        { studentId: 'demo2', name: 'Test Student B', discord: 'student_b', phone: '555-0101' },
+      ];
+    }
+    console.info('[test-progcontact] firing popup with', fullList.length, 'students');
+    showProgramContactPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      classId: cls.id,
+      classLevel: cls.level || 'absolute',
+      classDay: cls.day || data.day,
+      classTime: cls.time || data.time,
+      week,
+      occKey: `__test__${requestId}`,
+      programId: '__test__',
+      students: fullList,
+    });
+  } catch (err) {
+    console.error('[test-progcontact] handler failed:', err.code, err.message, err);
+    try {
+      await db.collection('reminder_test_requests').doc(requestId).delete();
+    } catch (e) {
+      console.warn('[test-progcontact] cleanup delete failed:', e);
+    }
+  }
+}
+
 async function createReminderProgram(assigneeId, programType) {
   if (!isBossOrManager(state.profile.role)) return;
   const assignee = state.allUsers.find(u => u.uid === assigneeId);
@@ -9428,6 +10086,7 @@ async function createReminderProgram(assigneeId, programType) {
   const typeLabel = ({
     class_10min_before: 'class reminders',
     class_end_attendance_contact: 'attendance contact',
+    class_end_program_contact: 'end-of-program contact',
   })[programType] || programType;
   // Don't double-add: if this user already has an active program of this
   // type, just say so.
@@ -9483,6 +10142,7 @@ function renderReminderProgramsSection() {
   const TYPE_LABELS = {
     class_10min_before: { icon: '📢', name: 'Class reminders (10 min before)' },
     class_end_attendance_contact: { icon: '📞', name: 'Attendance contact (after class)' },
+    class_end_program_contact: { icon: '🎓', name: 'End-of-program contact (after final class)' },
   };
 
   let listHtml = '';
@@ -9515,6 +10175,7 @@ function renderReminderProgramsSection() {
     <div class="reminder-action-row">
       <button class="btn-action primary" data-add-prog-type="class_10min_before">+ Class Reminders (10 min before)</button>
       <button class="btn-action primary" data-add-prog-type="class_end_attendance_contact">+ Attendance Contact (after class)</button>
+      <button class="btn-action primary" data-add-prog-type="class_end_program_contact">+ End-of-Program Contact (final class)</button>
     </div>
     <div style="margin-top: 8px;">
       <button class="btn-action secondary" id="testReminderBtn" title="Send a one-off test reminder to any teammate to verify the popup works">🧪 Test Now</button>
@@ -9553,6 +10214,13 @@ function openAddReminderProgramModal(programType) {
       'ends, listing students who were absent or have no attendance record. ' +
       'They\'ll send each absent student the class recording (Loom) and homework, ' +
       'then sign off in the popup.';
+  } else if (_pendingProgramType === 'class_end_program_contact') {
+    if (titleEl) titleEl.textContent = '🎓 Assign End-of-Program Contact';
+    if (helpEl) helpEl.textContent =
+      'The selected person will get a noisy popup 30 minutes after the FINAL ' +
+      'class of each 6-week program. They\'ll contact every student in the ' +
+      'class on Discord and via text using a pre-written message about ' +
+      'continuing in the academy, then sign off in the popup.';
   } else {
     if (titleEl) titleEl.textContent = '📢 Assign Class Reminders';
     if (helpEl) helpEl.textContent =
@@ -9601,11 +10269,13 @@ function openTestReminderModal() {
   if (Array.from(sel.options).some(o => o.value === state.user.uid)) {
     sel.value = state.user.uid;
   }
-  // Type toggle: show the week picker only for attendance-contact tests.
+  // Type toggle: show the week picker for attendance-contact AND end-of-program.
+  // Class-reminder (10-min-before) doesn't care about week.
   const typeSel = el('testReminderType');
   const updateTypeUI = () => {
-    const isAttContact = typeSel.value === 'class_end_attendance_contact';
-    el('testReminderWeekWrap').style.display = isAttContact ? '' : 'none';
+    const t = typeSel.value;
+    const showWeek = t === 'class_end_attendance_contact' || t === 'class_end_program_contact';
+    el('testReminderWeekWrap').style.display = showWeek ? '' : 'none';
   };
   typeSel.value = 'class_10min_before';
   typeSel.onchange = updateTypeUI;
@@ -9675,7 +10345,8 @@ async function submitTestReminder() {
       senderName: state.profile.name || '—',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
-    if (programType === 'class_end_attendance_contact') {
+    if (programType === 'class_end_attendance_contact'
+        || programType === 'class_end_program_contact') {
       reqData.week = week;
     }
     await db.collection('reminder_test_requests').add(reqData);
