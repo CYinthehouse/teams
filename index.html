@@ -4651,11 +4651,19 @@
     </div>
     <div class="modal-body">
       <p style="font-size: 13px; color: var(--ink-soft); margin-top: 0;">
-        Pick a day, time, and recipient. The system will look up a real class
-        matching that day and time, then fire a test popup on the recipient's
-        device with the actual Discord usernames and channel link. Test popups
-        don't write acknowledgements, so they won't interfere with real reminders.
+        Pick what kind of reminder to test, then a day, time, and recipient.
+        The system looks up a real class matching that day and time, and fires
+        a test popup on the recipient's device with real student data. Test
+        popups don't write acknowledgements or signoffs, so they don't
+        interfere with real reminders.
       </p>
+      <div class="form-group">
+        <label>Reminder type</label>
+        <select id="testReminderType" class="form-input">
+          <option value="class_10min_before">📢 Class reminder (10 min before)</option>
+          <option value="class_end_attendance_contact">📞 Attendance contact (after class)</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>Day</label>
         <select id="testReminderDay" class="form-input">
@@ -4681,6 +4689,17 @@
           <option value="6:10 PM-7:10 PM">6:10–7:10 PM (1hr)</option>
           <option value="7:20 PM-8:20 PM">7:20–8:20 PM (1hr)</option>
           <option value="11:00 PM-12:00 AM">11:00 PM–12:00 AM (1hr)</option>
+        </select>
+      </div>
+      <div class="form-group" id="testReminderWeekWrap" style="display:none;">
+        <label>Week (for homework lookup)</label>
+        <select id="testReminderWeek" class="form-input">
+          <option value="1">Week 1 (first class — triggers tutoring tag)</option>
+          <option value="2">Week 2</option>
+          <option value="3">Week 3</option>
+          <option value="4">Week 4</option>
+          <option value="5">Week 5</option>
+          <option value="6">Week 6</option>
         </select>
       </div>
       <div class="form-group">
@@ -8880,8 +8899,23 @@ function renderAttContactInfoView() {
     beginner: 'Beginner', advanced: 'Advanced Beginner',
   })[payload.classLevel] || payload.classLevel || '—';
 
-  el('attContactSubtitle').textContent =
-    `${payload.classDay} · ${payload.classTime} · ${levelName} · Week ${payload.week}`;
+  // Title bar — show TEST badge if this is a test fire.
+  const titleEl = document.querySelector('#attContactModal .modal-title');
+  if (titleEl) {
+    titleEl.textContent = payload.testMode
+      ? '🧪 TEST · 📞 Class Contact Required'
+      : '📞 Class Contact Required';
+  }
+
+  // Subtitle gets a test-banner if applicable.
+  if (payload.testMode) {
+    el('attContactSubtitle').innerHTML =
+      `<div style="background:#e7e0ff;border:1px solid #b89aff;color:#4a3370;padding:8px 12px;border-radius:8px;font-weight:600;margin-bottom:8px;">🧪 Test sent by ${escapeHtml(payload.testSenderName || '—')}. Submitting won't write a real signoff.</div>` +
+      `${escapeHtml(payload.classDay)} · ${escapeHtml(payload.classTime)} · ${escapeHtml(levelName)} · Week ${payload.week}`;
+  } else {
+    el('attContactSubtitle').textContent =
+      `${payload.classDay} · ${payload.classTime} · ${levelName} · Week ${payload.week}`;
+  }
 
   // Per-student rows.
   const listEl = el('attContactStudentList');
@@ -9038,35 +9072,54 @@ async function submitAttContactSignoff() {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Saving…';
   try {
-    const cls = { level: payload.classLevel, day: payload.classDay };
-    const hw = getHomeworkForClass(cls, payload.week);
-    await db.collection('attendance_contact_signoffs').doc(payload.occKey).set({
-      classId: payload.classId,
-      classLevel: payload.classLevel,
-      classDay: payload.classDay,
-      classTime: payload.classTime,
-      week: payload.week,
-      programId: payload.programId,
-      signedBy: state.user.uid,
-      signedByName: state.profile.name || '—',
-      signedNameTyped: typedName,
-      signedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      loomUrl: ATTENDANCE_LOOM_URL,
-      homeworkKind: hw.kind,
-      homeworkUrl: hw.url || null,
-      students: state.attContactSignoffStudents.map(s => ({
-        studentId: s.studentId,
-        name: s.name,
-        discord: s.discord,
-        phone: s.phone,
-        contactedDiscord: !!s.contactedDiscord,
-        contactedText: !!s.contactedText,
-      })),
-    });
+    if (payload.testMode) {
+      // Test mode: don't write a real signoff. Just delete the test
+      // request doc (so a refresh doesn't replay) and close.
+      if (payload.testRequestId) {
+        try {
+          await db.collection('reminder_test_requests').doc(payload.testRequestId).delete();
+        } catch (e) {
+          console.warn('test request delete failed:', e);
+        }
+      }
+    } else {
+      const cls = { level: payload.classLevel, day: payload.classDay };
+      const hw = getHomeworkForClass(cls, payload.week);
+      await db.collection('attendance_contact_signoffs').doc(payload.occKey).set({
+        classId: payload.classId,
+        classLevel: payload.classLevel,
+        classDay: payload.classDay,
+        classTime: payload.classTime,
+        week: payload.week,
+        programId: payload.programId,
+        signedBy: state.user.uid,
+        signedByName: state.profile.name || '—',
+        signedNameTyped: typedName,
+        signedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        loomUrl: ATTENDANCE_LOOM_URL,
+        homeworkKind: hw.kind,
+        homeworkUrl: hw.url || null,
+        students: state.attContactSignoffStudents.map(s => ({
+          studentId: s.studentId,
+          name: s.name,
+          discord: s.discord,
+          phone: s.phone,
+          contactedDiscord: !!s.contactedDiscord,
+          contactedText: !!s.contactedText,
+        })),
+      });
+    }
     state.pendingAttContact = null;
     state.attContactSignoffStudents = [];
     stopReminderAlarmLoop();
     hide('attContactModal');
+    // After dismissal, give the test-request listener a chance to deliver
+    // any queued tests. Re-subscribing forces a fresh snapshot evaluation.
+    setTimeout(() => {
+      if (!state.pendingReminder && !state.pendingAttContact && unsubs.reminderTestRequests) {
+        subscribeReminderTestRequests();
+      }
+    }, 100);
   } catch (err) {
     console.error('attendance contact signoff failed:', err);
     alert('Could not save signoff: ' + err.message);
@@ -9191,8 +9244,9 @@ function subscribeReminderTestRequests() {
         const bMs = (b.data().createdAt && b.data().createdAt.toMillis) ? b.data().createdAt.toMillis() : 0;
         return aMs - bMs;
       });
-      // Skip if a popup is already showing — we'll come back when it dismisses.
-      if (state.pendingReminder) return;
+      // Skip if any reminder popup is already showing — we'll come back
+      // when it dismisses (the dismiss handler re-subscribes).
+      if (state.pendingReminder || state.pendingAttContact) return;
       const doc = docs[0];
       if (!doc) return;
       handleIncomingTestRequest(doc.id, doc.data());
@@ -9200,9 +9254,14 @@ function subscribeReminderTestRequests() {
 }
 
 async function handleIncomingTestRequest(requestId, data) {
+  // Branch on type. Default to the original class-reminder if no type is set
+  // (for backwards-compat with any old test request docs floating around).
+  const requestType = data.type || 'class_10min_before';
+  if (requestType === 'class_end_attendance_contact') {
+    return handleIncomingTestAttContact(requestId, data);
+  }
+  // Otherwise: original 10-min-before class-reminder test flow.
   if (!state.taAccessReady) {
-    // We can't pull the class data — surface a minimal popup so the
-    // recipient at least knows a test was attempted.
     showReminderPopup({
       testMode: true,
       testRequestId: requestId,
@@ -9216,7 +9275,6 @@ async function handleIncomingTestRequest(requestId, data) {
   try {
     const classDoc = await taDb.collection('scheduler_classes').doc(data.classId).get();
     if (!classDoc.exists) {
-      // Class was deleted between request creation and delivery. Clean up silently.
       try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
       return;
     }
@@ -9246,6 +9304,95 @@ async function handleIncomingTestRequest(requestId, data) {
     });
   } catch (err) {
     console.error('handleIncomingTestRequest failed:', err);
+  }
+}
+
+// Test mode for the attendance-contact popup. Looks up the class, reads
+// the requested week's attendance status, computes absentees the same way
+// as the real flow, and fires the popup with `testMode: true`.
+// Special-case: if there are zero real absentees, we fabricate a couple
+// of demo absentees from the class roster so the assignee can see the UI.
+async function handleIncomingTestAttContact(requestId, data) {
+  if (!state.taAccessReady) {
+    showAttendanceContactPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      classId: data.classId,
+      classLevel: 'absolute',
+      classDay: data.day || 'Saturday',
+      classTime: data.time || '6:30 PM',
+      week: data.week || 1,
+      occKey: `__test__${requestId}`,
+      programId: '__test__',
+      absentStudents: [
+        { studentId: 'demo1', name: 'Demo Student (no class data)', discord: 'demo#1234', phone: '555-0100' },
+      ],
+    });
+    return;
+  }
+  try {
+    const classDoc = await taDb.collection('scheduler_classes').doc(data.classId).get();
+    if (!classDoc.exists) {
+      try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
+      return;
+    }
+    const cls = { id: classDoc.id, ...classDoc.data() };
+    const week = data.week || 1;
+
+    // Pull real absentees for this (class, week). If zero, fall back to
+    // a synthetic demo list so the test still demonstrates the UI.
+    const studentRefs = Array.isArray(cls.students) ? cls.students : [];
+    let absentList = [];
+    if (studentRefs.length > 0) {
+      absentList = await collectAbsentStudents(cls, week, studentRefs);
+    }
+    if (absentList.length === 0 && studentRefs.length > 0) {
+      // Fabricate 1–2 demo entries from the actual roster (so the recipient
+      // sees real names/discords, but it's clearly labeled as a test).
+      const sample = studentRefs.slice(0, Math.min(2, studentRefs.length));
+      const ids = sample.map(s => s.id).filter(Boolean);
+      const fullStudents = {};
+      if (ids.length > 0) {
+        try {
+          const qSnap = await taDb.collection('scheduler_students')
+            .where(firebase.firestore.FieldPath.documentId(), 'in', ids).get();
+          qSnap.docs.forEach(d => { fullStudents[d.id] = d.data(); });
+        } catch (e) {}
+      }
+      absentList = sample.map(s => {
+        const full = fullStudents[s.id] || {};
+        return {
+          studentId: s.id,
+          name: full.name || s.name || '—',
+          discord: (full.discord || full.discordName || '').trim() || null,
+          phone: (full.phone || full.phoneNumber || '').trim() || null,
+        };
+      });
+    }
+    if (absentList.length === 0) {
+      // Last resort: pure synthetic students.
+      absentList = [
+        { studentId: 'demo1', name: 'Test Student A', discord: 'student_a', phone: '555-0100' },
+        { studentId: 'demo2', name: 'Test Student B', discord: 'student_b', phone: '555-0101' },
+      ];
+    }
+
+    showAttendanceContactPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      classId: cls.id,
+      classLevel: cls.level || 'absolute',
+      classDay: cls.day || data.day,
+      classTime: cls.time || data.time,
+      week,
+      occKey: `__test__${requestId}`,
+      programId: '__test__',
+      absentStudents: absentList,
+    });
+  } catch (err) {
+    console.error('handleIncomingTestAttContact failed:', err);
   }
 }
 
@@ -9431,14 +9578,26 @@ function openTestReminderModal() {
   if (Array.from(sel.options).some(o => o.value === state.user.uid)) {
     sel.value = state.user.uid;
   }
+  // Type toggle: show the week picker only for attendance-contact tests.
+  const typeSel = el('testReminderType');
+  const updateTypeUI = () => {
+    const isAttContact = typeSel.value === 'class_end_attendance_contact';
+    el('testReminderWeekWrap').style.display = isAttContact ? '' : 'none';
+  };
+  typeSel.value = 'class_10min_before';
+  typeSel.onchange = updateTypeUI;
+  updateTypeUI();
   show('testReminderModal');
 }
 
 async function submitTestReminder() {
   if (!isBossOrManager(state.profile.role)) return;
+  const programType = el('testReminderType').value;
   const day = el('testReminderDay').value;
   const time = el('testReminderTime').value;
   const assigneeId = el('testReminderAssignee').value;
+  // Week is only used for attendance-contact tests; ignored otherwise.
+  const week = parseInt(el('testReminderWeek').value, 10) || 1;
   const errBox = el('testReminderError');
   const submitBtn = el('testReminderSubmitBtn');
 
@@ -9480,8 +9639,10 @@ async function submitTestReminder() {
     }
 
     // Write the test request — recipient's app picks it up via onSnapshot.
+    // The `type` field tells the recipient which popup flavor to fire.
     const assignee = state.allUsers.find(u => u.uid === assigneeId);
-    await db.collection('reminder_test_requests').add({
+    const reqData = {
+      type: programType,
       assigneeId,
       assigneeName: assignee ? assignee.name : '—',
       classId: classDoc.id,
@@ -9490,7 +9651,11 @@ async function submitTestReminder() {
       senderId: state.user.uid,
       senderName: state.profile.name || '—',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (programType === 'class_end_attendance_contact') {
+      reqData.week = week;
+    }
+    await db.collection('reminder_test_requests').add(reqData);
 
     hide('testReminderModal');
     showToast({
