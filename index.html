@@ -4416,12 +4416,67 @@
     </div>
     <div class="modal-footer">
       <button class="btn-action secondary" id="reminderCopyBtn" onclick="copyReminderMessage()">📋 Copy Message</button>
-      <button class="btn-action primary" onclick="dismissReminderPopup()">Done — I sent it</button>
+      <button class="btn-action primary" id="reminderDoneBtn" onclick="dismissReminderPopup()">Done — I sent it</button>
     </div>
   </div>
 </div>
 
 <!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
+<!-- Test Reminder modal — Boss/Mgr picks day + time + recipient,
+     fires a one-off test popup on the recipient's device -->
+<div id="testReminderModal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width: 460px;">
+    <div class="modal-head">
+      <div class="modal-title">🧪 Test Class Reminder</div>
+      <button class="modal-close" onclick="hide('testReminderModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: var(--ink-soft); margin-top: 0;">
+        Pick a day, time, and recipient. The system will look up a real class
+        matching that day and time, then fire a test popup on the recipient's
+        device with the actual Discord usernames and channel link. Test popups
+        don't write acknowledgements, so they won't interfere with real reminders.
+      </p>
+      <div class="form-group">
+        <label>Day</label>
+        <select id="testReminderDay" class="form-input">
+          <option value="Saturday">Saturday</option>
+          <option value="Sunday">Sunday</option>
+          <option value="Monday">Monday</option>
+          <option value="Tuesday">Tuesday</option>
+          <option value="Wednesday">Wednesday</option>
+          <option value="Thursday">Thursday</option>
+          <option value="Friday">Friday</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Time (EST)</label>
+        <select id="testReminderTime" class="form-input">
+          <option value="6:30 PM">6:30 PM</option>
+          <option value="7:10 PM">7:10 PM</option>
+          <option value="7:50 PM">7:50 PM</option>
+          <option value="8:30 PM">8:30 PM</option>
+          <option value="9:10 PM">9:10 PM</option>
+          <option value="9:50 PM">9:50 PM</option>
+          <option value="10:30 PM">10:30 PM</option>
+          <option value="6:10 PM-7:10 PM">6:10–7:10 PM (1hr)</option>
+          <option value="7:20 PM-8:20 PM">7:20–8:20 PM (1hr)</option>
+          <option value="11:00 PM-12:00 AM">11:00 PM–12:00 AM (1hr)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Send test to</label>
+        <select id="testReminderAssignee" class="form-input"></select>
+      </div>
+      <div id="testReminderError" style="display:none; color:#b3334e; font-size:12px; margin-top:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="hide('testReminderModal')">Cancel</button>
+      <button class="btn-action primary" id="testReminderSubmitBtn" onclick="submitTestReminder()">🧪 Send Test</button>
+    </div>
+  </div>
+</div>
+
 <div id="addReminderProgramModal" class="modal-backdrop hidden">
   <div class="modal" style="max-width: 420px;">
     <div class="modal-head">
@@ -4705,6 +4760,7 @@ const unsubs = {
   tasks: null,
   tasksPrivate: null,        // second listener for non-Boss/Mgr private-tasks-I-participate-in
   reminderPrograms: null,    // listener on reminder_programs (mine if Worker, all if Boss/Mgr)
+  reminderTestRequests: null, // listener for incoming test-reminder requests targeted at me
   comments: null,
   activity: null,
   appSettings: null,
@@ -5435,6 +5491,9 @@ auth.onAuthStateChanged(async (user) => {
 
   // Reminders: subscribe to programs (mine if Worker, all if Boss/Mgr).
   subscribeReminderPrograms();
+  // Also subscribe to incoming test-reminder requests targeted at me, so
+  // a Boss/Mgr clicking "Test Now" on their device fires a popup on mine.
+  subscribeReminderTestRequests();
   // Run an initial fire-check after a short delay so secondary auth has
   // a chance to be ready (it might be hydrating from local storage).
   setTimeout(() => checkAndFireReminders(), 3000);
@@ -8150,23 +8209,41 @@ function showReminderPopup(reminder) {
   el('reminderPopupChannel').textContent = reminder.channelUrl;
   el('reminderPopupMessage').textContent = message;
 
-  // "Was X min ago" indicator if late.
+  // Test-mode visuals: badge in title, no late-warning, dismiss button label.
+  const titleEl = document.querySelector('#reminderPopupModal .modal-title');
   const lateLabel = el('reminderPopupLate');
-  if (reminder.lateMinutes >= 1) {
-    lateLabel.textContent = `⚠️ This reminder was due ${reminder.lateMinutes} min ago.`;
-    lateLabel.style.display = 'block';
-  } else {
+  const doneBtn = el('reminderDoneBtn');
+  if (reminder.testMode) {
+    if (titleEl) titleEl.innerHTML = '🧪 TEST · 🔔 Class Reminder';
     lateLabel.style.display = 'none';
+    if (reminder.testSenderName) {
+      lateLabel.textContent = `🧪 Test reminder sent by ${reminder.testSenderName}. Dismissing won't write an acknowledgement.`;
+      lateLabel.style.display = 'block';
+      lateLabel.style.background = '#e7e0ff';
+      lateLabel.style.borderColor = '#b89aff';
+      lateLabel.style.color = '#4a3370';
+    }
+    if (doneBtn) doneBtn.textContent = 'Close (test)';
+  } else {
+    if (titleEl) titleEl.textContent = '🔔 Class Reminder';
+    if (doneBtn) doneBtn.textContent = 'Done — I sent it';
+    // Reset late-label colors in case they were overridden by a previous test
+    lateLabel.style.background = '';
+    lateLabel.style.borderColor = '';
+    lateLabel.style.color = '';
+    if (reminder.lateMinutes >= 1) {
+      lateLabel.textContent = `⚠️ This reminder was due ${reminder.lateMinutes} min ago.`;
+      lateLabel.style.display = 'block';
+    } else {
+      lateLabel.style.display = 'none';
+    }
   }
 
   show('reminderPopupModal');
 
   // Start the alarm sound loop. Stops as soon as the user focuses the window.
   startReminderAlarm();
-  // If the window already has focus, don't loop noisily — stop after the
-  // initial buzz.
   if (document.hasFocus()) stopReminderAlarmLoop();
-  // Once the window gains focus (e.g. user clicks the tab), silence.
   window.addEventListener('focus', stopReminderAlarmLoop, { once: true });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) stopReminderAlarmLoop();
@@ -8216,24 +8293,48 @@ async function dismissReminderPopup() {
     stopReminderAlarmLoop();
     return;
   }
-  // Write the ack doc so it doesn't fire again on this device or any other,
-  // and so Boss/Mgr can see it was acknowledged.
-  try {
-    await db.collection('reminder_acks').doc(reminder.occKey).set({
-      programId: reminder.programId,
-      classId: reminder.classId,
-      acknowledgedBy: state.user.uid,
-      acknowledgedByName: state.profile.name || '—',
-      acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      teacherName: reminder.teacherName,
-      targetTime: reminder.targetMs,
-    });
-  } catch (err) {
-    console.error('reminder ack write failed:', err);
+  if (reminder.testMode) {
+    // Test mode: delete the test request doc (so a refresh doesn't replay it),
+    // but DON'T write a real ack — test runs shouldn't suppress a real
+    // reminder for the same class today.
+    if (reminder.testRequestId) {
+      try {
+        await db.collection('reminder_test_requests').doc(reminder.testRequestId).delete();
+      } catch (err) {
+        console.error('test request delete failed:', err);
+      }
+    }
+  } else {
+    // Real mode: write the ack so it doesn't fire again on this or any
+    // other device, and so Boss/Mgr can see it was acknowledged.
+    try {
+      await db.collection('reminder_acks').doc(reminder.occKey).set({
+        programId: reminder.programId,
+        classId: reminder.classId,
+        acknowledgedBy: state.user.uid,
+        acknowledgedByName: state.profile.name || '—',
+        acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        teacherName: reminder.teacherName,
+        targetTime: reminder.targetMs,
+      });
+    } catch (err) {
+      console.error('reminder ack write failed:', err);
+    }
   }
   state.pendingReminder = null;
   stopReminderAlarmLoop();
   hide('reminderPopupModal');
+  // After dismissal, give the test-request listener a chance to deliver any
+  // queued tests. The delete above already triggers a snapshot, but if the
+  // dismissed popup wasn't a test (real reminder), there might still be a
+  // queued test waiting. Force a quick re-check.
+  setTimeout(() => {
+    if (!state.pendingReminder && unsubs.reminderTestRequests) {
+      // The active onSnapshot will have the latest data; re-running its
+      // handler is straightforward — just resubscribe.
+      subscribeReminderTestRequests();
+    }
+  }, 100);
 }
 
 // Copy the rendered message to clipboard.
@@ -8269,6 +8370,79 @@ function subscribeReminderPrograms() {
       renderReminderHistorySection();
     }
   }, () => {});
+}
+
+// Subscribe to test-reminder requests targeted at me. When a request appears,
+// fetch the matching class data and fire the test popup. The "Done — close
+// (test)" button deletes the request doc (no ack written for tests).
+function subscribeReminderTestRequests() {
+  if (!state.user) return;
+  if (unsubs.reminderTestRequests) { unsubs.reminderTestRequests(); unsubs.reminderTestRequests = null; }
+  unsubs.reminderTestRequests = db.collection('reminder_test_requests')
+    .where('assigneeId', '==', state.user.uid)
+    .onSnapshot(snap => {
+      // Process the OLDEST first so multiple queued tests fire in order.
+      const docs = snap.docs.slice().sort((a, b) => {
+        const aMs = (a.data().createdAt && a.data().createdAt.toMillis) ? a.data().createdAt.toMillis() : 0;
+        const bMs = (b.data().createdAt && b.data().createdAt.toMillis) ? b.data().createdAt.toMillis() : 0;
+        return aMs - bMs;
+      });
+      // Skip if a popup is already showing — we'll come back when it dismisses.
+      if (state.pendingReminder) return;
+      const doc = docs[0];
+      if (!doc) return;
+      handleIncomingTestRequest(doc.id, doc.data());
+    }, () => {});
+}
+
+async function handleIncomingTestRequest(requestId, data) {
+  if (!state.taAccessReady) {
+    // We can't pull the class data — surface a minimal popup so the
+    // recipient at least knows a test was attempted.
+    showReminderPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      teacherName: '(unable to load class data)',
+      channelUrl: '(no class-data access on this device)',
+      studentDiscords: [],
+    });
+    return;
+  }
+  try {
+    const classDoc = await taDb.collection('scheduler_classes').doc(data.classId).get();
+    if (!classDoc.exists) {
+      // Class was deleted between request creation and delivery. Clean up silently.
+      try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
+      return;
+    }
+    const cls = { id: classDoc.id, ...classDoc.data() };
+    const teacher = await getCachedTaTeacher(cls.teacherId);
+    if (!teacher) {
+      showReminderPopup({
+        testMode: true,
+        testRequestId: requestId,
+        testSenderName: data.senderName || '—',
+        teacherName: '(no teacher assigned to this class)',
+        channelUrl: '(skipped in real reminders)',
+        studentDiscords: [],
+      });
+      return;
+    }
+    const channelUrl = pickReminderChannel(cls.day, teacher.name)
+      || '(no Discord channel mapping for this day/teacher — would skip in real reminders)';
+    const studentDiscords = await collectClassStudentDiscords(cls);
+    showReminderPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      teacherName: teacher.name,
+      channelUrl,
+      studentDiscords,
+    });
+  } catch (err) {
+    console.error('handleIncomingTestRequest failed:', err);
+  }
 }
 
 async function createReminderProgram(assigneeId) {
@@ -8351,11 +8525,15 @@ function renderReminderProgramsSection() {
     <h4>📢 Reminders</h4>
     ${statusBanner}
     <div class="reminder-programs-list">${listHtml}</div>
-    <button class="btn-action primary" id="addReminderProgramBtn" style="margin-top: 10px;">+ Assign Class Reminders</button>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button class="btn-action primary" id="addReminderProgramBtn" style="flex:1;">+ Assign Class Reminders</button>
+      <button class="btn-action secondary" id="testReminderBtn" title="Send a one-off test reminder to any teammate to verify the popup works">🧪 Test Now</button>
+    </div>
   `;
 
   // Wire add button.
   el('addReminderProgramBtn').addEventListener('click', openAddReminderProgramModal);
+  el('testReminderBtn').addEventListener('click', openTestReminderModal);
   // Wire remove buttons.
   wrap.querySelectorAll('[data-rm-prog]').forEach(btn => {
     btn.addEventListener('click', () => deleteReminderProgram(btn.dataset.rmProg));
@@ -8384,6 +8562,104 @@ async function submitAddReminderProgram() {
   if (!assigneeId) return;
   await createReminderProgram(assigneeId);
   hide('addReminderProgramModal');
+}
+
+/* ---- Test reminder ---- */
+
+function openTestReminderModal() {
+  if (!isBossOrManager(state.profile.role)) return;
+  const errBox = el('testReminderError');
+  errBox.style.display = 'none';
+  errBox.textContent = '';
+  // Populate the recipient picker with all active users.
+  const sel = el('testReminderAssignee');
+  sel.innerHTML = '';
+  const candidates = state.allUsers.filter(u => u.active !== false);
+  candidates.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.uid;
+    const isMe = u.uid === state.user.uid ? ' (me)' : '';
+    opt.textContent = `${u.name} (${u.role || 'Support'})${isMe}`;
+    sel.appendChild(opt);
+  });
+  // Default to me so the simplest test works without picking.
+  if (Array.from(sel.options).some(o => o.value === state.user.uid)) {
+    sel.value = state.user.uid;
+  }
+  show('testReminderModal');
+}
+
+async function submitTestReminder() {
+  if (!isBossOrManager(state.profile.role)) return;
+  const day = el('testReminderDay').value;
+  const time = el('testReminderTime').value;
+  const assigneeId = el('testReminderAssignee').value;
+  const errBox = el('testReminderError');
+  const submitBtn = el('testReminderSubmitBtn');
+
+  errBox.style.display = 'none';
+  errBox.textContent = '';
+
+  if (!day || !time || !assigneeId) {
+    errBox.textContent = 'Please pick a day, time, and recipient.';
+    errBox.style.display = 'block';
+    return;
+  }
+  if (!state.taAccessReady) {
+    errBox.textContent = 'Not connected to class data. Sign out and back in to retry.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Looking up class…';
+  try {
+    // Find a class matching this exact day + time. There might be multiple
+    // (e.g. two beginner classes at 6:30 PM Saturday) — pick the first
+    // active one and tell the user.
+    const snap = await taDb.collection('scheduler_classes')
+      .where('day', '==', day)
+      .where('time', '==', time)
+      .where('status', '==', 'active')
+      .get();
+
+    if (snap.empty) {
+      errBox.textContent = `No class found for ${day} at ${time}. Check the day/time match an existing class exactly.`;
+      errBox.style.display = 'block';
+      return;
+    }
+
+    const classDoc = snap.docs[0];
+    if (snap.docs.length > 1) {
+      console.info(`Multiple matches; using first (id=${classDoc.id}).`);
+    }
+
+    // Write the test request — recipient's app picks it up via onSnapshot.
+    const assignee = state.allUsers.find(u => u.uid === assigneeId);
+    await db.collection('reminder_test_requests').add({
+      assigneeId,
+      assigneeName: assignee ? assignee.name : '—',
+      classId: classDoc.id,
+      day,
+      time,
+      senderId: state.user.uid,
+      senderName: state.profile.name || '—',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    hide('testReminderModal');
+    showToast({
+      title: '🧪 Test reminder sent',
+      text: `${assignee ? assignee.name : 'Recipient'} should see a popup any moment now.`,
+      kind: 'default',
+    });
+  } catch (err) {
+    errBox.textContent = 'Failed to send test: ' + err.message;
+    errBox.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '🧪 Send Test';
+  }
 }
 
 function renderReminderHistorySection() {
