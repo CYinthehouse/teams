@@ -378,6 +378,157 @@
     border-radius: 6px;
   }
 
+  /* ---------- Attendance Contact popup ---------- */
+  .att-contact-students-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .att-contact-student {
+    background: var(--bg-3);
+    border: 1.5px solid var(--bg-2);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .att-contact-student-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .att-contact-student-meta {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .att-contact-copy {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+  }
+  .att-contact-copy:hover {
+    color: var(--pink-deep);
+  }
+  .att-contact-firstclass {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 8px;
+    background: #ffe6ec;
+    color: #b3334e;
+    border: 1px solid #ffc4d2;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .att-contact-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .att-contact-buttons .btn-action {
+    flex: 1 1 30%;
+    min-width: 100px;
+  }
+
+  /* Signoff form table */
+  .att-contact-signoff-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 13px;
+  }
+  .att-contact-signoff-table th,
+  .att-contact-signoff-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--bg-2);
+  }
+  .att-contact-signoff-table th {
+    background: var(--bg-3);
+    font-weight: 700;
+    color: var(--ink-soft);
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .att-contact-signoff-table input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--pink-deep);
+    cursor: pointer;
+  }
+
+  /* Homework sub-modal: link box */
+  .att-homework-link {
+    background: var(--bg-3);
+    border: 1.5px dashed var(--lavender);
+    border-radius: 10px;
+    padding: 10px 12px;
+    word-break: break-all;
+    font-size: 12px;
+    margin: 12px 0;
+  }
+  .att-homework-link a { color: var(--ink); text-decoration: underline; }
+
+  /* Reminder action row (two assign buttons side by side) */
+  .reminder-action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .reminder-action-row .btn-action {
+    flex: 1 1 200px;
+    font-size: 12px;
+    padding: 10px 14px;
+  }
+
+  /* ---------- Class Contacts list ---------- */
+  .class-contact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .class-contact-row {
+    background: var(--bg-3);
+    border: 1.5px solid var(--bg-2);
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .class-contact-row summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 10px 12px;
+    user-select: none;
+  }
+  .class-contact-row summary::-webkit-details-marker { display: none; }
+  .class-contact-row[open] summary {
+    border-bottom: 1px dashed var(--bg-2);
+  }
+  .class-contact-summary-line1 {
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .class-contact-summary-line2 {
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-top: 2px;
+  }
+  .class-contact-details {
+    padding: 10px 12px;
+    background: var(--bg-2);
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .class-contact-detail-line {
+    margin-bottom: 4px;
+    word-break: break-word;
+  }
+  .class-contact-detail-line:last-child { margin-bottom: 0; }
+  .class-contact-detail-line a { color: var(--ink); text-decoration: underline; }
+
   .form-input {
     width: 100%;
     padding: 13px 16px;
@@ -4421,6 +4572,74 @@
   </div>
 </div>
 
+<!-- Attendance Contact popup — fires from checkAndFireAttendanceContacts().
+     Two views inside one modal: the info view (list of absentees + buttons)
+     and the signoff view (checkbox table + name field). -->
+<div id="attContactModal" class="modal-backdrop hidden" style="z-index: 480;">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-head">
+      <div class="modal-title">📞 Class Contact Required</div>
+    </div>
+
+    <!-- VIEW 1: info / call to action -->
+    <div id="attContactInfoView" class="modal-body">
+      <div class="reminder-popup-headline">
+        These students were absent! Contact them now with:<br>
+        1) The class recording &nbsp; 2) Their homework assignment.
+      </div>
+      <div id="attContactSubtitle" style="font-size: 12px; color: var(--ink-light); margin-bottom: 12px;">—</div>
+
+      <div id="attContactStudentList" class="att-contact-students-wrap"></div>
+
+      <div class="att-contact-buttons">
+        <button class="btn-action secondary" onclick="openAttContactLoom()">🎬 View Loom</button>
+        <button class="btn-action secondary" onclick="openAttContactHomework()">📚 View Homework</button>
+        <button class="btn-action primary" onclick="showAttContactSignoffView()">✍️ Sign Off and Close</button>
+      </div>
+    </div>
+
+    <!-- VIEW 2: signoff form -->
+    <div id="attContactSignoffView" class="modal-body" style="display:none;">
+      <div class="reminder-popup-instruction">
+        Confirm you've contacted each student. All boxes must be checked,
+        and you must type your name below to sign off.
+      </div>
+      <table class="att-contact-signoff-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Student</th>
+            <th style="text-align:center;">Discord ✓</th>
+            <th style="text-align:center;">Texted ✓</th>
+          </tr>
+        </thead>
+        <tbody id="attContactSignoffRows"></tbody>
+      </table>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Type your name to sign</label>
+        <input type="text" id="attContactSignName" class="form-input" placeholder="Your full name…" />
+      </div>
+      <div style="display:flex; gap:8px; justify-content:space-between; margin-top:8px;">
+        <button class="btn-action secondary" onclick="backToAttContactInfoView()">← Back</button>
+        <button class="btn-action primary" id="attContactSubmitBtn" onclick="submitAttContactSignoff()" disabled>✍️ Submit & Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Homework sub-modal (opened from "View Homework" inside the contact popup) -->
+<div id="attHomeworkSubModal" class="modal-backdrop hidden" style="z-index: 490;">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-head">
+      <div class="modal-title" id="attHomeworkTitle">📚 Homework</div>
+      <button class="modal-close" onclick="hide('attHomeworkSubModal')">✕</button>
+    </div>
+    <div class="modal-body" id="attHomeworkBody"></div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="hide('attHomeworkSubModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
 <!-- Test Reminder modal — Boss/Mgr picks day + time + recipient,
      fires a one-off test popup on the recipient's device -->
@@ -4484,7 +4703,7 @@
       <button class="modal-close" onclick="hide('addReminderProgramModal')">✕</button>
     </div>
     <div class="modal-body">
-      <p style="font-size: 13px; color: var(--ink-soft); margin-top: 0;">
+      <p id="addReminderProgramHelp" style="font-size: 13px; color: var(--ink-soft); margin-top: 0;">
         The selected person will get a noisy popup 10 minutes before every class
         on Saturday and Sunday (Wonjoo's and Calvin's classes), with a pre-written
         Discord message ready to copy and paste.
@@ -4555,6 +4774,11 @@
       <!-- Reminder history (acks) — visible only to Boss/Manager.
            renderReminderHistorySection() populates this. -->
       <div class="settings-section" id="reminderHistoryWrap" style="display:none;"></div>
+
+      <!-- Class Contacts — visible to EVERYONE. Shows recent attendance
+           contact signoffs so the team can see who reached out about
+           absent students. renderClassContactsSection() populates this. -->
+      <div class="settings-section" id="classContactsWrap" style="display:none;"></div>
 
       <div class="settings-section" id="appSettingsSection">
         <h4>🔔 Notification Bell</h4>
@@ -4719,6 +4943,11 @@ const state = {
   remindersFired: new Set(),   // in-memory cache of "occurrence keys" already fired this session
   pendingReminder: null,       // currently-displayed reminder popup, if any
   reminderSoundLoop: null,     // setInterval id playing the alarm
+  // Attendance Contact reminders (separate program type)
+  attContactsFired: new Set(), // in-memory dedupe of fired (classId, week) keys
+  pendingAttContact: null,     // currently-displayed attendance-contact popup, if any
+  attContactSignoffStudents: [], // working state for the signoff form: [{studentId, name, contactedDiscord, contactedText}]
+  attContactsHistory: [],      // last N signoff docs (for the Class Contacts view)
   // Stage 4
   feedbackBenefits: [''],
   feedbackImprovements: [''],
@@ -4761,6 +4990,7 @@ const unsubs = {
   tasksPrivate: null,        // second listener for non-Boss/Mgr private-tasks-I-participate-in
   reminderPrograms: null,    // listener on reminder_programs (mine if Worker, all if Boss/Mgr)
   reminderTestRequests: null, // listener for incoming test-reminder requests targeted at me
+  attContactsHistory: null,  // listener on attendance_contact_signoffs for the "Class Contacts" view
   comments: null,
   activity: null,
   appSettings: null,
@@ -5416,6 +5646,17 @@ auth.onAuthStateChanged(async (user) => {
     if (!el('reminderPopupModal').classList.contains('hidden')) {
       hide('reminderPopupModal');
     }
+    // Attendance contact cleanup
+    state.attContactsFired = new Set();
+    state.pendingAttContact = null;
+    state.attContactSignoffStudents = [];
+    state.attContactsHistory = [];
+    if (!el('attContactModal').classList.contains('hidden')) {
+      hide('attContactModal');
+    }
+    if (!el('attHomeworkSubModal').classList.contains('hidden')) {
+      hide('attHomeworkSubModal');
+    }
     // Also wipe the localStorage cache so a different user on the same
     // browser doesn't briefly see the previous user's playlists at next sign-in.
     try {
@@ -5494,9 +5735,15 @@ auth.onAuthStateChanged(async (user) => {
   // Also subscribe to incoming test-reminder requests targeted at me, so
   // a Boss/Mgr clicking "Test Now" on their device fires a popup on mine.
   subscribeReminderTestRequests();
+  // Subscribe to the attendance contact signoff history so the Class
+  // Contacts section in Settings stays live for everyone.
+  subscribeAttContactsHistory();
   // Run an initial fire-check after a short delay so secondary auth has
   // a chance to be ready (it might be hydrating from local storage).
-  setTimeout(() => checkAndFireReminders(), 3000);
+  setTimeout(() => {
+    checkAndFireReminders();
+    checkAndFireAttendanceContacts();
+  }, 3000);
 
   // Stage 3: start periodic tick (1 minute) to refresh timer pills and detect expiries
   if (state.tickInterval) clearInterval(state.tickInterval);
@@ -5508,6 +5755,8 @@ auth.onAuthStateChanged(async (user) => {
     renderPokeStrip();
     // Check whether any class reminder is due to fire (10 min before class).
     checkAndFireReminders();
+    // Check whether any attendance contact reminder is due (15 min after class end).
+    checkAndFireAttendanceContacts();
   }, 30 * 1000); // every 30 seconds
 
   // Subscribe to teams I'm on (or all teams if Boss)
@@ -7781,6 +8030,8 @@ function renderSettings() {
   // Reminders (Boss/Manager) — programs list + history
   renderReminderProgramsSection();
   renderReminderHistorySection();
+  // Class Contacts (everyone) — list of attendance contact signoffs
+  renderClassContactsSection();
 
   // People
   const peopleWrap = el('peopleList');
@@ -7963,6 +8214,89 @@ const REMINDER_LEAD_MIN = 10;
 // How long after the target time we'll still fire a missed reminder (minutes).
 // Beyond this window, the reminder is considered too stale to be useful.
 const REMINDER_LATE_WINDOW_MIN = 60;
+
+/* ============================================
+   Attendance Contact reminders — separate program type.
+   Fires 15 minutes after a class ends, listing students who were
+   marked absent or have no attendance record for that class week.
+============================================ */
+
+// Loom link is the same Google Sheet for everyone.
+const ATTENDANCE_LOOM_URL = 'https://docs.google.com/spreadsheets/d/1SMGRa8JenwJA2T85mcVdU3kZh0DJFiOgkEnP358UbZU/edit?usp=sharing';
+
+// Homework PDFs for Absolute Beginner, weeks 1–6.
+const HW_ABSOLUTE = {
+  1: 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/HW_ABS_1.pdf?v=1770512391',
+  2: 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/HW_ABS_2_1.pdf?v=1772923919',
+  3: 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/HW_ABS_3_1.pdf?v=1772923919',
+  4: 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/HW_ABS_4_1.pdf?v=1772923919',
+  5: 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/HW_ABS_5_1.pdf?v=1772923921',
+  6: 'https://cdn.shopify.com/s/files/1/0674/6747/7282/files/ABS_6_1.pdf?v=1776559630',
+};
+
+// For Novice (and other non-Absolute levels), homework lives in a Discord
+// channel — different channel for Saturday vs Sunday classes.
+const HW_DISCORD_FALLBACK = {
+  Saturday: 'https://discord.com/channels/987542874352652378/1367597692129251410',
+  Sunday: 'https://discord.com/channels/987542874352652378/1455564603634483392',
+};
+
+// Compute the homework "deliverable" for a class + week.
+// Returns { kind: 'pdf', url } | { kind: 'discord', url, day } | { kind: 'unknown' }.
+function getHomeworkForClass(cls, week) {
+  if (!cls || !cls.level) return { kind: 'unknown' };
+  if (cls.level === 'absolute') {
+    const url = HW_ABSOLUTE[week];
+    return url ? { kind: 'pdf', url } : { kind: 'unknown' };
+  }
+  // For Novice / Beginner / Advanced — fall back to the Discord chat.
+  const url = HW_DISCORD_FALLBACK[cls.day];
+  if (url) return { kind: 'discord', url, day: cls.day };
+  return { kind: 'unknown' };
+}
+
+// Parse a class `time` string into start + end in minutes from start.
+// "6:30 PM"               → { startStr: "6:30 PM", durationMin: 75 }
+// "6:10 PM-7:10 PM"       → { startStr: "6:10 PM", durationMin: 60 } (1-hour)
+// "11:00 PM-12:00 AM"     → { startStr: "11:00 PM", durationMin: 60 }
+function parseClassTimeRange(timeStr) {
+  if (!timeStr) return null;
+  if (timeStr.includes('-')) {
+    // 1-hour explicit range
+    return {
+      startStr: timeStr.split('-')[0].trim(),
+      durationMin: 60,
+    };
+  }
+  // Default: standard 75-minute class
+  return {
+    startStr: timeStr.trim(),
+    durationMin: 75,
+  };
+}
+
+// Given a class doc, compute which week (1..N) of the program it's on right
+// now in NY time. Returns null if class hasn't started yet or if startDate is
+// missing. Mirrors the slot manager's getClassCurrentWeek().
+function getClassCurrentWeek(cls) {
+  if (!cls || !cls.startDate) return null;
+  // cls.startDate is "YYYY-MM-DD" in EST.
+  const todayParts = nyParts(new Date());
+  const todayStr = `${todayParts.year}-${String(todayParts.month).padStart(2, '0')}-${String(todayParts.day).padStart(2, '0')}`;
+  if (todayStr < cls.startDate) return 0;
+  const [sy, sm, sd] = cls.startDate.split('-').map(Number);
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const daysSince = Math.floor((Date.UTC(ty, tm - 1, td) - Date.UTC(sy, sm - 1, sd)) / msPerDay);
+  return Math.min(Math.floor(daysSince / 7) + 1, 7);
+}
+
+// Lead time AFTER class end before the contact reminder fires.
+const ATT_CONTACT_GRACE_MIN = 15;
+// How long after the target time we'll still fire a missed contact reminder.
+// Long window because signoffs are once-per-class and may be opened a day late.
+const ATT_CONTACT_LATE_WINDOW_MIN = 24 * 60; // 24 hours
+
 
 // Returns the JS Date representing `nowMs` interpreted in New York time as
 // y/m/d/h/m/s components. Used to figure out "what day is it in NY right now".
@@ -8351,6 +8685,476 @@ async function copyReminderMessage() {
   }
 }
 
+/* ============================================
+   Attendance Contact engine
+============================================ */
+
+// Main check, runs in the same 30-sec tick as checkAndFireReminders.
+// For each active class assigned to me (via class_end_attendance_contact
+// program), checks whether the most recent class occurrence has ended
+// (start + duration + 15min grace), pulls absentees, and fires popup.
+async function checkAndFireAttendanceContacts() {
+  if (!state.user || !state.profile) return;
+  if (!state.taAccessReady) return;
+  if (state.pendingReminder) return;       // existing class reminder showing
+  if (state.pendingAttContact) return;     // already showing one of these
+
+  // Find programs of the new type assigned to me.
+  const myPrograms = state.reminderPrograms.filter(p =>
+    p.active && p.type === 'class_end_attendance_contact' && p.assigneeId === state.user.uid
+  );
+  if (myPrograms.length === 0) return;
+
+  // Pull all active classes once.
+  let classes;
+  try {
+    const snap = await taDb.collection('scheduler_classes')
+      .where('status', '==', 'active').get();
+    classes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('checkAndFireAttendanceContacts: classes read failed:', err);
+    return;
+  }
+  if (classes.length === 0) return;
+
+  const now = Date.now();
+  const todayNy = nyParts(new Date(now));
+  const yesterdayNy = nyParts(new Date(now - 24 * 3600 * 1000));
+
+  for (const cls of classes) {
+    // Match class.day to today or yesterday (so a Saturday class can still
+    // fire its popup early Sunday morning if missed).
+    let useDate = null;
+    if (cls.day === todayNy.weekday) useDate = todayNy;
+    else if (cls.day === yesterdayNy.weekday) useDate = yesterdayNy;
+    else continue;
+
+    const range = parseClassTimeRange(cls.time);
+    if (!range) continue;
+    const startMs = nyDateTimeToUtcMs(useDate.year, useDate.month, useDate.day, range.startStr);
+    if (!startMs) continue;
+    const endMs = startMs + range.durationMin * 60 * 1000;
+    const targetMs = endMs + ATT_CONTACT_GRACE_MIN * 60 * 1000;
+    const lateBy = now - targetMs;
+    if (lateBy < 0) continue;
+    if (lateBy > ATT_CONTACT_LATE_WINDOW_MIN * 60 * 1000) continue;
+
+    // What program-week is this? (1..6+)
+    const week = getClassCurrentWeek(cls);
+    if (!week || week < 1) continue;
+
+    const occKey = `${cls.id}__${week}`;
+    if (state.attContactsFired.has(occKey)) continue;
+    state.attContactsFired.add(occKey);
+
+    // Persistent dedup: did anyone already sign off?
+    let alreadySigned = false;
+    try {
+      const sigDoc = await db.collection('attendance_contact_signoffs').doc(occKey).get();
+      if (sigDoc.exists) alreadySigned = true;
+    } catch (e) {
+      // ignore — we'll still fire
+    }
+    if (alreadySigned) continue;
+
+    // Compute absent students: anyone in cls.students whose
+    // scheduler_attendance/{classId}_{studentId}_{week} either doesn't exist
+    // OR has status == 'absent'.
+    const studentRefs = Array.isArray(cls.students) ? cls.students : [];
+    if (studentRefs.length === 0) continue;
+    const absentList = await collectAbsentStudents(cls, week, studentRefs);
+    if (absentList.length === 0) continue; // nobody absent — skip
+
+    // Fire popup. Just one program at a time; if multiple programs target
+    // me they'd all fire the same popup anyway.
+    showAttendanceContactPopup({
+      classId: cls.id,
+      classLevel: cls.level,
+      classDay: cls.day,
+      classTime: cls.time,
+      week,
+      occKey,
+      programId: myPrograms[0].id,
+      absentStudents: absentList,
+    });
+    return; // one popup at a time
+  }
+}
+
+// For a class + week, look up scheduler_attendance docs and figure out
+// which students were absent or have no record. Pulls full student docs
+// to get name/discord/phone.
+async function collectAbsentStudents(cls, week, studentRefs) {
+  // Pull the attendance status for everyone in the class for this week.
+  // Doc IDs are deterministic: ${classId}_${studentId}_${week}.
+  const docIds = studentRefs
+    .map(s => s.id)
+    .filter(Boolean)
+    .map(sid => `${cls.id}_${sid}_${week}`);
+  // We'll read these in chunks of 30 (Firestore "in" query limit on docId).
+  const attendanceByStudent = {};
+  const CHUNK = 30;
+  for (let i = 0; i < docIds.length; i += CHUNK) {
+    const chunk = docIds.slice(i, i + CHUNK);
+    try {
+      const qSnap = await taDb.collection('scheduler_attendance')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+      qSnap.docs.forEach(d => {
+        const data = d.data();
+        attendanceByStudent[data.studentId] = data.status;
+      });
+    } catch (e) {
+      console.warn('collectAbsentStudents chunk failed:', e);
+    }
+  }
+  // An absentee is anyone in studentRefs whose status is 'absent' or
+  // who has no record at all.
+  const absentRefs = studentRefs.filter(s => {
+    const status = attendanceByStudent[s.id];
+    return status === 'absent' || status === undefined;
+  });
+  if (absentRefs.length === 0) return [];
+
+  // Pull full student docs to get discord / phone.
+  const ids = absentRefs.map(s => s.id);
+  const fullStudents = {};
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    try {
+      const qSnap = await taDb.collection('scheduler_students')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+      qSnap.docs.forEach(d => { fullStudents[d.id] = d.data(); });
+    } catch (e) {
+      console.warn('collectAbsentStudents student-fetch failed:', e);
+    }
+  }
+  return absentRefs.map(s => {
+    const full = fullStudents[s.id] || {};
+    return {
+      studentId: s.id,
+      name: full.name || s.name || '—',
+      discord: (full.discord || full.discordName || '').trim() || null,
+      phone: (full.phone || full.phoneNumber || '').trim() || null,
+    };
+  });
+}
+
+/* ---- Attendance Contact popup ---- */
+
+function showAttendanceContactPopup(payload) {
+  state.pendingAttContact = payload;
+  // Reset per-student checkbox state for the signoff form.
+  state.attContactSignoffStudents = payload.absentStudents.map(s => ({
+    studentId: s.studentId,
+    name: s.name,
+    discord: s.discord,
+    phone: s.phone,
+    contactedDiscord: false,
+    contactedText: false,
+  }));
+
+  // Render the info-view first.
+  renderAttContactInfoView();
+  show('attContactModal');
+
+  // Reuse the same alarm logic as the class-reminder popup.
+  startReminderAlarm();
+  if (document.hasFocus()) stopReminderAlarmLoop();
+  window.addEventListener('focus', stopReminderAlarmLoop, { once: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) stopReminderAlarmLoop();
+  }, { once: true });
+}
+
+// View 1: list of absentees with "Loom / Homework / Sign Off" buttons.
+function renderAttContactInfoView() {
+  const payload = state.pendingAttContact;
+  if (!payload) return;
+  // Hide signoff view, show info view.
+  el('attContactInfoView').style.display = '';
+  el('attContactSignoffView').style.display = 'none';
+
+  const isFirstWeek = payload.week === 1;
+  const levelName = ({
+    absolute: 'Absolute Beginner', novice: 'Novice',
+    beginner: 'Beginner', advanced: 'Advanced Beginner',
+  })[payload.classLevel] || payload.classLevel || '—';
+
+  el('attContactSubtitle').textContent =
+    `${payload.classDay} · ${payload.classTime} · ${levelName} · Week ${payload.week}`;
+
+  // Per-student rows.
+  const listEl = el('attContactStudentList');
+  listEl.innerHTML = state.attContactSignoffStudents.map(s => {
+    const discordLabel = s.discord
+      ? `🎮 <span class="att-contact-copy" data-copy="${escapeAttr(s.discord)}" title="Click to copy">${escapeHtml(s.discord)}</span>`
+      : `<span style="color: var(--ink-light); font-style: italic;">no Discord</span>`;
+    const phoneLabel = s.phone
+      ? `📱 <span class="att-contact-copy" data-copy="${escapeAttr(s.phone)}" title="Click to copy">${escapeHtml(s.phone)}</span>`
+      : `<span style="color: var(--ink-light); font-style: italic;">no phone</span>`;
+    const firstClassBadge = isFirstWeek
+      ? `<span class="att-contact-firstclass" title="Set up a tutoring time to onboard them">🆕 First class — schedule tutoring</span>`
+      : '';
+    return `
+      <div class="att-contact-student">
+        <div class="att-contact-student-name">${escapeHtml(s.name)}</div>
+        <div class="att-contact-student-meta">${discordLabel} &nbsp;·&nbsp; ${phoneLabel}</div>
+        ${firstClassBadge}
+      </div>
+    `;
+  }).join('');
+
+  // Wire up click-to-copy for discord/phone.
+  listEl.querySelectorAll('.att-contact-copy').forEach(span => {
+    span.addEventListener('click', () => {
+      const text = span.dataset.copy;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = span.textContent;
+        span.textContent = '✓ Copied!';
+        setTimeout(() => { span.textContent = orig; }, 1200);
+      }).catch(() => {});
+    });
+  });
+}
+
+// Open the "View Loom" link in a new tab.
+function openAttContactLoom() {
+  window.open(ATTENDANCE_LOOM_URL, '_blank', 'noopener');
+}
+
+// Show the homework modal-within-modal.
+function openAttContactHomework() {
+  const payload = state.pendingAttContact;
+  if (!payload) return;
+  const cls = { level: payload.classLevel, day: payload.classDay };
+  const hw = getHomeworkForClass(cls, payload.week);
+
+  const titleEl = el('attHomeworkTitle');
+  const bodyEl = el('attHomeworkBody');
+  if (hw.kind === 'pdf') {
+    titleEl.textContent = '📚 Homework PDF';
+    bodyEl.innerHTML = `
+      <p>This week's homework PDF for <strong>Absolute Beginner Week ${payload.week}</strong>:</p>
+      <div class="att-homework-link">
+        <a href="${escapeAttr(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
+      </div>
+      <button class="btn-action secondary" id="attHomeworkCopyBtn">📋 Copy Link</button>
+    `;
+    el('attHomeworkCopyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(hw.url).then(() => {
+        el('attHomeworkCopyBtn').textContent = '✓ Copied!';
+        setTimeout(() => { el('attHomeworkCopyBtn').textContent = '📋 Copy Link'; }, 1200);
+      });
+    });
+  } else if (hw.kind === 'discord') {
+    titleEl.textContent = '📚 Homework — Discord';
+    bodyEl.innerHTML = `
+      <p>For ${escapeHtml(hw.day)} Novice/Beginner classes, this week's homework lives in the Discord chat:</p>
+      <div class="att-homework-link">
+        <a href="${escapeAttr(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
+      </div>
+      <p style="font-size: 12px; color: var(--ink-light);">If the homework isn't in the chat, please ask Mr. Calvin.</p>
+      <button class="btn-action secondary" id="attHomeworkCopyBtn">📋 Copy Link</button>
+    `;
+    el('attHomeworkCopyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(hw.url).then(() => {
+        el('attHomeworkCopyBtn').textContent = '✓ Copied!';
+        setTimeout(() => { el('attHomeworkCopyBtn').textContent = '📋 Copy Link'; }, 1200);
+      });
+    });
+  } else {
+    titleEl.textContent = '📚 Homework — Unknown';
+    bodyEl.innerHTML = `
+      <p>I don't have a homework link for this class type / week.</p>
+      <p style="font-size: 12px;">Please ask Mr. Calvin where to send the homework for this class.</p>
+    `;
+  }
+  show('attHomeworkSubModal');
+}
+
+// Toggle to the signoff form view.
+function showAttContactSignoffView() {
+  el('attContactInfoView').style.display = 'none';
+  el('attContactSignoffView').style.display = '';
+  el('attContactSignName').value = '';
+  renderAttContactSignoffTable();
+  updateAttContactSubmitButton();
+}
+
+// Back to the info view.
+function backToAttContactInfoView() {
+  renderAttContactInfoView();
+}
+
+// Renders the signoff form's checkbox table.
+function renderAttContactSignoffTable() {
+  const tbody = el('attContactSignoffRows');
+  tbody.innerHTML = state.attContactSignoffStudents.map((s, i) => `
+    <tr>
+      <td>${escapeHtml(s.name)}</td>
+      <td style="text-align:center;">
+        <input type="checkbox" data-idx="${i}" data-field="discord" ${s.contactedDiscord ? 'checked' : ''} />
+      </td>
+      <td style="text-align:center;">
+        <input type="checkbox" data-idx="${i}" data-field="text" ${s.contactedText ? 'checked' : ''} />
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      const field = cb.dataset.field;
+      if (field === 'discord') state.attContactSignoffStudents[idx].contactedDiscord = cb.checked;
+      else if (field === 'text') state.attContactSignoffStudents[idx].contactedText = cb.checked;
+      updateAttContactSubmitButton();
+    });
+  });
+  // Also wire the name input.
+  el('attContactSignName').addEventListener('input', updateAttContactSubmitButton);
+}
+
+// Enable/disable the submit button based on whether all checkboxes are
+// checked AND the name field is non-empty.
+function updateAttContactSubmitButton() {
+  const allChecked = state.attContactSignoffStudents.every(
+    s => s.contactedDiscord && s.contactedText
+  );
+  const nameOk = (el('attContactSignName').value || '').trim().length > 0;
+  el('attContactSubmitBtn').disabled = !(allChecked && nameOk);
+}
+
+async function submitAttContactSignoff() {
+  const payload = state.pendingAttContact;
+  if (!payload) return;
+  const allChecked = state.attContactSignoffStudents.every(
+    s => s.contactedDiscord && s.contactedText
+  );
+  const typedName = (el('attContactSignName').value || '').trim();
+  if (!allChecked || !typedName) {
+    return; // button should be disabled but be safe
+  }
+
+  const submitBtn = el('attContactSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+  try {
+    const cls = { level: payload.classLevel, day: payload.classDay };
+    const hw = getHomeworkForClass(cls, payload.week);
+    await db.collection('attendance_contact_signoffs').doc(payload.occKey).set({
+      classId: payload.classId,
+      classLevel: payload.classLevel,
+      classDay: payload.classDay,
+      classTime: payload.classTime,
+      week: payload.week,
+      programId: payload.programId,
+      signedBy: state.user.uid,
+      signedByName: state.profile.name || '—',
+      signedNameTyped: typedName,
+      signedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      loomUrl: ATTENDANCE_LOOM_URL,
+      homeworkKind: hw.kind,
+      homeworkUrl: hw.url || null,
+      students: state.attContactSignoffStudents.map(s => ({
+        studentId: s.studentId,
+        name: s.name,
+        discord: s.discord,
+        phone: s.phone,
+        contactedDiscord: !!s.contactedDiscord,
+        contactedText: !!s.contactedText,
+      })),
+    });
+    state.pendingAttContact = null;
+    state.attContactSignoffStudents = [];
+    stopReminderAlarmLoop();
+    hide('attContactModal');
+  } catch (err) {
+    console.error('attendance contact signoff failed:', err);
+    alert('Could not save signoff: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '✍️ Submit & Close';
+  }
+}
+
+/* ---- Class Contacts list (Settings, visible to everyone) ---- */
+
+function subscribeAttContactsHistory() {
+  if (!state.user) return;
+  if (unsubs.attContactsHistory) { unsubs.attContactsHistory(); unsubs.attContactsHistory = null; }
+  // Read latest 50 signoffs. Visible to everyone signed in.
+  unsubs.attContactsHistory = db.collection('attendance_contact_signoffs')
+    .orderBy('signedAt', 'desc').limit(50)
+    .onSnapshot(snap => {
+      state.attContactsHistory = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (!el('settingsModal').classList.contains('hidden')) {
+        renderClassContactsSection();
+      }
+    }, () => {});
+}
+
+function renderClassContactsSection() {
+  const wrap = el('classContactsWrap');
+  if (!wrap) return;
+  // Visible to everyone — no role gating.
+  wrap.style.display = '';
+
+  const items = state.attContactsHistory || [];
+  if (items.length === 0) {
+    wrap.innerHTML = `
+      <h4>📞 Class Contacts</h4>
+      <div class="reminder-empty">No class contact signoffs yet.</div>
+    `;
+    return;
+  }
+
+  const rowsHtml = items.map(c => {
+    const when = c.signedAt && c.signedAt.toMillis
+      ? new Date(c.signedAt.toMillis()).toLocaleString(undefined, {
+          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        })
+      : '—';
+    const levelName = ({
+      absolute: 'Absolute Beginner', novice: 'Novice',
+      beginner: 'Beginner', advanced: 'Advanced Beginner',
+    })[c.classLevel] || c.classLevel || '—';
+    const studentsList = (c.students || []).map(s => {
+      const tags = [];
+      if (s.contactedDiscord) tags.push('🎮');
+      if (s.contactedText) tags.push('📱');
+      return `${escapeHtml(s.name)} ${tags.join('')}`;
+    }).join(', ');
+    const hwLabel = c.homeworkKind === 'pdf' ? 'Absolute HW PDF'
+      : c.homeworkKind === 'discord' ? 'Discord chat HW'
+      : 'no HW link';
+    return `
+      <details class="class-contact-row">
+        <summary>
+          <div class="class-contact-summary-line1">
+            <strong>${escapeHtml(c.classDay || '')} · ${escapeHtml(c.classTime || '')} · ${escapeHtml(levelName)} · Wk ${c.week}</strong>
+          </div>
+          <div class="class-contact-summary-line2">
+            ✓ <strong>${escapeHtml(c.signedByName || '—')}</strong> ·
+            ${(c.students || []).length} student${(c.students || []).length === 1 ? '' : 's'} ·
+            ${escapeHtml(when)}
+          </div>
+        </summary>
+        <div class="class-contact-details">
+          <div class="class-contact-detail-line"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
+          <div class="class-contact-detail-line"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeAttr(c.homeworkUrl) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
+          <div class="class-contact-detail-line"><strong>Loom:</strong> <a href="${escapeAttr(c.loomUrl || '#')}" target="_blank" rel="noopener">link</a></div>
+          <div class="class-contact-detail-line"><strong>Students contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>
+        </div>
+      </details>
+    `;
+  }).join('');
+
+  wrap.innerHTML = `
+    <h4>📞 Class Contacts</h4>
+    <div class="class-contact-list">${rowsHtml}</div>
+  `;
+}
+
+
 /* ---- Reminder programs subscription + admin UI ---- */
 
 function subscribeReminderPrograms() {
@@ -8445,22 +9249,28 @@ async function handleIncomingTestRequest(requestId, data) {
   }
 }
 
-async function createReminderProgram(assigneeId) {
+async function createReminderProgram(assigneeId, programType) {
   if (!isBossOrManager(state.profile.role)) return;
   const assignee = state.allUsers.find(u => u.uid === assigneeId);
   if (!assignee) return;
-  // Don't double-add: if this user already has an active program for the
-  // class_10min_before type, just say so.
+  programType = programType || 'class_10min_before';
+  // Friendly type label for messages
+  const typeLabel = ({
+    class_10min_before: 'class reminders',
+    class_end_attendance_contact: 'attendance contact',
+  })[programType] || programType;
+  // Don't double-add: if this user already has an active program of this
+  // type, just say so.
   const existing = state.reminderPrograms.find(p =>
-    p.type === 'class_10min_before' && p.assigneeId === assigneeId && p.active
+    p.type === programType && p.assigneeId === assigneeId && p.active
   );
   if (existing) {
-    alert(`${assignee.name} already has an active class-reminders program assigned.`);
+    alert(`${assignee.name} already has an active ${typeLabel} program assigned.`);
     return;
   }
   try {
     await db.collection('reminder_programs').add({
-      type: 'class_10min_before',
+      type: programType,
       assigneeId,
       assigneeName: assignee.name,
       createdBy: state.user.uid,
@@ -8499,6 +9309,12 @@ function renderReminderProgramsSection() {
 
   const activePrograms = state.reminderPrograms.filter(p => p.active);
 
+  // Friendly labels per program type.
+  const TYPE_LABELS = {
+    class_10min_before: { icon: '📢', name: 'Class reminders (10 min before)' },
+    class_end_attendance_contact: { icon: '📞', name: 'Attendance contact (after class)' },
+  };
+
   let listHtml = '';
   if (activePrograms.length === 0) {
     listHtml = `<div class="reminder-empty">No reminder programs assigned yet.</div>`;
@@ -8507,12 +9323,13 @@ function renderReminderProgramsSection() {
       const created = p.createdAt && p.createdAt.toMillis
         ? new Date(p.createdAt.toMillis()).toLocaleDateString()
         : '—';
+      const meta = TYPE_LABELS[p.type] || { icon: '📋', name: p.type || 'reminder' };
       return `
         <div class="reminder-program-row">
           <div class="reminder-program-info">
-            <div class="reminder-program-assignee">📢 ${escapeHtml(p.assigneeName || '—')}</div>
+            <div class="reminder-program-assignee">${meta.icon} ${escapeHtml(p.assigneeName || '—')}</div>
             <div class="reminder-program-sub">
-              Class reminders · assigned by ${escapeHtml(p.createdByName || '—')} · ${escapeHtml(created)}
+              ${escapeHtml(meta.name)} · assigned by ${escapeHtml(p.createdByName || '—')} · ${escapeHtml(created)}
             </div>
           </div>
           <button class="btn-mini danger" data-rm-prog="${escapeHtml(p.id)}" title="Remove">✕</button>
@@ -8525,14 +9342,21 @@ function renderReminderProgramsSection() {
     <h4>📢 Reminders</h4>
     ${statusBanner}
     <div class="reminder-programs-list">${listHtml}</div>
-    <div style="display:flex; gap:8px; margin-top:10px;">
-      <button class="btn-action primary" id="addReminderProgramBtn" style="flex:1;">+ Assign Class Reminders</button>
+    <div class="reminder-action-row">
+      <button class="btn-action primary" data-add-prog-type="class_10min_before">+ Class Reminders (10 min before)</button>
+      <button class="btn-action primary" data-add-prog-type="class_end_attendance_contact">+ Attendance Contact (after class)</button>
+    </div>
+    <div style="margin-top: 8px;">
       <button class="btn-action secondary" id="testReminderBtn" title="Send a one-off test reminder to any teammate to verify the popup works">🧪 Test Now</button>
     </div>
   `;
 
-  // Wire add button.
-  el('addReminderProgramBtn').addEventListener('click', openAddReminderProgramModal);
+  // Wire add buttons (one per program type).
+  wrap.querySelectorAll('[data-add-prog-type]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openAddReminderProgramModal(btn.dataset.addProgType);
+    });
+  });
   el('testReminderBtn').addEventListener('click', openTestReminderModal);
   // Wire remove buttons.
   wrap.querySelectorAll('[data-rm-prog]').forEach(btn => {
@@ -8540,11 +9364,32 @@ function renderReminderProgramsSection() {
   });
 }
 
-function openAddReminderProgramModal() {
+// Stash the program type chosen so submitAddReminderProgram can read it.
+let _pendingProgramType = 'class_10min_before';
+
+function openAddReminderProgramModal(programType) {
   // Build a list of users (Teacher/Support/Manager — anyone except Boss-only people)
   // who could realistically receive class reminders. Boss CAN assign to themselves.
   const candidates = state.allUsers.filter(u => u.active !== false);
   if (candidates.length === 0) { alert('No users to assign to.'); return; }
+  _pendingProgramType = programType || 'class_10min_before';
+  // Update the modal title + helper text to reflect which type we're assigning.
+  const titleEl = document.querySelector('#addReminderProgramModal .modal-title');
+  const helpEl = el('addReminderProgramHelp');
+  if (_pendingProgramType === 'class_end_attendance_contact') {
+    if (titleEl) titleEl.textContent = '📞 Assign Attendance Contact';
+    if (helpEl) helpEl.textContent =
+      'The selected person will get a noisy popup 15 minutes after every class ' +
+      'ends, listing students who were absent or have no attendance record. ' +
+      'They\'ll send each absent student the class recording (Loom) and homework, ' +
+      'then sign off in the popup.';
+  } else {
+    if (titleEl) titleEl.textContent = '📢 Assign Class Reminders';
+    if (helpEl) helpEl.textContent =
+      'The selected person will get a noisy popup 10 minutes before every class ' +
+      'on Saturday and Sunday (Wonjoo\'s and Calvin\'s classes), with a pre-written ' +
+      'Discord message ready to copy and paste.';
+  }
   const sel = el('addReminderProgramAssignee');
   sel.innerHTML = '';
   candidates.forEach(u => {
@@ -8560,7 +9405,7 @@ async function submitAddReminderProgram() {
   const sel = el('addReminderProgramAssignee');
   const assigneeId = sel.value;
   if (!assigneeId) return;
-  await createReminderProgram(assigneeId);
+  await createReminderProgram(assigneeId, _pendingProgramType);
   hide('addReminderProgramModal');
 }
 
