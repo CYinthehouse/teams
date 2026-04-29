@@ -3842,6 +3842,16 @@
   .music-btn.play:hover {
     background: linear-gradient(135deg, #ff7aa8 0%, #ff9bc1 100%);
   }
+  /* Shuffle "active" indicator — clear visual state when ON. */
+  #musicShuffleBtn.active {
+    background: linear-gradient(135deg, var(--lavender) 0%, var(--pink-soft) 100%);
+    color: var(--ink);
+    box-shadow: 0 0 0 2px var(--lavender-soft), 0 2px 6px rgba(180, 150, 230, 0.35);
+  }
+  body.dark #musicShuffleBtn.active {
+    background: linear-gradient(135deg, var(--lavender) 0%, var(--pink-deep) 100%);
+    color: #fff;
+  }
 
   /* Volume slider row */
   .music-volume-row {
@@ -4256,6 +4266,19 @@
   .music-add-input:focus {
     border-color: var(--pink);
   }
+  /* Optional song-name input below the URL row — slightly de-emphasized
+     so it's clear it's optional. */
+  .music-add-title-input {
+    margin-top: 6px;
+    margin-bottom: 0;
+    font-size: 11px;
+    color: var(--ink-soft);
+    border-style: dashed;
+  }
+  .music-add-title-input:focus {
+    border-style: solid;
+    color: var(--ink);
+  }
   .music-add-row-buttons {
     display: flex;
     gap: 6px;
@@ -4477,6 +4500,7 @@
       <div class="music-title" id="musicTitle">Music</div>
       <div class="music-status" id="musicStatus">Pick a track ♡</div>
     </div>
+    <button class="music-btn" id="musicShuffleBtn" title="Shuffle">🔀</button>
     <button class="music-btn" id="musicPrevBtn" title="Previous">⏮</button>
     <button class="music-btn play" id="musicPlayBtn" title="Play / Pause">▶</button>
     <button class="music-btn" id="musicNextBtn" title="Next">⏭</button>
@@ -12504,6 +12528,12 @@ const music = {
   volume: 25,
   collapsed: true,
   initialized: false,
+  // Shuffle play. When true, playMusicNext picks a random track instead
+  // of advancing sequentially. Persisted to localStorage like volume.
+  shuffle: false,
+  // Recent track-id history for shuffle "previous". When shuffle is off
+  // this stays empty and we use sequential prev/next.
+  shuffleHistory: [],
   // The user's own playlists (private + public). Each has a `visibility` field.
   playlists: [],
   // Public playlists created by OTHER users — read-only, visible to everyone.
@@ -12586,6 +12616,7 @@ function loadMusicSettings() {
   try {
     const vol = parseInt(localStorage.getItem('music_volume') || '25', 10);
     if (!isNaN(vol) && vol >= 0 && vol <= 100) music.volume = vol;
+    music.shuffle = localStorage.getItem('music_shuffle') === '1';
 
     // Load user playlists from localStorage cache (will be overridden by
     // Firestore once that loads — this just prevents UI flash before then).
@@ -12841,6 +12872,7 @@ function saveMusicSettings() {
   // Always write to localStorage (fast, used as cache + offline fallback).
   try {
     localStorage.setItem('music_volume', String(music.volume));
+    localStorage.setItem('music_shuffle', music.shuffle ? '1' : '0');
     localStorage.setItem('music_playlists', JSON.stringify(music.playlists));
     localStorage.setItem('music_active_playlist', music.activePlaylistId);
     const tracks = getAllTracks();
@@ -12983,6 +13015,25 @@ function playMusicNext() {
     playMusicTrack(0, true);
     return;
   }
+  if (music.shuffle && tracks.length > 1) {
+    // Push the current track onto history so "previous" can step back
+    // through what was actually played.
+    const curId = tracks[music.currentIdx] && tracks[music.currentIdx].id;
+    if (curId) {
+      music.shuffleHistory.push(curId);
+      // Cap history so it doesn't grow unbounded over a long session.
+      if (music.shuffleHistory.length > 200) {
+        music.shuffleHistory = music.shuffleHistory.slice(-100);
+      }
+    }
+    // Pick a random track that isn't the current one.
+    let nextIdx;
+    do {
+      nextIdx = Math.floor(Math.random() * tracks.length);
+    } while (nextIdx === music.currentIdx);
+    playMusicTrack(nextIdx, true);
+    return;
+  }
   const next = (music.currentIdx + 1) % tracks.length;
   playMusicTrack(next, true);
 }
@@ -12994,8 +13045,29 @@ function playMusicPrev() {
     playMusicTrack(tracks.length - 1, true);
     return;
   }
+  if (music.shuffle && music.shuffleHistory.length > 0) {
+    // Pop the most recent shuffle-history entry and play that track if
+    // it's still in the playlist; if not, fall through to sequential prev.
+    while (music.shuffleHistory.length > 0) {
+      const prevId = music.shuffleHistory.pop();
+      const idx = tracks.findIndex(t => t.id === prevId);
+      if (idx >= 0 && idx !== music.currentIdx) {
+        playMusicTrack(idx, true);
+        return;
+      }
+    }
+  }
   const prev = (music.currentIdx - 1 + tracks.length) % tracks.length;
   playMusicTrack(prev, true);
+}
+
+// Toggle shuffle mode. Clears the history when turning off so an old
+// stack doesn't leak into a future shuffle session.
+function toggleMusicShuffle() {
+  music.shuffle = !music.shuffle;
+  if (!music.shuffle) music.shuffleHistory = [];
+  saveMusicSettings();
+  renderMusicPlayer();
 }
 
 function setMusicVolume(vol) {
@@ -13136,6 +13208,8 @@ function renderTrackList() {
               <button class="music-add-btn primary" id="musicSearchBtn">🔍 Search</button>
             </div>
           </div>
+          <input type="text" class="music-add-input music-add-title-input" id="musicAddTitle"
+            placeholder="Song name (optional — for + Add only, leave blank to auto-name)" />
         </div>
       `;
     } else {
@@ -13423,6 +13497,8 @@ function addTrackToActivePlaylist() {
     playMusicTrack(existingIdx, true);
     el('musicTracklist').classList.remove('open');
     urlInput.value = '';
+    const titleInputEarly = el('musicAddTitle');
+    if (titleInputEarly) titleInputEarly.value = '';
     showToast({
       title: '🎵 Already in this playlist',
       text: 'Playing it now.',
@@ -13431,12 +13507,17 @@ function addTrackToActivePlaylist() {
     return;
   }
 
-  const title = `Custom — ${videoId}`;
+  // Optional custom title input. If the user typed something, use it
+  // verbatim; otherwise fall back to the auto-generated "Custom — ID".
+  const titleInput = el('musicAddTitle');
+  const customTitle = titleInput ? titleInput.value.trim() : '';
+  const title = customTitle || `Custom — ${videoId}`;
   playlist.tracks.push({ id: videoId, title });
   saveMusicSettings();
 
   const newIdx = playlist.tracks.length - 1;
   urlInput.value = '';
+  if (titleInput) titleInput.value = '';
   playMusicTrack(newIdx, true);
   renderTrackList();
 }
@@ -13803,6 +13884,13 @@ function renderMusicPlayer() {
   const playBtn = el('musicPlayBtn');
   const icon = el('musicIcon');
 
+  // Reflect shuffle state on its toggle button.
+  const shuffleBtn = el('musicShuffleBtn');
+  if (shuffleBtn) {
+    shuffleBtn.classList.toggle('active', !!music.shuffle);
+    shuffleBtn.title = music.shuffle ? 'Shuffle: ON' : 'Shuffle: OFF';
+  }
+
   const tracks = getAllTracks();
   if (music.currentIdx >= 0 && music.currentIdx < tracks.length) {
     title.textContent = tracks[music.currentIdx].title;
@@ -13860,6 +13948,10 @@ function initMusicPlayer() {
   el('musicNextBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     playMusicNext();
+  });
+  el('musicShuffleBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMusicShuffle();
   });
 
   const volumeSlider = el('musicVolume');
