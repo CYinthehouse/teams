@@ -8682,6 +8682,17 @@ async function loadReminderHistory() {
   const listEl = el('reminderHistoryList');
   if (!listEl) return;
   try {
+    // Diagnostic step 1: try reading a single arbitrary doc by id (this
+    // is a `get` operation; if it fails with permissions, the rule for
+    // `reminder_acks` `allow read` isn't matching at all).
+    try {
+      await db.collection('reminder_acks').doc('__probe__').get();
+      console.info('[reminder history] probe get OK — rules allow individual gets');
+    } catch (probeErr) {
+      console.error('[reminder history] probe get FAILED', probeErr.code, probeErr.message);
+    }
+
+    // Diagnostic step 2: the actual list query.
     const snap = await db.collection('reminder_acks')
       .orderBy('acknowledgedAt', 'desc').limit(50).get();
     if (snap.empty) {
@@ -8706,14 +8717,6 @@ async function loadReminderHistory() {
       `;
     }).join('');
   } catch (err) {
-    // Surface diagnostic info so you can see WHICH part of the rules
-    // is blocking the read. Common causes:
-    // - Rules not yet propagated (wait ~30s after publish)
-    // - Rules deployed to wrong Firebase project
-    // - Logged-in user doesn't have a `users/{uid}` doc with role: 'Boss'/'Manager'
-    //   (this affects rules that depend on isBossOrMgr() — but reminder_acks
-    //   read is just `signedIn()`, so role shouldn't matter here)
-    // - Auth token not attached to the request (rare; usually a sign-in issue)
     const myUid = state.user ? state.user.uid : '(no user)';
     const myRole = state.profile ? state.profile.role : '(no profile)';
     const projectId = db.app.options.projectId;
@@ -8732,8 +8735,8 @@ async function loadReminderHistory() {
           Project: <code>${escapeHtml(projectId)}</code><br>
           UID: <code>${escapeHtml(myUid)}</code><br>
           Role: <code>${escapeHtml(myRole)}</code><br>
-          Check the Firebase Console for project <code>${escapeHtml(projectId)}</code> →
-          Firestore → Rules tab and verify the <code>reminder_acks</code> block is present.
+          Error code: <code>${escapeHtml(err.code || '—')}</code><br>
+          Check the browser console for [reminder history] log lines.
         </div>
       </div>
     `;
