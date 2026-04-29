@@ -8921,10 +8921,10 @@ function renderAttContactInfoView() {
   const listEl = el('attContactStudentList');
   listEl.innerHTML = state.attContactSignoffStudents.map(s => {
     const discordLabel = s.discord
-      ? `🎮 <span class="att-contact-copy" data-copy="${escapeAttr(s.discord)}" title="Click to copy">${escapeHtml(s.discord)}</span>`
+      ? `🎮 <span class="att-contact-copy" data-copy="${escapeHtml(s.discord)}" title="Click to copy">${escapeHtml(s.discord)}</span>`
       : `<span style="color: var(--ink-light); font-style: italic;">no Discord</span>`;
     const phoneLabel = s.phone
-      ? `📱 <span class="att-contact-copy" data-copy="${escapeAttr(s.phone)}" title="Click to copy">${escapeHtml(s.phone)}</span>`
+      ? `📱 <span class="att-contact-copy" data-copy="${escapeHtml(s.phone)}" title="Click to copy">${escapeHtml(s.phone)}</span>`
       : `<span style="color: var(--ink-light); font-style: italic;">no phone</span>`;
     const firstClassBadge = isFirstWeek
       ? `<span class="att-contact-firstclass" title="Set up a tutoring time to onboard them">🆕 First class — schedule tutoring</span>`
@@ -8970,7 +8970,7 @@ function openAttContactHomework() {
     bodyEl.innerHTML = `
       <p>This week's homework PDF for <strong>Absolute Beginner Week ${payload.week}</strong>:</p>
       <div class="att-homework-link">
-        <a href="${escapeAttr(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
+        <a href="${escapeHtml(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
       </div>
       <button class="btn-action secondary" id="attHomeworkCopyBtn">📋 Copy Link</button>
     `;
@@ -8985,7 +8985,7 @@ function openAttContactHomework() {
     bodyEl.innerHTML = `
       <p>For ${escapeHtml(hw.day)} Novice/Beginner classes, this week's homework lives in the Discord chat:</p>
       <div class="att-homework-link">
-        <a href="${escapeAttr(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
+        <a href="${escapeHtml(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
       </div>
       <p style="font-size: 12px; color: var(--ink-light);">If the homework isn't in the chat, please ask Mr. Calvin.</p>
       <button class="btn-action secondary" id="attHomeworkCopyBtn">📋 Copy Link</button>
@@ -9193,8 +9193,8 @@ function renderClassContactsSection() {
         </summary>
         <div class="class-contact-details">
           <div class="class-contact-detail-line"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
-          <div class="class-contact-detail-line"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeAttr(c.homeworkUrl) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
-          <div class="class-contact-detail-line"><strong>Loom:</strong> <a href="${escapeAttr(c.loomUrl || '#')}" target="_blank" rel="noopener">link</a></div>
+          <div class="class-contact-detail-line"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(c.homeworkUrl) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
+          <div class="class-contact-detail-line"><strong>Loom:</strong> <a href="${escapeHtml(c.loomUrl || '#')}" target="_blank" rel="noopener">link</a></div>
           <div class="class-contact-detail-line"><strong>Students contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>
         </div>
       </details>
@@ -9410,6 +9410,12 @@ async function handleIncomingTestAttContact(requestId, data) {
     });
   } catch (err) {
     console.error('[test-attcontact] handler failed:', err.code, err.message, err);
+    // Clean up the broken request so it doesn't keep firing on every snapshot.
+    try {
+      await db.collection('reminder_test_requests').doc(requestId).delete();
+    } catch (e) {
+      console.warn('[test-attcontact] cleanup delete failed:', e);
+    }
   }
 }
 
