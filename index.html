@@ -239,6 +239,145 @@
     margin-bottom: 6px;
   }
 
+  /* ---------- Reminders ---------- */
+  /* Status banner inside Settings telling Boss/Mgr if cross-project access is alive. */
+  .reminder-status {
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .reminder-status.ok {
+    background: #e6f7ec;
+    color: #166534;
+    border: 1px solid #bce5c8;
+  }
+  .reminder-status.err {
+    background: #ffe6ec;
+    color: #b3334e;
+    border: 1px solid #ffc4d2;
+  }
+  .reminder-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--ink-light);
+    font-size: 12px;
+    background: var(--bg-3);
+    border-radius: 10px;
+  }
+  .reminder-programs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .reminder-program-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-3);
+    border-radius: 10px;
+    border: 1px solid var(--bg-2);
+  }
+  .reminder-program-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .reminder-program-assignee {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .reminder-program-sub {
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-top: 2px;
+  }
+  .reminder-history-row {
+    display: flex;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px dashed var(--bg-2);
+  }
+  .reminder-history-row:last-child { border-bottom: none; }
+  .reminder-history-icon {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #b8ecd5;
+    color: #166534;
+    font-weight: 700;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .reminder-history-info {
+    flex: 1;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .reminder-history-time {
+    font-size: 10px;
+    color: var(--ink-light);
+    margin-top: 2px;
+  }
+
+  /* Reminder popup styling — reused inside .modal */
+  .reminder-popup-headline {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .reminder-popup-late {
+    background: #fff4d6;
+    border: 1px solid #ffd97a;
+    color: #7a5b00;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .reminder-popup-instruction {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .reminder-popup-message {
+    background: var(--bg-3);
+    border: 2px dashed var(--lavender);
+    border-radius: 10px;
+    padding: 12px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    color: var(--ink);
+    user-select: text;
+    margin-bottom: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .reminder-popup-channel-label {
+    font-size: 11px;
+    color: var(--ink-light);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .reminder-popup-channel {
+    font-size: 11px;
+    color: var(--ink-soft);
+    word-break: break-all;
+    background: var(--bg-2);
+    padding: 6px 8px;
+    border-radius: 6px;
+  }
+
   .form-input {
     width: 100%;
     padding: 13px 16px;
@@ -4259,6 +4398,54 @@
 </div>
 
 <!-- Task detail modal -->
+<!-- Reminder popup modal — fires from checkAndFireReminders() -->
+<div id="reminderPopupModal" class="modal-backdrop hidden" style="z-index: 480;">
+  <div class="modal" style="max-width: 540px;">
+    <div class="modal-head">
+      <div class="modal-title">🔔 Class Reminder</div>
+    </div>
+    <div class="modal-body">
+      <div class="reminder-popup-headline">
+        Class with <strong id="reminderPopupTeacher">—</strong> starts in 10 minutes.
+      </div>
+      <div class="reminder-popup-late" id="reminderPopupLate" style="display:none;"></div>
+      <div class="reminder-popup-instruction">Send this message in Discord:</div>
+      <div class="reminder-popup-message" id="reminderPopupMessage">—</div>
+      <div class="reminder-popup-channel-label">Discord channel:</div>
+      <div class="reminder-popup-channel" id="reminderPopupChannel">—</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" id="reminderCopyBtn" onclick="copyReminderMessage()">📋 Copy Message</button>
+      <button class="btn-action primary" onclick="dismissReminderPopup()">Done — I sent it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
+<div id="addReminderProgramModal" class="modal-backdrop hidden">
+  <div class="modal" style="max-width: 420px;">
+    <div class="modal-head">
+      <div class="modal-title">📢 Assign Class Reminders</div>
+      <button class="modal-close" onclick="hide('addReminderProgramModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 13px; color: var(--ink-soft); margin-top: 0;">
+        The selected person will get a noisy popup 10 minutes before every class
+        on Saturday and Sunday (Wonjoo's and Calvin's classes), with a pre-written
+        Discord message ready to copy and paste.
+      </p>
+      <div class="form-group">
+        <label>Assign to</label>
+        <select id="addReminderProgramAssignee" class="form-input"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="hide('addReminderProgramModal')">Cancel</button>
+      <button class="btn-action primary" onclick="submitAddReminderProgram()">Assign</button>
+    </div>
+  </div>
+</div>
+
 <div id="taskDetailModal" class="modal-backdrop hidden">
   <div class="modal" style="max-width: 620px;">
     <div class="modal-head">
@@ -4305,6 +4492,14 @@
         <h4>👥 People</h4>
         <div id="peopleList"></div>
       </div>
+
+      <!-- Reminder programs management — visible only to Boss/Manager.
+           renderReminderProgramsSection() populates this. -->
+      <div class="settings-section" id="reminderProgramsWrap" style="display:none;"></div>
+
+      <!-- Reminder history (acks) — visible only to Boss/Manager.
+           renderReminderHistorySection() populates this. -->
+      <div class="settings-section" id="reminderHistoryWrap" style="display:none;"></div>
 
       <div class="settings-section" id="appSettingsSection">
         <h4>🔔 Notification Bell</h4>
@@ -4407,6 +4602,24 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
 
+// Secondary Firebase app pointing at the korean-ta-evaluator project, where
+// scheduler_classes, scheduler_students, and scheduler_teachers live.
+// We initialize it as a NAMED app so it doesn't conflict with the default
+// koreanlearnin-teams instance. Reads are cross-project; auth happens via a
+// secondary auth instance signed in with the same email/password the user
+// used on the primary app.
+const taEvaluatorConfig = {
+  apiKey: "AIzaSyDzI1_B49onrKJriy3er88O1KOJTLBzbYY",
+  authDomain: "korean-ta-evaluator.firebaseapp.com",
+  projectId: "korean-ta-evaluator",
+  storageBucket: "korean-ta-evaluator.firebasestorage.app",
+  messagingSenderId: "386010826708",
+  appId: "1:386010826708:web:d06d6fbdadce561b36b841",
+};
+const taApp = firebase.initializeApp(taEvaluatorConfig, 'taEvaluator');
+const taAuth = taApp.auth();
+const taDb = taApp.firestore();
+
 /* ============================================
    App state
 ============================================ */
@@ -4445,6 +4658,12 @@ const state = {
   notifiedApproved: new Set(),
   initialTaskLoadDone: false,  // skip notifications on first snapshot
   tickInterval: null,
+  // Reminder programs (assigned by Boss/Mgr to teachers; fire 10 min before classes)
+  taAccessReady: false,        // true when secondary korean-ta-evaluator auth is alive
+  reminderPrograms: [],        // active programs from reminder_programs collection
+  remindersFired: new Set(),   // in-memory cache of "occurrence keys" already fired this session
+  pendingReminder: null,       // currently-displayed reminder popup, if any
+  reminderSoundLoop: null,     // setInterval id playing the alarm
   // Stage 4
   feedbackBenefits: [''],
   feedbackImprovements: [''],
@@ -4485,6 +4704,7 @@ const unsubs = {
   teams: null,
   tasks: null,
   tasksPrivate: null,        // second listener for non-Boss/Mgr private-tasks-I-participate-in
+  reminderPrograms: null,    // listener on reminder_programs (mine if Worker, all if Boss/Mgr)
   comments: null,
   activity: null,
   appSettings: null,
@@ -5047,6 +5267,18 @@ async function handleAuthSubmit() {
     } else {
       await auth.signInWithEmailAndPassword(email, password);
     }
+    // ALSO attempt to sign in to the secondary korean-ta-evaluator app so
+    // we can read scheduler_classes/students/teachers for the reminders
+    // feature. Same email/password is expected to exist on both projects.
+    // If it fails (e.g., user doesn't have a TA account), reminders just
+    // won't work for them — flagged via state.taAccessReady.
+    try {
+      await taAuth.signInWithEmailAndPassword(email, password);
+      state.taAccessReady = true;
+    } catch (taErr) {
+      state.taAccessReady = false;
+      console.warn('Secondary (TA) sign-in failed; class-reminders will be unavailable:', taErr.message);
+    }
   } catch (err) {
     errBox.textContent = err.message || 'Something went wrong.';
     errBox.classList.remove('hidden');
@@ -5057,6 +5289,9 @@ async function handleAuthSubmit() {
 
 function signOut() {
   auth.signOut();
+  // Sign out of the secondary app too so the next user doesn't inherit
+  // the previous user's class-data access.
+  try { taAuth.signOut(); } catch (e) {}
 }
 
 // Submit the auth form on Enter from any of its fields.
@@ -5074,6 +5309,17 @@ function signOut() {
 /* ============================================
    Auth state observer
 ============================================ */
+// Secondary observer: tracks whether we're signed in to the TA project.
+// Fires on page reload (using cached session) and after any taAuth sign-in/out.
+taAuth.onAuthStateChanged(taUser => {
+  state.taAccessReady = !!taUser;
+  // If reminders UI is open, refresh it to reflect TA access status.
+  if (state.profile && isBossOrManager(state.profile.role)
+      && !el('settingsModal').classList.contains('hidden')) {
+    renderReminderProgramsSection();
+  }
+});
+
 auth.onAuthStateChanged(async (user) => {
   // Tear down old subscriptions
   Object.keys(unsubs).forEach(k => { if (unsubs[k]) { unsubs[k](); unsubs[k] = null; } });
@@ -5106,6 +5352,14 @@ auth.onAuthStateChanged(async (user) => {
     music.isPlaying = false;
     // Allow the privacy-field migration to run again on next Boss sign-in.
     _migrationRan = false;
+    // Reminders cleanup
+    state.reminderPrograms = [];
+    state.remindersFired = new Set();
+    state.pendingReminder = null;
+    stopReminderAlarmLoop();
+    if (!el('reminderPopupModal').classList.contains('hidden')) {
+      hide('reminderPopupModal');
+    }
     // Also wipe the localStorage cache so a different user on the same
     // browser doesn't briefly see the previous user's playlists at next sign-in.
     try {
@@ -5179,6 +5433,12 @@ auth.onAuthStateChanged(async (user) => {
   startPokeAutoExpire();
   subscribePokeLog(); // Boss/Manager only (function checks internally)
 
+  // Reminders: subscribe to programs (mine if Worker, all if Boss/Mgr).
+  subscribeReminderPrograms();
+  // Run an initial fire-check after a short delay so secondary auth has
+  // a chance to be ready (it might be hydrating from local storage).
+  setTimeout(() => checkAndFireReminders(), 3000);
+
   // Stage 3: start periodic tick (1 minute) to refresh timer pills and detect expiries
   if (state.tickInterval) clearInterval(state.tickInterval);
   state.tickInterval = setInterval(() => {
@@ -5187,6 +5447,8 @@ auth.onAuthStateChanged(async (user) => {
     renderBoard();
     // Refresh poke strip (so online dots update as users go in/out of presence)
     renderPokeStrip();
+    // Check whether any class reminder is due to fire (10 min before class).
+    checkAndFireReminders();
   }, 30 * 1000); // every 30 seconds
 
   // Subscribe to teams I'm on (or all teams if Boss)
@@ -7457,6 +7719,9 @@ function renderSettings() {
   renderAppSettings();
   // Poke log (Boss/Manager)
   renderPokeLog();
+  // Reminders (Boss/Manager) — programs list + history
+  renderReminderProgramsSection();
+  renderReminderHistorySection();
 
   // People
   const peopleWrap = el('peopleList');
@@ -7613,6 +7878,559 @@ async function migrateTasksAddPrivacyFields() {
     console.info('[migration] done');
   } catch (err) {
     console.error('migrateTasksAddPrivacyFields failed:', err);
+  }
+}
+
+/* ============================================
+   Reminders — assigned by Boss/Mgr to a teacher;
+   fire 10 minutes before each class in scheduler_classes (korean-ta-evaluator).
+   Times are in America/New_York. Acknowledgements stored per-occurrence.
+============================================ */
+
+// Hardcoded Discord channel mappings: { day: { teacherNameContains: channelUrl } }
+// Per the requirements only Saturday/Sunday with Wonjoo/Calvin are supported.
+const REMINDER_DISCORD_CHANNELS = {
+  Saturday: {
+    Wonjoo: 'https://discord.com/channels/987542874352652378/1472384260714270801',
+    Calvin: 'https://discord.com/channels/987542874352652378/1367597692129251410',
+  },
+  Sunday: {
+    Wonjoo: 'https://discord.com/channels/987542874352652378/1462586352968400986',
+    Calvin: 'https://discord.com/channels/987542874352652378/1455564603634483392',
+  },
+};
+// Lead time in minutes before the class start that the reminder fires.
+const REMINDER_LEAD_MIN = 10;
+// How long after the target time we'll still fire a missed reminder (minutes).
+// Beyond this window, the reminder is considered too stale to be useful.
+const REMINDER_LATE_WINDOW_MIN = 60;
+
+// Returns the JS Date representing `nowMs` interpreted in New York time as
+// y/m/d/h/m/s components. Used to figure out "what day is it in NY right now".
+function nyParts(date) {
+  // Use Intl with America/New_York to get the parts; this auto-handles DST.
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, weekday: 'long',
+  });
+  const parts = fmt.formatToParts(date);
+  const out = {};
+  for (const p of parts) out[p.type] = p.value;
+  return {
+    year: parseInt(out.year, 10),
+    month: parseInt(out.month, 10),
+    day: parseInt(out.day, 10),
+    hour: parseInt(out.hour === '24' ? '0' : out.hour, 10),
+    minute: parseInt(out.minute, 10),
+    weekday: out.weekday, // "Saturday" etc.
+  };
+}
+
+// Convert a NY-local Y/M/D + "6:30 PM" string into a UTC millisecond
+// timestamp. Iterative DST-safe approach: format candidate UTC times back to
+// NY and solve for the offset.
+function nyDateTimeToUtcMs(year, month, day, timeStr) {
+  // Parse "6:30 PM" or "11:00 PM" into 24-hour hour/minute.
+  const m = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let hour = parseInt(m[1], 10);
+  const minute = parseInt(m[2], 10);
+  const isPM = m[3].toUpperCase() === 'PM';
+  if (hour === 12) hour = isPM ? 12 : 0;
+  else if (isPM) hour += 12;
+
+  // Initial guess: treat as UTC, then offset back. Iterate twice to settle DST.
+  let guess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  for (let i = 0; i < 3; i++) {
+    const parts = nyParts(new Date(guess));
+    // Compute drift between what NY *would* show and what we want.
+    const target = { year, month, day, hour, minute };
+    const wantMs = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, 0);
+    const haveMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, 0);
+    const drift = wantMs - haveMs;
+    if (drift === 0) break;
+    guess += drift;
+  }
+  return guess;
+}
+
+// Parse a class's `time` field. Returns the START time as { hour, minute }
+// in 12-hour parts. Handles "6:30 PM" and "6:10 PM-7:10 PM" (1-hour) formats.
+function parseClassStartTime(timeStr) {
+  if (!timeStr) return null;
+  // "6:10 PM-7:10 PM" → take left side
+  const left = timeStr.split('-')[0].trim();
+  return left;
+}
+
+// Returns the day-name (e.g. "Saturday") for the given JS Date in NY tz.
+function nyDayName(date) {
+  return nyParts(date).weekday;
+}
+
+// Compute a unique occurrence key for de-duping reminders.
+// Format: programId__YYYY-MM-DD__classId
+function occurrenceKey(programId, dateStr, classId) {
+  return `${programId}__${dateStr}__${classId}`;
+}
+
+// For each active program assigned to me, scan today + tomorrow's NY-local
+// classes and figure out which ones should be firing now (target time was
+// REMINDER_LEAD_MIN before class start, fire window = REMINDER_LATE_WINDOW_MIN).
+async function checkAndFireReminders() {
+  if (!state.user || !state.profile) return;
+  if (!state.taAccessReady) return;
+  if (state.pendingReminder) return; // already showing one — don't pile up
+
+  // Find programs where I'm the assignee.
+  const myPrograms = state.reminderPrograms.filter(p =>
+    p.active && p.assigneeId === state.user.uid
+  );
+  if (myPrograms.length === 0) return;
+
+  // Pull all active classes once (cached briefly via state).
+  let classes;
+  try {
+    const snap = await taDb.collection('scheduler_classes')
+      .where('status', '==', 'active').get();
+    classes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('checkAndFireReminders: classes read failed:', err);
+    return;
+  }
+  if (classes.length === 0) return;
+
+  // For "what day is it" we look at *now* in NY; reminders fire for
+  // classes happening today (their `day` matches today's NY day name).
+  // We also check tomorrow's classes in case it's near midnight and a
+  // class earlier today already passed.
+  const now = Date.now();
+  const todayNy = nyParts(new Date(now));
+  const tomorrowNy = nyParts(new Date(now + 24 * 3600 * 1000));
+
+  for (const prog of myPrograms) {
+    for (const cls of classes) {
+      // Match the day of week to today or tomorrow (same NY tz).
+      let useDate = null;
+      if (cls.day === todayNy.weekday) useDate = todayNy;
+      else if (cls.day === tomorrowNy.weekday) useDate = tomorrowNy;
+      else continue;
+
+      const startStr = parseClassStartTime(cls.time);
+      if (!startStr) continue;
+      const startMs = nyDateTimeToUtcMs(useDate.year, useDate.month, useDate.day, startStr);
+      if (!startMs) continue;
+
+      // Reminder target = start - lead.
+      const targetMs = startMs - REMINDER_LEAD_MIN * 60 * 1000;
+      const lateBy = now - targetMs; // positive if past target
+      // Fire only if we're within [target, target + late_window).
+      if (lateBy < 0) continue;
+      if (lateBy > REMINDER_LATE_WINDOW_MIN * 60 * 1000) continue;
+
+      // Resolve teacher name; need it to pick the Discord channel.
+      const teacher = await getCachedTaTeacher(cls.teacherId);
+      if (!teacher) continue;
+      const channelUrl = pickReminderChannel(cls.day, teacher.name);
+      if (!channelUrl) continue; // skip Tuesday classes etc — no mapping defined
+
+      // Occurrence key uses the class's NY date so even if I open the tab
+      // late, the same key is used and the ack lookup works.
+      const dateStr = `${useDate.year}-${String(useDate.month).padStart(2, '0')}-${String(useDate.day).padStart(2, '0')}`;
+      const occKey = occurrenceKey(prog.id, dateStr, cls.id);
+
+      // In-memory de-dup: avoid spamming Firestore reads for ones we
+      // already showed/handled this session.
+      if (state.remindersFired.has(occKey)) continue;
+      state.remindersFired.add(occKey);
+
+      // Persistent de-dup: check if an ack doc exists.
+      let alreadyAcked = false;
+      try {
+        const ackSnap = await db.collection('reminder_acks').doc(occKey).get();
+        if (ackSnap.exists) alreadyAcked = true;
+      } catch (e) {
+        // ignore — we'll still fire
+      }
+      if (alreadyAcked) continue;
+
+      // Fire the popup.
+      const studentDiscords = await collectClassStudentDiscords(cls);
+      const lateMinutes = Math.floor(lateBy / 60000);
+      showReminderPopup({
+        programId: prog.id,
+        classId: cls.id,
+        occKey,
+        teacherName: teacher.name,
+        channelUrl,
+        studentDiscords,
+        targetMs,
+        lateMinutes,
+      });
+      return; // one at a time
+    }
+  }
+}
+
+// Cache of teacher docs from the TA project (keyed by teacherId).
+const _taTeacherCache = new Map();
+async function getCachedTaTeacher(teacherId) {
+  if (!teacherId) return null;
+  if (_taTeacherCache.has(teacherId)) return _taTeacherCache.get(teacherId);
+  try {
+    const doc = await taDb.collection('scheduler_teachers').doc(teacherId).get();
+    const data = doc.exists ? { id: doc.id, ...doc.data() } : null;
+    _taTeacherCache.set(teacherId, data);
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Pull the Discord usernames for the students embedded in the class doc.
+// Class.students is a slim list of { id, name, ... }; full discord field is
+// on the student document itself.
+async function collectClassStudentDiscords(cls) {
+  const students = Array.isArray(cls.students) ? cls.students : [];
+  if (students.length === 0) return [];
+  const ids = students.map(s => s.id).filter(Boolean);
+  // Firestore "in" supports up to 30 — we should be fine for class sizes,
+  // but chunk to be safe.
+  const out = [];
+  const CHUNK = 30;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    try {
+      const qSnap = await taDb.collection('scheduler_students')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+      qSnap.docs.forEach(d => {
+        const data = d.data();
+        const dn = (data.discord || data.discordName || '').trim();
+        if (dn) out.push(dn);
+      });
+    } catch (e) {
+      console.warn('collectClassStudentDiscords chunk failed:', e);
+    }
+  }
+  return out;
+}
+
+// Pick the channel URL by day + teacher-name match.
+function pickReminderChannel(day, teacherName) {
+  if (!day || !teacherName) return null;
+  const map = REMINDER_DISCORD_CHANNELS[day];
+  if (!map) return null;
+  // Match teacher name case-insensitively against keys.
+  const lower = teacherName.toLowerCase();
+  for (const key of Object.keys(map)) {
+    if (lower.includes(key.toLowerCase())) return map[key];
+  }
+  return null;
+}
+
+// Construct the canned message for a reminder. Renders the Discord usernames,
+// teacher name, and channel link as plain text suitable for paste-to-Discord.
+function buildReminderMessage({ teacherName, channelUrl, studentDiscords }) {
+  const mentions = studentDiscords.length > 0
+    ? studentDiscords.map(d => '@' + d.replace(/^@/, '')).join(' ')
+    : '[no Discord usernames found for this class]';
+  return `${mentions}  Your class will be held here with ${teacherName} in 10 minutes! Please click here to join :point_right: ${channelUrl}`;
+}
+
+/* ---- Reminder popup UI ---- */
+
+function showReminderPopup(reminder) {
+  // Stash so the engine doesn't pile up another popup on top.
+  state.pendingReminder = reminder;
+
+  const message = buildReminderMessage(reminder);
+  el('reminderPopupTeacher').textContent = reminder.teacherName;
+  el('reminderPopupChannel').textContent = reminder.channelUrl;
+  el('reminderPopupMessage').textContent = message;
+
+  // "Was X min ago" indicator if late.
+  const lateLabel = el('reminderPopupLate');
+  if (reminder.lateMinutes >= 1) {
+    lateLabel.textContent = `⚠️ This reminder was due ${reminder.lateMinutes} min ago.`;
+    lateLabel.style.display = 'block';
+  } else {
+    lateLabel.style.display = 'none';
+  }
+
+  show('reminderPopupModal');
+
+  // Start the alarm sound loop. Stops as soon as the user focuses the window.
+  startReminderAlarm();
+  // If the window already has focus, don't loop noisily — stop after the
+  // initial buzz.
+  if (document.hasFocus()) stopReminderAlarmLoop();
+  // Once the window gains focus (e.g. user clicks the tab), silence.
+  window.addEventListener('focus', stopReminderAlarmLoop, { once: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) stopReminderAlarmLoop();
+  }, { once: true });
+}
+
+function startReminderAlarm() {
+  // Use the existing poke sound or bell sound — synth a beep if neither.
+  // We loop a short tone until the user comes back.
+  stopReminderAlarmLoop();
+  if (!state.audioUnlocked) {
+    // Audio is gated until first user interaction; fire silently.
+    return;
+  }
+  const playBeep = () => {
+    try {
+      const ctx = state.audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      state.audioCtx = ctx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.value = 0.0001;
+      osc.connect(gain).connect(ctx.destination);
+      const now = ctx.currentTime;
+      gain.gain.exponentialRampToValueAtTime(0.4, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } catch (e) {}
+  };
+  playBeep();
+  state.reminderSoundLoop = setInterval(playBeep, 1500);
+}
+
+function stopReminderAlarmLoop() {
+  if (state.reminderSoundLoop) {
+    clearInterval(state.reminderSoundLoop);
+    state.reminderSoundLoop = null;
+  }
+}
+
+async function dismissReminderPopup() {
+  const reminder = state.pendingReminder;
+  if (!reminder) {
+    hide('reminderPopupModal');
+    stopReminderAlarmLoop();
+    return;
+  }
+  // Write the ack doc so it doesn't fire again on this device or any other,
+  // and so Boss/Mgr can see it was acknowledged.
+  try {
+    await db.collection('reminder_acks').doc(reminder.occKey).set({
+      programId: reminder.programId,
+      classId: reminder.classId,
+      acknowledgedBy: state.user.uid,
+      acknowledgedByName: state.profile.name || '—',
+      acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      teacherName: reminder.teacherName,
+      targetTime: reminder.targetMs,
+    });
+  } catch (err) {
+    console.error('reminder ack write failed:', err);
+  }
+  state.pendingReminder = null;
+  stopReminderAlarmLoop();
+  hide('reminderPopupModal');
+}
+
+// Copy the rendered message to clipboard.
+async function copyReminderMessage() {
+  const text = el('reminderPopupMessage').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = el('reminderCopyBtn');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  } catch (e) {
+    alert('Could not copy. Select the message manually and copy.');
+  }
+}
+
+/* ---- Reminder programs subscription + admin UI ---- */
+
+function subscribeReminderPrograms() {
+  if (!state.user) return;
+  if (unsubs.reminderPrograms) { unsubs.reminderPrograms(); unsubs.reminderPrograms = null; }
+  // Boss/Mgr see all programs (so they can manage). Workers see only their
+  // own assignments (so the firing logic and "what's coming" are scoped).
+  let q = db.collection('reminder_programs');
+  if (!isBossOrManager(state.profile.role)) {
+    q = q.where('assigneeId', '==', state.user.uid);
+  }
+  unsubs.reminderPrograms = q.onSnapshot(snap => {
+    state.reminderPrograms = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // If the Settings modal is open and showing the section, refresh it.
+    if (!el('settingsModal').classList.contains('hidden')) {
+      renderReminderProgramsSection();
+      renderReminderHistorySection();
+    }
+  }, () => {});
+}
+
+async function createReminderProgram(assigneeId) {
+  if (!isBossOrManager(state.profile.role)) return;
+  const assignee = state.allUsers.find(u => u.uid === assigneeId);
+  if (!assignee) return;
+  // Don't double-add: if this user already has an active program for the
+  // class_10min_before type, just say so.
+  const existing = state.reminderPrograms.find(p =>
+    p.type === 'class_10min_before' && p.assigneeId === assigneeId && p.active
+  );
+  if (existing) {
+    alert(`${assignee.name} already has an active class-reminders program assigned.`);
+    return;
+  }
+  try {
+    await db.collection('reminder_programs').add({
+      type: 'class_10min_before',
+      assigneeId,
+      assigneeName: assignee.name,
+      createdBy: state.user.uid,
+      createdByName: state.profile.name,
+      active: true,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    alert('Could not create reminder program: ' + err.message);
+  }
+}
+
+async function deleteReminderProgram(programId) {
+  if (!isBossOrManager(state.profile.role)) return;
+  if (!confirm('Stop this person from receiving class reminders?')) return;
+  try {
+    await db.collection('reminder_programs').doc(programId).delete();
+  } catch (err) {
+    alert('Could not delete: ' + err.message);
+  }
+}
+
+function renderReminderProgramsSection() {
+  const wrap = el('reminderProgramsWrap');
+  if (!wrap) return;
+  if (!isBossOrManager(state.profile.role)) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+
+  // Status banner about TA-project access.
+  const statusBanner = state.taAccessReady
+    ? `<div class="reminder-status ok">✓ Connected to class data</div>`
+    : `<div class="reminder-status err">⚠ Not connected to class-data project. Sign out and sign back in to retry. Reminders won't fire until this is fixed.</div>`;
+
+  const activePrograms = state.reminderPrograms.filter(p => p.active);
+
+  let listHtml = '';
+  if (activePrograms.length === 0) {
+    listHtml = `<div class="reminder-empty">No reminder programs assigned yet.</div>`;
+  } else {
+    listHtml = activePrograms.map(p => {
+      const created = p.createdAt && p.createdAt.toMillis
+        ? new Date(p.createdAt.toMillis()).toLocaleDateString()
+        : '—';
+      return `
+        <div class="reminder-program-row">
+          <div class="reminder-program-info">
+            <div class="reminder-program-assignee">📢 ${escapeHtml(p.assigneeName || '—')}</div>
+            <div class="reminder-program-sub">
+              Class reminders · assigned by ${escapeHtml(p.createdByName || '—')} · ${escapeHtml(created)}
+            </div>
+          </div>
+          <button class="btn-mini danger" data-rm-prog="${escapeHtml(p.id)}" title="Remove">✕</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  wrap.innerHTML = `
+    <h4>📢 Reminders</h4>
+    ${statusBanner}
+    <div class="reminder-programs-list">${listHtml}</div>
+    <button class="btn-action primary" id="addReminderProgramBtn" style="margin-top: 10px;">+ Assign Class Reminders</button>
+  `;
+
+  // Wire add button.
+  el('addReminderProgramBtn').addEventListener('click', openAddReminderProgramModal);
+  // Wire remove buttons.
+  wrap.querySelectorAll('[data-rm-prog]').forEach(btn => {
+    btn.addEventListener('click', () => deleteReminderProgram(btn.dataset.rmProg));
+  });
+}
+
+function openAddReminderProgramModal() {
+  // Build a list of users (Teacher/Support/Manager — anyone except Boss-only people)
+  // who could realistically receive class reminders. Boss CAN assign to themselves.
+  const candidates = state.allUsers.filter(u => u.active !== false);
+  if (candidates.length === 0) { alert('No users to assign to.'); return; }
+  const sel = el('addReminderProgramAssignee');
+  sel.innerHTML = '';
+  candidates.forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.uid;
+    opt.textContent = `${u.name} (${u.role || 'Support'})`;
+    sel.appendChild(opt);
+  });
+  show('addReminderProgramModal');
+}
+
+async function submitAddReminderProgram() {
+  const sel = el('addReminderProgramAssignee');
+  const assigneeId = sel.value;
+  if (!assigneeId) return;
+  await createReminderProgram(assigneeId);
+  hide('addReminderProgramModal');
+}
+
+function renderReminderHistorySection() {
+  const wrap = el('reminderHistoryWrap');
+  if (!wrap) return;
+  if (!isBossOrManager(state.profile.role)) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  // Lazy load the last 50 acks. We don't subscribe live (low value, more reads).
+  wrap.innerHTML = `
+    <h4>📋 Reminders Sent</h4>
+    <div id="reminderHistoryList"><div class="reminder-empty">Loading…</div></div>
+  `;
+  loadReminderHistory();
+}
+
+async function loadReminderHistory() {
+  const listEl = el('reminderHistoryList');
+  if (!listEl) return;
+  try {
+    const snap = await db.collection('reminder_acks')
+      .orderBy('acknowledgedAt', 'desc').limit(50).get();
+    if (snap.empty) {
+      listEl.innerHTML = `<div class="reminder-empty">No reminders have been sent yet.</div>`;
+      return;
+    }
+    listEl.innerHTML = snap.docs.map(d => {
+      const a = d.data();
+      const when = a.acknowledgedAt && a.acknowledgedAt.toMillis
+        ? new Date(a.acknowledgedAt.toMillis()).toLocaleString(undefined, {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+          })
+        : '—';
+      return `
+        <div class="reminder-history-row">
+          <div class="reminder-history-icon">✓</div>
+          <div class="reminder-history-info">
+            <div><strong>${escapeHtml(a.acknowledgedByName || '—')}</strong> sent reminder for ${escapeHtml(a.teacherName || '—')}'s class</div>
+            <div class="reminder-history-time">${escapeHtml(when)}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div class="reminder-empty">Couldn't load history: ${escapeHtml(err.message)}</div>`;
   }
 }
 
