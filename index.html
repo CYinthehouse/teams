@@ -5082,6 +5082,7 @@
     <div class="modal-footer">
       <button class="btn-action secondary" onclick="closeTaskDetail()">Close</button>
       <button class="btn-action secondary" id="taskEditBtn" onclick="openEditTaskModal(state.currentTaskId)" style="display:none;">✏️ Edit</button>
+      <button class="btn-action primary" id="taskMarkDoneBtn" onclick="markCurrentTaskDone()" style="display:none;">✓ Mark as Done</button>
       <button class="btn-action primary revive-btn" id="taskReviveBtn" onclick="reviveCurrentTask()" style="display:none;">🌱 Revive Task</button>
       <button class="btn-action primary" id="taskDeleteBtn" onclick="deleteCurrentTask()" style="display:none; background: linear-gradient(135deg, #e75577, #ff8caa);">Delete</button>
     </div>
@@ -7204,6 +7205,25 @@ function renderDetailHead(task) {
      task.assigneeId === state.user.uid ||
      isBossOrManager(state.profile.role));
   el('taskEditBtn').style.display = canEdit ? 'flex' : 'none';
+
+  // Mark-as-Done button: visible only on in_progress tasks, and only to the
+  // assignee, creator, or Boss/Manager. Boss/Mgr with the button click
+  // jumps straight to "approved" since they don't need their own review;
+  // for everyone else it submits to pending_approval. Logic is in
+  // markCurrentTaskDone().
+  const canMarkDone = task.status === 'in_progress' &&
+    (task.assigneeId === state.user.uid ||
+     task.creatorId === state.user.uid ||
+     isBossOrManager(state.profile.role));
+  const markBtn = el('taskMarkDoneBtn');
+  if (canMarkDone) {
+    markBtn.style.display = 'flex';
+    markBtn.textContent = isBossOrManager(state.profile.role)
+      ? '✅ Mark Approved'
+      : '✓ Mark as Done';
+  } else {
+    markBtn.style.display = 'none';
+  }
 }
 
 /* ---- Tab: Overview ---- */
@@ -8486,6 +8506,54 @@ async function approveTask(taskId) {
     // The status_change toast logic in tasks subscription handles the morale ping.
   } catch (err) {
     alert('Could not approve: ' + err.message);
+  }
+}
+
+// Triggered by the "Mark as Done" / "Mark Approved" footer button on the
+// task detail modal. Picks the destination status based on role:
+//  - Boss/Manager → goes straight to 'approved' (skips review)
+//  - Assignee/creator (Teacher/Support) → goes to 'pending_approval'
+async function markCurrentTaskDone() {
+  const task = getCurrentTask();
+  if (!task) return;
+  if (task.status !== 'in_progress') return;
+
+  const allowed = task.assigneeId === state.user.uid
+               || task.creatorId === state.user.uid
+               || isBossOrManager(state.profile.role);
+  if (!allowed) return;
+
+  const btn = el('taskMarkDoneBtn');
+  btn.disabled = true;
+  const origText = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    if (isBossOrManager(state.profile.role)) {
+      // Skip pending — Boss/Mgr approving their own work or someone else's
+      // shouldn't have to bounce through review.
+      await db.collection('tasks').doc(task.id).update({
+        status: 'approved',
+        approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        approvedBy: state.user.uid,
+        approvedByName: state.profile.name,
+        lastFeedback: firebase.firestore.FieldValue.delete(),
+      });
+      await logActivity(task.id, 'approved', { taskTitle: task.title });
+    } else {
+      await db.collection('tasks').doc(task.id).update({
+        status: 'pending_approval',
+      });
+      await logActivity(task.id, 'status_changed', {
+        from: 'in_progress', to: 'pending_approval',
+      });
+    }
+    closeTaskDetail();
+  } catch (err) {
+    console.error('markCurrentTaskDone failed:', err);
+    alert('Could not update: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
   }
 }
 
