@@ -4424,7 +4424,7 @@
 <!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
 <!-- Test Reminder modal — Boss/Mgr picks day + time + recipient,
      fires a one-off test popup on the recipient's device -->
-<div id="testReminderModal" class="modal-backdrop hidden">
+<div id="testReminderModal" class="modal-backdrop hidden" style="z-index: 250;">
   <div class="modal" style="max-width: 460px;">
     <div class="modal-head">
       <div class="modal-title">🧪 Test Class Reminder</div>
@@ -4477,7 +4477,7 @@
   </div>
 </div>
 
-<div id="addReminderProgramModal" class="modal-backdrop hidden">
+<div id="addReminderProgramModal" class="modal-backdrop hidden" style="z-index: 250;">
   <div class="modal" style="max-width: 420px;">
     <div class="modal-head">
       <div class="modal-title">📢 Assign Class Reminders</div>
@@ -8706,7 +8706,37 @@ async function loadReminderHistory() {
       `;
     }).join('');
   } catch (err) {
-    listEl.innerHTML = `<div class="reminder-empty">Couldn't load history: ${escapeHtml(err.message)}</div>`;
+    // Surface diagnostic info so you can see WHICH part of the rules
+    // is blocking the read. Common causes:
+    // - Rules not yet propagated (wait ~30s after publish)
+    // - Rules deployed to wrong Firebase project
+    // - Logged-in user doesn't have a `users/{uid}` doc with role: 'Boss'/'Manager'
+    //   (this affects rules that depend on isBossOrMgr() — but reminder_acks
+    //   read is just `signedIn()`, so role shouldn't matter here)
+    // - Auth token not attached to the request (rare; usually a sign-in issue)
+    const myUid = state.user ? state.user.uid : '(no user)';
+    const myRole = state.profile ? state.profile.role : '(no profile)';
+    const projectId = db.app.options.projectId;
+    console.error('[reminder history] read failed', {
+      code: err.code,
+      message: err.message,
+      myUid,
+      myRole,
+      projectId,
+    });
+    listEl.innerHTML = `
+      <div class="reminder-empty">
+        Couldn't load history: ${escapeHtml(err.message)}
+        <div style="font-size: 10px; margin-top: 8px; color: var(--ink-light); text-align: left;">
+          <strong>Debug:</strong><br>
+          Project: <code>${escapeHtml(projectId)}</code><br>
+          UID: <code>${escapeHtml(myUid)}</code><br>
+          Role: <code>${escapeHtml(myRole)}</code><br>
+          Check the Firebase Console for project <code>${escapeHtml(projectId)}</code> →
+          Firestore → Rules tab and verify the <code>reminder_acks</code> block is present.
+        </div>
+      </div>
+    `;
   }
 }
 
