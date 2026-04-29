@@ -11706,12 +11706,23 @@ function showMissedPokesModal() {
 async function dismissMissedPokes() {
   const pokes = [...state.missedPokesAtMe];
   hide('missedPokesModal');
+  // Clear the local list IMMEDIATELY so the listener can't re-trigger the
+  // modal during the Firestore round-trip. The next snapshot from
+  // onSnapshot will rebuild this list anyway based on the persisted
+  // targetSawMissed field, so this is just a stale-prevention step.
+  state.missedPokesAtMe = [];
+  // Also stop the bell/notification dot from pulsing.
+  updateGlowState && updateGlowState();
   for (const p of pokes) {
     try {
       await db.collection('pokes').doc(p.id).update({
         targetSawMissed: true,
       });
-    } catch (e) {}
+    } catch (e) {
+      // Surface this — silent failures here cause the popup to reappear
+      // forever because the listener still sees the poke as "not seen".
+      console.error('Failed to mark poke as seen:', p.id, e.code, e.message);
+    }
   }
 }
 
