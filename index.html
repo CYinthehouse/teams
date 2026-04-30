@@ -3732,7 +3732,7 @@
   .thought-bubble-btn {
     position: fixed;
     left: 16px;
-    bottom: 76px;            /* flush above collapsed music player (56 + 16 + 4 gap) */
+    bottom: 86px;            /* music player COLLAPSED — flush above the 56px badge */
     width: 56px;
     height: 56px;
     border-radius: 50%;
@@ -3763,10 +3763,13 @@
     50%  { transform: translateY(-3px) rotate(2deg); }
     100% { transform: translateY(0) rotate(-2deg); }
   }
+  /* When the music player is expanded (showing controls + volume), the
+     bubble lifts up to clear the taller player. */
+  body.music-expanded .thought-bubble-btn {
+    bottom: 136px;
+  }
   /* When the music tracklist is open it floats up above the player by
-     ~360px, so the bubble needs to clear that overlay. Otherwise the
-     bubble's base position works for both collapsed and expanded music
-     player states (since their heights barely differ). */
+     ~360px, so the bubble needs to clear that overlay. */
   body.music-tracklist-open .thought-bubble-btn {
     bottom: 480px;
   }
@@ -3775,7 +3778,7 @@
   .thoughts-panel {
     position: fixed;
     left: 16px;
-    bottom: 152px;
+    bottom: 162px;
     width: 360px;
     max-width: calc(100vw - 32px);
     max-height: 70vh;
@@ -3788,6 +3791,9 @@
     flex-direction: column;
     overflow: hidden;
     transition: bottom 0.25s ease;
+  }
+  body.music-expanded .thoughts-panel {
+    bottom: 212px;
   }
   body.music-tracklist-open .thoughts-panel {
     bottom: 548px;
