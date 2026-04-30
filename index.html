@@ -7476,12 +7476,15 @@ function taskModalHasContent() {
   return false;
 }
 
-function closeTaskModal() {
+function closeTaskModal(skipConfirm) {
   // If the form has any content, require explicit confirmation before
   // wiping it. Backdrop clicks are already disabled for this modal so
   // the only ways to reach here are the ✕ icon and the Cancel button —
   // both intentional but easy to mis-click on a touch device.
-  if (taskModalHasContent()) {
+  // skipConfirm=true is used by saveTask() after a successful create —
+  // the form still has values but the user just chose to save them, so
+  // the discard prompt would be wrong.
+  if (!skipConfirm && taskModalHasContent()) {
     if (!confirm('Discard this new task? Anything you typed will be lost.')) {
       return;
     }
@@ -7580,7 +7583,7 @@ async function saveTask() {
     if (taskData.durationMs) activityDetails.durationMs = taskData.durationMs;
     if (taskData.deadlineAt) activityDetails.deadlineAt = taskData.deadlineAt.toDate().getTime();
     await logActivity(docRef.id, 'created', activityDetails);
-    closeTaskModal();
+    closeTaskModal(true);   // skipConfirm — user just saved, don't ask to discard
   } catch (err) {
     alert('Could not save task: ' + err.message);
   } finally {
@@ -8723,8 +8726,8 @@ function editTaskModalHasUnsavedChanges() {
   return false;
 }
 
-function closeEditTaskModal() {
-  if (editTaskModalHasUnsavedChanges()) {
+function closeEditTaskModal(skipConfirm) {
+  if (!skipConfirm && editTaskModalHasUnsavedChanges()) {
     if (!confirm('Discard your edits? Unsaved changes will be lost.')) {
       return;
     }
@@ -8877,7 +8880,7 @@ async function saveTaskEdits() {
   }
 
   if (Object.keys(updates).length === 0) {
-    closeEditTaskModal();
+    closeEditTaskModal(true);
     return;
   }
 
@@ -8901,7 +8904,7 @@ async function saveTaskEdits() {
       }
     }
 
-    closeEditTaskModal();
+    closeEditTaskModal(true);   // skipConfirm — user just saved
   } catch (err) {
     alert('Could not save: ' + err.message);
   } finally {
