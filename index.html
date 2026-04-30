@@ -3763,11 +3763,11 @@
     50%  { transform: translateY(-3px) rotate(2deg); }
     100% { transform: translateY(0) rotate(-2deg); }
   }
-  /* When the music player is expanded, slide the bubble up. */
-  body.music-expanded .thought-bubble-btn {
-    bottom: 158px;
-  }
-  body.music-expanded.music-tracklist-open .thought-bubble-btn {
+  /* When the music tracklist is open it floats up above the player by
+     ~360px, so the bubble needs to clear that overlay. Otherwise the
+     bubble's base position works for both collapsed and expanded music
+     player states (since their heights barely differ). */
+  body.music-tracklist-open .thought-bubble-btn {
     bottom: 480px;
   }
 
@@ -3789,10 +3789,7 @@
     overflow: hidden;
     transition: bottom 0.25s ease;
   }
-  body.music-expanded .thoughts-panel {
-    bottom: 226px;
-  }
-  body.music-expanded.music-tracklist-open .thoughts-panel {
+  body.music-tracklist-open .thoughts-panel {
     bottom: 548px;
   }
   .thoughts-panel.hidden { display: none; }
@@ -4053,6 +4050,20 @@
   body.dark #musicShuffleBtn.active {
     background: linear-gradient(135deg, var(--lavender) 0%, var(--pink-deep) 100%);
     color: #fff;
+  }
+  /* Collapse button — small subtle control to shrink the player back to
+     its 56px badge while still playing. Sits at the end of the button row. */
+  .music-btn-collapse {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+    background: transparent;
+    color: var(--ink-soft);
+    margin-left: 2px;
+  }
+  .music-btn-collapse:hover {
+    background: var(--bg-2);
+    color: var(--ink);
   }
 
   /* Volume slider row */
@@ -4706,6 +4717,7 @@
     <button class="music-btn" id="musicPrevBtn" title="Previous">⏮</button>
     <button class="music-btn play" id="musicPlayBtn" title="Play / Pause">▶</button>
     <button class="music-btn" id="musicNextBtn" title="Next">⏭</button>
+    <button class="music-btn music-btn-collapse" id="musicCollapseBtn" title="Collapse player">➖</button>
   </div>
   <div class="music-volume-row" id="musicVolumeRow">
     <span class="music-volume-icon">🔉</span>
@@ -13403,6 +13415,26 @@ function toggleMusicShuffle() {
   renderMusicPlayer();
 }
 
+// Manually collapse the music player to its 56px badge. Useful when
+// something is playing but the user wants the screen back. The next
+// mouseenter on the player will re-expand it as usual.
+function forceCollapseMusicPlayer() {
+  music.collapsed = true;
+  const p = el('musicPlayer');
+  p.classList.add('collapsed');
+  // Also close the tracklist if it's open — if we leave it open while
+  // collapsing the player, the absolute-positioned tracklist orphans
+  // visually above a tiny badge.
+  const list = el('musicTracklist');
+  if (list && list.classList.contains('open')) {
+    list.classList.remove('open');
+    music.showingPlaylistPicker = false;
+    el('musicPlaylistPicker').classList.remove('open');
+    music.editMode = false;
+  }
+  renderMusicPlayer();
+}
+
 function setMusicVolume(vol) {
   music.volume = Math.max(0, Math.min(100, vol));
   saveMusicSettings();
@@ -14504,6 +14536,10 @@ function initMusicPlayer() {
   el('musicShuffleBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     toggleMusicShuffle();
+  });
+  el('musicCollapseBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    forceCollapseMusicPlayer();
   });
 
   const volumeSlider = el('musicVolume');
