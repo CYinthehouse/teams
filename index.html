@@ -3732,7 +3732,7 @@
   .thought-bubble-btn {
     position: fixed;
     left: 16px;
-    bottom: 84px;            /* clears collapsed music player (56px + 16px + 12px gap) */
+    bottom: 76px;            /* flush above collapsed music player (56 + 16 + 4 gap) */
     width: 56px;
     height: 56px;
     border-radius: 50%;
@@ -4737,8 +4737,9 @@
     <textarea id="thoughtsInput" class="thoughts-input" rows="3"
               placeholder="What's on your mind?" maxlength="2000"></textarea>
     <button class="btn-action primary" id="thoughtsSubmitBtn" onclick="submitThought()">+ Add Thought</button>
+    <button class="btn-action secondary" id="thoughtsViewToggleBtn" onclick="toggleThoughtsListView()">📂 View Thoughts</button>
   </div>
-  <div class="thoughts-list" id="thoughtsList">
+  <div class="thoughts-list" id="thoughtsList" style="display:none;">
     <div class="thoughts-empty">Nothing here yet.</div>
   </div>
 </div>
@@ -5511,6 +5512,7 @@ const state = {
   // Random Thoughts
   thoughts: [],                // user's own thoughts (or all, for Boss)
   thoughtsPanelOpen: false,    // whether the floating panel is currently visible
+  thoughtsListExpanded: false, // whether the past-thoughts list is shown (toggled by "View Thoughts")
   // End of Program contact reminder (third type)
   progContactsFired: new Set(),     // in-memory dedupe (prog__classId__week)
   pendingProgContact: null,         // currently-displayed end-of-program popup
@@ -14286,7 +14288,13 @@ function subscribeThoughts() {
         .orderBy('createdAt', 'desc').limit(200);
   unsubs.thoughts = q.onSnapshot(snap => {
     state.thoughts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (state.thoughtsPanelOpen) renderThoughtsPanel();
+    if (state.thoughtsPanelOpen) {
+      // Refresh the count on the toggle button. Only re-render the list
+      // body if it's currently expanded — otherwise the data stays in
+      // state.thoughts and renders next time the user expands.
+      updateThoughtsViewToggleLabel();
+      if (state.thoughtsListExpanded) renderThoughtsPanel();
+    }
   }, err => {
     console.error('thoughts subscription error:', err.code, err.message);
   });
@@ -14312,7 +14320,9 @@ function toggleThoughtsPanel() {
 
 function openThoughtsPanel() {
   state.thoughtsPanelOpen = true;
+  state.thoughtsListExpanded = false;     // always start with the list collapsed
   el('thoughtsPanel').classList.remove('hidden');
+  el('thoughtsList').style.display = 'none';
   // Update sub-text based on role.
   const sub = el('thoughtsPanelSub');
   if (sub) {
@@ -14320,7 +14330,7 @@ function openThoughtsPanel() {
       ? "All team members' thoughts (you can only delete your own)."
       : "Just for you. Jot down whatever's on your mind.";
   }
-  renderThoughtsPanel();
+  updateThoughtsViewToggleLabel();
   // Focus input for quick typing.
   setTimeout(() => {
     const inp = el('thoughtsInput');
@@ -14330,7 +14340,32 @@ function openThoughtsPanel() {
 
 function closeThoughtsPanel() {
   state.thoughtsPanelOpen = false;
+  state.thoughtsListExpanded = false;
   el('thoughtsPanel').classList.add('hidden');
+}
+
+// Toggle the list visibility within the panel. The list is hidden by
+// default (compose-only view) — clicking "📂 View Thoughts" expands it
+// to scroll through past entries; clicking again hides it.
+function toggleThoughtsListView() {
+  state.thoughtsListExpanded = !state.thoughtsListExpanded;
+  const list = el('thoughtsList');
+  list.style.display = state.thoughtsListExpanded ? '' : 'none';
+  if (state.thoughtsListExpanded) renderThoughtsPanel();
+  updateThoughtsViewToggleLabel();
+}
+
+function updateThoughtsViewToggleLabel() {
+  const btn = el('thoughtsViewToggleBtn');
+  if (!btn) return;
+  const count = (state.thoughts || []).length;
+  if (state.thoughtsListExpanded) {
+    btn.textContent = '📂 Hide Thoughts';
+  } else {
+    btn.textContent = count > 0
+      ? `📂 View Thoughts (${count})`
+      : '📂 View Thoughts';
+  }
 }
 
 function renderThoughtsPanel() {
@@ -14420,6 +14455,13 @@ async function submitThought() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     inp.value = '';
+    // Auto-expand so the user can see the thought they just added.
+    if (!state.thoughtsListExpanded) {
+      state.thoughtsListExpanded = true;
+      el('thoughtsList').style.display = '';
+      renderThoughtsPanel();
+      updateThoughtsViewToggleLabel();
+    }
   } catch (err) {
     console.error('submitThought failed:', err);
     alert('Could not save thought: ' + err.message);
