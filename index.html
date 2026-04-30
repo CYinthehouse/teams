@@ -3724,6 +3724,208 @@
     z-index: -1;
   }
 
+  /* ---------- Random Thoughts (💭) ---------- */
+  /* Floating circular button, same size as the collapsed music player.
+     Lives bottom-left, sitting just above the music player. When the
+     music player expands, the body gets a `music-expanded` class and
+     the button slides up to stay flush above it. */
+  .thought-bubble-btn {
+    position: fixed;
+    left: 16px;
+    bottom: 84px;            /* clears collapsed music player (56px + 16px + 12px gap) */
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2.5px solid var(--lavender);
+    box-shadow: 0 6px 20px rgba(180, 120, 160, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 380;
+    padding: 0;
+    transition: bottom 0.25s ease, transform 0.15s, box-shadow 0.2s;
+  }
+  .thought-bubble-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 8px 24px rgba(180, 120, 160, 0.32);
+  }
+  .thought-bubble-emoji {
+    font-size: 28px;
+    line-height: 1;
+    /* Gentle bob — softer than the sakura's loader animation. */
+    display: inline-block;
+    animation: thoughtBob 3.2s ease-in-out infinite;
+  }
+  @keyframes thoughtBob {
+    0%   { transform: translateY(0) rotate(-2deg); }
+    50%  { transform: translateY(-3px) rotate(2deg); }
+    100% { transform: translateY(0) rotate(-2deg); }
+  }
+  /* When the music player is expanded, slide the bubble up. */
+  body.music-expanded .thought-bubble-btn {
+    bottom: 158px;
+  }
+  body.music-expanded.music-tracklist-open .thought-bubble-btn {
+    bottom: 480px;
+  }
+
+  /* Thoughts panel — opens from the bubble. */
+  .thoughts-panel {
+    position: fixed;
+    left: 16px;
+    bottom: 152px;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    max-height: 70vh;
+    background: var(--white);
+    border: 2.5px solid var(--lavender);
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(180, 120, 160, 0.32);
+    z-index: 385;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: bottom 0.25s ease;
+  }
+  body.music-expanded .thoughts-panel {
+    bottom: 226px;
+  }
+  body.music-expanded.music-tracklist-open .thoughts-panel {
+    bottom: 548px;
+  }
+  .thoughts-panel.hidden { display: none; }
+  .thoughts-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, var(--lavender-soft), var(--bg-3));
+    border-bottom: 2px dashed var(--lavender-soft);
+  }
+  .thoughts-panel-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--ink);
+  }
+  .thoughts-panel-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    color: var(--ink);
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .thoughts-panel-close:hover { background: var(--pink-soft); }
+  .thoughts-panel-sub {
+    padding: 8px 14px 0;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .thoughts-compose-row {
+    padding: 10px 14px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px dashed var(--bg-2);
+  }
+  .thoughts-input {
+    width: 100%;
+    border: 2px solid var(--bg-2);
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--white);
+    resize: vertical;
+    outline: none;
+  }
+  .thoughts-input:focus { border-color: var(--pink); }
+  .thoughts-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .thoughts-empty {
+    text-align: center;
+    color: var(--ink-light);
+    font-size: 12px;
+    padding: 20px 0;
+    font-style: italic;
+  }
+  .thought-card {
+    background: var(--bg-3);
+    border: 1.5px solid var(--bg-2);
+    border-radius: 12px;
+    padding: 10px 12px;
+    transition: border 0.15s;
+  }
+  .thought-card:hover { border-color: var(--lavender); }
+  .thought-card-author {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--pink-deep);
+    margin-bottom: 4px;
+  }
+  .thought-card-text {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .thought-card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--ink-light);
+  }
+  .thought-card-delete {
+    background: none;
+    border: none;
+    color: var(--ink-light);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .thought-card-delete:hover {
+    background: #ffe6ec;
+    color: #b3334e;
+  }
+  /* Group header for Boss view (one section per author). */
+  .thoughts-author-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 2px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .thoughts-author-group-head:first-child { margin-top: 0; }
+  .thoughts-author-group-head .author-pill {
+    background: var(--lavender-soft);
+    color: var(--ink);
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
   /* Bottom-left floating player */
   .music-player {
     position: fixed;
@@ -4515,6 +4717,32 @@
 <!-- Hidden YouTube player host -->
 <div id="ytHost" class="yt-host"></div>
 
+<!-- Random Thoughts floating button (sits above the music player, slides
+     up with it when expanded). Same size as collapsed music button. -->
+<button id="thoughtBubbleBtn" class="thought-bubble-btn hidden"
+        onclick="toggleThoughtsPanel()" title="Random thoughts">
+  <span class="thought-bubble-emoji">💭</span>
+</button>
+
+<!-- Random Thoughts panel — opens when the bubble is clicked. List of
+     past thoughts on top, compose box at the bottom. Boss sees everyone's
+     thoughts grouped by author; everyone else sees only their own. -->
+<div id="thoughtsPanel" class="thoughts-panel hidden">
+  <div class="thoughts-panel-head">
+    <span class="thoughts-panel-title">💭 Random Thoughts</span>
+    <button class="thoughts-panel-close" onclick="closeThoughtsPanel()" title="Close">✕</button>
+  </div>
+  <div class="thoughts-panel-sub" id="thoughtsPanelSub">Jot down whatever's on your mind.</div>
+  <div class="thoughts-compose-row">
+    <textarea id="thoughtsInput" class="thoughts-input" rows="3"
+              placeholder="What's on your mind?" maxlength="2000"></textarea>
+    <button class="btn-action primary" id="thoughtsSubmitBtn" onclick="submitThought()">+ Add Thought</button>
+  </div>
+  <div class="thoughts-list" id="thoughtsList">
+    <div class="thoughts-empty">Nothing here yet.</div>
+  </div>
+</div>
+
 <!-- Poke character strip (bottom-right) -->
 <div id="pokeStrip" class="poke-strip"></div>
 
@@ -5280,6 +5508,9 @@ const state = {
   pendingAttContact: null,     // currently-displayed attendance-contact popup, if any
   attContactSignoffStudents: [], // working state for the signoff form: [{studentId, name, contactedDiscord, contactedText}]
   attContactsHistory: [],      // last N signoff docs (for the Class Contacts view)
+  // Random Thoughts
+  thoughts: [],                // user's own thoughts (or all, for Boss)
+  thoughtsPanelOpen: false,    // whether the floating panel is currently visible
   // End of Program contact reminder (third type)
   progContactsFired: new Set(),     // in-memory dedupe (prog__classId__week)
   pendingProgContact: null,         // currently-displayed end-of-program popup
@@ -5327,6 +5558,7 @@ const unsubs = {
   reminderPrograms: null,    // listener on reminder_programs (mine if Worker, all if Boss/Mgr)
   reminderTestRequests: null, // listener for incoming test-reminder requests targeted at me
   attContactsHistory: null,  // listener on attendance_contact_signoffs for the "Class Contacts" view
+  thoughts: null,            // listener on random_thoughts (own only, or all if Boss)
   comments: null,
   activity: null,
   appSettings: null,
@@ -6093,6 +6325,11 @@ auth.onAuthStateChanged(async (user) => {
     if (!el('progCannedMessageSubModal').classList.contains('hidden')) {
       hide('progCannedMessageSubModal');
     }
+    // Random Thoughts cleanup
+    if (unsubs.thoughts) { unsubs.thoughts(); unsubs.thoughts = null; }
+    state.thoughts = [];
+    state.thoughtsPanelOpen = false;
+    hideThoughtBubble();
     // Also wipe the localStorage cache so a different user on the same
     // browser doesn't briefly see the previous user's playlists at next sign-in.
     try {
@@ -6174,6 +6411,9 @@ auth.onAuthStateChanged(async (user) => {
   // Subscribe to the attendance contact signoff history so the Class
   // Contacts section in Settings stays live for everyone.
   subscribeAttContactsHistory();
+  // Random thoughts: everyone subscribes to their own; Boss to all.
+  subscribeThoughts();
+  showThoughtBubble();
   // Run an initial fire-check after a short delay so secondary auth has
   // a chance to be ready (it might be hydrating from local storage).
   setTimeout(() => {
@@ -13175,6 +13415,7 @@ function toggleTrackList() {
   const isOpen = list.classList.contains('open');
   if (isOpen) {
     list.classList.remove('open');
+    document.body.classList.remove('music-tracklist-open');
     // Also close the playlist picker if it was open, and clear any search state
     // so reopening the tracklist starts on the playlist view, not stale results.
     music.showingPlaylistPicker = false;
@@ -13188,8 +13429,10 @@ function toggleTrackList() {
   }
   music.collapsed = false;
   el('musicPlayer').classList.remove('collapsed');
+  document.body.classList.add('music-expanded');
   renderTrackList();
   list.classList.add('open');
+  document.body.classList.add('music-tracklist-open');
 }
 
 function renderTrackList() {
@@ -13324,6 +13567,7 @@ function renderTrackList() {
       const idx = parseInt(item.dataset.idx, 10);
       playMusicTrack(idx, true);
       el('musicTracklist').classList.remove('open');
+      document.body.classList.remove('music-tracklist-open');
     });
   });
 
@@ -13587,6 +13831,7 @@ function addTrackToActivePlaylist() {
   if (existingIdx >= 0) {
     playMusicTrack(existingIdx, true);
     el('musicTracklist').classList.remove('open');
+    document.body.classList.remove('music-tracklist-open');
     urlInput.value = '';
     const titleInputEarly = el('musicAddTitle');
     if (titleInputEarly) titleInputEarly.value = '';
@@ -14019,6 +14264,180 @@ function renderMusicPlayer() {
   }
 }
 
+/* ============================================
+   Random Thoughts
+   - Personal scratchpad: each user can jot down thoughts
+   - Saved to top-level `random_thoughts` collection
+   - Each doc: { userId, userName, text, createdAt }
+   - Rules: owner always reads/writes own; Boss reads all
+   - Boss view: groups by author with name labels
+============================================ */
+
+function subscribeThoughts() {
+  if (!state.user) return;
+  if (unsubs.thoughts) { unsubs.thoughts(); unsubs.thoughts = null; }
+  const isBoss = state.profile && state.profile.role === 'Boss';
+  // Boss subscribes to ALL thoughts (sorted by author then time below);
+  // everyone else subscribes only to their own.
+  const q = isBoss
+    ? db.collection('random_thoughts').orderBy('createdAt', 'desc').limit(500)
+    : db.collection('random_thoughts')
+        .where('userId', '==', state.user.uid)
+        .orderBy('createdAt', 'desc').limit(200);
+  unsubs.thoughts = q.onSnapshot(snap => {
+    state.thoughts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (state.thoughtsPanelOpen) renderThoughtsPanel();
+  }, err => {
+    console.error('thoughts subscription error:', err.code, err.message);
+  });
+}
+
+function showThoughtBubble() {
+  const btn = el('thoughtBubbleBtn');
+  if (btn) btn.classList.remove('hidden');
+}
+function hideThoughtBubble() {
+  const btn = el('thoughtBubbleBtn');
+  if (btn) btn.classList.add('hidden');
+  closeThoughtsPanel();
+}
+
+function toggleThoughtsPanel() {
+  if (state.thoughtsPanelOpen) {
+    closeThoughtsPanel();
+  } else {
+    openThoughtsPanel();
+  }
+}
+
+function openThoughtsPanel() {
+  state.thoughtsPanelOpen = true;
+  el('thoughtsPanel').classList.remove('hidden');
+  // Update sub-text based on role.
+  const sub = el('thoughtsPanelSub');
+  if (sub) {
+    sub.textContent = (state.profile && state.profile.role === 'Boss')
+      ? "All team members' thoughts (you can only delete your own)."
+      : "Just for you. Jot down whatever's on your mind.";
+  }
+  renderThoughtsPanel();
+  // Focus input for quick typing.
+  setTimeout(() => {
+    const inp = el('thoughtsInput');
+    if (inp) inp.focus();
+  }, 150);
+}
+
+function closeThoughtsPanel() {
+  state.thoughtsPanelOpen = false;
+  el('thoughtsPanel').classList.add('hidden');
+}
+
+function renderThoughtsPanel() {
+  const list = el('thoughtsList');
+  if (!list) return;
+  const items = state.thoughts || [];
+  if (items.length === 0) {
+    list.innerHTML = `<div class="thoughts-empty">Nothing here yet.</div>`;
+    return;
+  }
+  const isBoss = state.profile && state.profile.role === 'Boss';
+  if (isBoss) {
+    // Group by author. Each user has their own section so it's clear
+    // who wrote what.
+    const byUser = {};
+    items.forEach(t => {
+      const uid = t.userId || '__unknown__';
+      if (!byUser[uid]) byUser[uid] = { name: t.userName || '—', items: [] };
+      byUser[uid].items.push(t);
+    });
+    // Order groups by most recent thought in each.
+    const groups = Object.entries(byUser).sort((a, b) => {
+      const aMs = (a[1].items[0].createdAt && a[1].items[0].createdAt.toMillis)
+        ? a[1].items[0].createdAt.toMillis() : 0;
+      const bMs = (b[1].items[0].createdAt && b[1].items[0].createdAt.toMillis)
+        ? b[1].items[0].createdAt.toMillis() : 0;
+      return bMs - aMs;
+    });
+    list.innerHTML = groups.map(([uid, g]) => {
+      const isMe = uid === state.user.uid;
+      const headLabel = isMe
+        ? `<span class="author-pill">You</span>`
+        : `<span class="author-pill">${escapeHtml(g.name)}</span>`;
+      const cards = g.items.map(t => renderThoughtCardHtml(t, isMe || isBoss)).join('');
+      return `<div class="thoughts-author-group-head">${headLabel}</div>${cards}`;
+    }).join('');
+  } else {
+    list.innerHTML = items.map(t => renderThoughtCardHtml(t, true)).join('');
+  }
+  // Wire delete buttons.
+  list.querySelectorAll('.thought-card-delete').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (!id) return;
+      if (!confirm('Delete this thought?')) return;
+      deleteThought(id);
+    });
+  });
+}
+
+function renderThoughtCardHtml(t, canDelete) {
+  const when = t.createdAt && t.createdAt.toMillis
+    ? formatTime(t.createdAt)
+    : 'just now';
+  const fullWhen = t.createdAt && t.createdAt.toMillis
+    ? formatTimeFull(t.createdAt)
+    : '';
+  const deleteBtn = canDelete
+    ? `<button class="thought-card-delete" data-id="${escapeHtml(t.id)}" title="Delete">🗑 delete</button>`
+    : '';
+  return `
+    <div class="thought-card">
+      <div class="thought-card-text">${escapeHtml(t.text || '')}</div>
+      <div class="thought-card-foot">
+        <span title="${escapeHtml(fullWhen)}">${escapeHtml(when)}</span>
+        ${deleteBtn}
+      </div>
+    </div>
+  `;
+}
+
+async function submitThought() {
+  if (!state.user || !state.profile) return;
+  const inp = el('thoughtsInput');
+  const text = (inp.value || '').trim();
+  if (!text) return;
+  const btn = el('thoughtsSubmitBtn');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    await db.collection('random_thoughts').add({
+      userId: state.user.uid,
+      userName: state.profile.name || '—',
+      text,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    inp.value = '';
+  } catch (err) {
+    console.error('submitThought failed:', err);
+    alert('Could not save thought: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+async function deleteThought(thoughtId) {
+  try {
+    await db.collection('random_thoughts').doc(thoughtId).delete();
+  } catch (err) {
+    console.error('deleteThought failed:', err);
+    alert('Could not delete: ' + err.message);
+  }
+}
+
 function initMusicPlayer() {
   if (music.initialized) return;
   music.initialized = true;
@@ -14066,6 +14485,7 @@ function initMusicPlayer() {
     const player = el('musicPlayer');
     if (!player.contains(e.target)) {
       list.classList.remove('open');
+      document.body.classList.remove('music-tracklist-open');
     }
   });
 
@@ -14074,6 +14494,7 @@ function initMusicPlayer() {
   playerEl.addEventListener('mouseenter', () => {
     music.collapsed = false;
     playerEl.classList.remove('collapsed');
+    document.body.classList.add('music-expanded');
   });
   playerEl.addEventListener('mouseleave', () => {
     // Don't collapse while the user is mid-interaction with playlists or
@@ -14085,6 +14506,7 @@ function initMusicPlayer() {
     if (!music.isPlaying && !listOpen && !pickerOpen && !formOpen && music.currentIdx < 0) {
       music.collapsed = true;
       playerEl.classList.add('collapsed');
+      document.body.classList.remove('music-expanded');
     }
   });
 
@@ -14092,6 +14514,7 @@ function initMusicPlayer() {
   if (music.currentIdx >= 0) {
     music.collapsed = false;
     playerEl.classList.remove('collapsed');
+    document.body.classList.add('music-expanded');
   }
 
   renderMusicPlayer();
