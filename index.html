@@ -5922,6 +5922,30 @@ function approvedAtMs(task) {
   return d.getTime();
 }
 
+// Helper: get a task's createdAt as ms-epoch, defaulting to 0 if missing.
+// Used by sortTasksForColumn to break urgency ties by recency.
+function taskCreatedAtMs(task) {
+  if (!task.createdAt) return 0;
+  const d = task.createdAt.toDate ? task.createdAt.toDate() : new Date(task.createdAt);
+  return d.getTime() || 0;
+}
+
+// Sort comparator for tasks within a column. Order is:
+//   1. Urgency tier: red > yellow > blue > none
+//   2. Within tier: newest first (highest createdAt first)
+// Used in buildMemberColumn and buildPendingColumn so red-tagged tasks
+// always float to the top of every column.
+const URGENCY_RANK = { red: 0, yellow: 1, blue: 2 };
+function sortTasksForColumn(tasks) {
+  return tasks.slice().sort((a, b) => {
+    const aRank = URGENCY_RANK[a.urgency] ?? 3;
+    const bRank = URGENCY_RANK[b.urgency] ?? 3;
+    if (aRank !== bRank) return aRank - bRank;
+    // Newest first within the same urgency tier.
+    return taskCreatedAtMs(b) - taskCreatedAtMs(a);
+  });
+}
+
 function dateKey(ms) {
   // Returns YYYY-MM-DD for grouping
   const d = new Date(ms);
@@ -6966,11 +6990,11 @@ function buildMemberColumn(member, isGhost) {
   col.dataset.dropTarget = 'member';
   col.dataset.userId = member.uid;
 
-  const tasks = state.tasks.filter(t =>
+  const tasks = sortTasksForColumn(state.tasks.filter(t =>
     t.assigneeId === member.uid &&
     t.status !== 'pending_approval' &&
     t.status !== 'approved'
-  );
+  ));
 
   // Per-column "+ new task" shortcut: visible on the user's own column
   // for everyone, and on all member columns for Boss/Manager. Skipped on
@@ -7024,7 +7048,7 @@ function buildMemberColumn(member, isGhost) {
 function buildPendingColumn() {
   const col = document.createElement('div');
   col.className = 'column special';
-  const tasks = state.tasks.filter(t => t.status === 'pending_approval');
+  const tasks = sortTasksForColumn(state.tasks.filter(t => t.status === 'pending_approval'));
 
   col.innerHTML = `
     <div class="col-head">
