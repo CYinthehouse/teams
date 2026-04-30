@@ -1031,6 +1031,28 @@
     font-size: 11px;
     font-weight: 700;
   }
+  /* Per-column "new task" pencil button — sits between col-info and the
+     count. Subtle by default, brighter on hover so it doesn't compete
+     visually with task data but is easy to find when you want it. */
+  .col-quick-add {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    margin-right: 4px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    color: var(--ink-soft);
+  }
+  .col-quick-add:hover {
+    background: var(--pink-soft);
+    color: var(--ink);
+    transform: scale(1.08);
+  }
 
   .col-tasks {
     flex: 1;
@@ -1067,6 +1089,108 @@
   .task-card.dragging {
     opacity: 0.4;
     cursor: grabbing;
+  }
+
+  /* ---- Urgency tints ----
+     Three levels, each with light + dark mode variants tuned for legibility.
+     The whole card background tints; borders pick up a darker version of
+     the same hue. Text stays at --ink which already inverts in dark mode. */
+  .task-card.urgency-red {
+    background: #ffe0e8;
+    border-color: #ff8aa6;
+  }
+  .task-card.urgency-red:hover { border-color: #ff5e87; }
+  .task-card.urgency-yellow {
+    background: #fff5c8;
+    border-color: #e8c75a;
+  }
+  .task-card.urgency-yellow:hover { border-color: #d6b13a; }
+  .task-card.urgency-blue {
+    background: #d8e9ff;
+    border-color: #7eb4ee;
+  }
+  .task-card.urgency-blue:hover { border-color: #4f93dc; }
+
+  body.dark .task-card.urgency-red {
+    background: #4a2230;
+    border-color: #a04060;
+    color: #ffd6e0;
+  }
+  body.dark .task-card.urgency-red:hover { border-color: #d8628a; }
+  body.dark .task-card.urgency-yellow {
+    background: #3e3618;
+    border-color: #a08a30;
+    color: #fff0b8;
+  }
+  body.dark .task-card.urgency-yellow:hover { border-color: #d8b850; }
+  body.dark .task-card.urgency-blue {
+    background: #1f3450;
+    border-color: #4f7eba;
+    color: #c8dffa;
+  }
+  body.dark .task-card.urgency-blue:hover { border-color: #6ea2e0; }
+
+  /* Quick-cycle urgency dot in the card top-right. Sits over the title
+     row's right edge. Cycles null → red → yellow → blue → null on click. */
+  .task-card-urgency-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    border: 1.5px solid var(--ink-light);
+    cursor: pointer;
+    z-index: 2;
+    transition: transform 0.15s, background 0.15s, border-color 0.15s;
+    padding: 0;
+  }
+  .task-card-urgency-dot:hover { transform: scale(1.2); }
+  .task-card-urgency-dot.urgency-red    { background: #ff5e87; border-color: #c43560; }
+  .task-card-urgency-dot.urgency-yellow { background: #f3c93a; border-color: #b08a18; }
+  .task-card-urgency-dot.urgency-blue   { background: #4f93dc; border-color: #2c6db0; }
+  /* Reserve space at the right edge of the title so it doesn't run under
+     the urgency dot. Padding kept on the title rather than the card so
+     the rest of the card retains symmetric padding. */
+  .task-card .task-title {
+    padding-right: 22px;
+  }
+  /* Urgency picker — used in new-task, edit-task, and detail modals.
+     Four pill-shaped buttons in a row; selected one gets a darker border. */
+  .urgency-picker {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .urgency-pick {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 2px solid var(--bg-2);
+    background: var(--white);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  }
+  .urgency-pick:hover { transform: translateY(-1px); }
+  .urgency-pick.urgency-red    { background: #ffe0e8; border-color: #ff8aa6; }
+  .urgency-pick.urgency-yellow { background: #fff5c8; border-color: #e8c75a; }
+  .urgency-pick.urgency-blue   { background: #d8e9ff; border-color: #7eb4ee; }
+  .urgency-pick.selected {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 2px var(--pink-soft);
+  }
+  body.dark .urgency-pick.urgency-red    { background: #4a2230; border-color: #a04060; color: #ffd6e0; }
+  body.dark .urgency-pick.urgency-yellow { background: #3e3618; border-color: #a08a30; color: #fff0b8; }
+  body.dark .urgency-pick.urgency-blue   { background: #1f3450; border-color: #4f7eba; color: #c8dffa; }
+  body.dark .urgency-pick.selected {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 2px var(--pink-deep);
   }
 
   .task-title {
@@ -4963,6 +5087,15 @@
         <select id="taskAssignee" class="form-input"></select>
       </div>
       <div class="form-group">
+        <label>Urgency</label>
+        <div class="urgency-picker" id="newTaskUrgencyPicker">
+          <button type="button" class="urgency-pick" data-urgency="" title="No urgency">None</button>
+          <button type="button" class="urgency-pick urgency-red" data-urgency="red" title="Most urgent">🔴 Red</button>
+          <button type="button" class="urgency-pick urgency-yellow" data-urgency="yellow" title="Mid urgency">🟡 Yellow</button>
+          <button type="button" class="urgency-pick urgency-blue" data-urgency="blue" title="Least urgent">🔵 Blue</button>
+        </div>
+      </div>
+      <div class="form-group">
         <label class="private-toggle-label" id="newTaskPrivateLabel" title="Only the assigner and the assignee can see private tasks. Boss and Managers can also see them.">
           <input type="checkbox" id="newTaskPrivate" />
           <span>🔒 <strong>Private task</strong> — only visible to you, the assignee, Boss & Managers</span>
@@ -5015,6 +5148,15 @@
       <div class="form-group" id="editAssigneeWrap">
         <label>Assign to <span style="color:var(--ink-light);font-weight:500;" id="editAssigneeNote"></span></label>
         <select id="editTaskAssignee" class="form-input"></select>
+      </div>
+      <div class="form-group">
+        <label>Urgency</label>
+        <div class="urgency-picker" id="editTaskUrgencyPicker">
+          <button type="button" class="urgency-pick" data-urgency="" title="No urgency">None</button>
+          <button type="button" class="urgency-pick urgency-red" data-urgency="red" title="Most urgent">🔴 Red</button>
+          <button type="button" class="urgency-pick urgency-yellow" data-urgency="yellow" title="Mid urgency">🟡 Yellow</button>
+          <button type="button" class="urgency-pick urgency-blue" data-urgency="blue" title="Least urgent">🔵 Blue</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="private-toggle-label" id="editTaskPrivateLabel" title="Only the assigner and the assignee can see private tasks. Boss and Managers can also see them.">
@@ -5495,6 +5637,8 @@ const state = {
   _tasksPrivateCache: [],
   authMode: 'signin',
   pendingSteps: [],
+  pendingUrgency: null,         // selected urgency in the new-task modal
+  editPendingUrgency: null,     // selected urgency in the edit-task modal
   currentTaskId: null,
   editingTaskId: null,
   currentEditingTeamId: null,
@@ -6713,6 +6857,20 @@ function renderTeamSwitcher() {
 ============================================ */
 function renderBoard() {
   const root = el('boardContent');
+
+  // Save scroll positions BEFORE re-rendering so the user doesn't lose
+  // their place every time the 30-second tick or a Firestore snapshot
+  // forces a redraw. Map keyed by data-col-key so we can restore them
+  // even if the column order changed.
+  const scrollByKey = {};
+  root.querySelectorAll('.col-tasks[data-col-key]').forEach(c => {
+    if (c.scrollTop > 0) scrollByKey[c.dataset.colKey] = c.scrollTop;
+  });
+  // Also remember the horizontal scroll on the parent .board-area.
+  const boardArea = document.querySelector('.board-area');
+  const boardAreaScrollLeft = boardArea ? boardArea.scrollLeft : 0;
+  const boardAreaScrollTop  = boardArea ? boardArea.scrollTop  : 0;
+
   if (!state.activeTeam) {
     el('boardName').textContent = 'No team selected';
     el('boardSub').textContent = state.teams.length === 0
@@ -6772,6 +6930,21 @@ function renderBoard() {
   root.innerHTML = '';
   root.appendChild(columns);
 
+  // Restore scroll positions captured before re-render. We do this in a
+  // microtask via requestAnimationFrame so the new column DOM has had a
+  // chance to layout (otherwise scrollHeight is 0 and scrollTop assignment
+  // is silently clamped).
+  requestAnimationFrame(() => {
+    Object.entries(scrollByKey).forEach(([key, top]) => {
+      const c = root.querySelector(`.col-tasks[data-col-key="${CSS.escape(key)}"]`);
+      if (c) c.scrollTop = top;
+    });
+    if (boardArea) {
+      if (boardAreaScrollLeft) boardArea.scrollLeft = boardAreaScrollLeft;
+      if (boardAreaScrollTop)  boardArea.scrollTop  = boardAreaScrollTop;
+    }
+  });
+
   // If a detail modal is open, refresh its head and active tab to reflect realtime changes
   if (state.currentTaskId && !el('taskDetailModal').classList.contains('hidden')) {
     const t = getCurrentTask();
@@ -6799,6 +6972,17 @@ function buildMemberColumn(member, isGhost) {
     t.status !== 'approved'
   );
 
+  // Per-column "+ new task" shortcut: visible on the user's own column
+  // for everyone, and on all member columns for Boss/Manager. Skipped on
+  // ghost columns (those users aren't on the team anymore).
+  const showQuickAdd = !isGhost && (
+    member.uid === state.user.uid ||
+    isBossOrManager(state.profile.role)
+  );
+  const quickAddBtn = showQuickAdd
+    ? `<button class="col-quick-add" data-quick-add-uid="${escapeHtml(member.uid)}" title="New task assigned to ${escapeHtml(member.name)}">✏️</button>`
+    : '';
+
   col.innerHTML = `
     <div class="col-head">
       <div class="col-avatar" style="background: ${avatarColorFor(member.name)}">${avatarLetter(member.name)}</div>
@@ -6806,13 +6990,29 @@ function buildMemberColumn(member, isGhost) {
         <div class="col-name">${escapeHtml(member.name)}${isGhost ? ' 👻' : ''}</div>
         <div class="col-meta">${escapeHtml(member.role || '—')}${isGhost ? ' · not on team' : ''}</div>
       </div>
+      ${quickAddBtn}
       <div class="col-count">${tasks.length}</div>
     </div>
-    <div class="col-tasks" data-drop-zone="member" data-user-id="${member.uid}">
+    <div class="col-tasks" data-drop-zone="member" data-user-id="${member.uid}" data-col-key="member:${escapeHtml(member.uid)}">
       ${tasks.length === 0 ? `<div class="empty-col"><span class="emoji">☁️</span>All clear!</div>` : ''}
       <div class="drop-hint">Drop here ♡</div>
     </div>
   `;
+
+  // Wire the quick-add button to open the new-task modal pre-assigned
+  // to this column's user.
+  const qa = col.querySelector('.col-quick-add');
+  if (qa) {
+    qa.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTaskModal();
+      // openTaskModal populates the assignee dropdown; pre-select this user.
+      const sel = el('taskAssignee');
+      if (sel) sel.value = qa.dataset.quickAddUid;
+      // Focus the title input for fast entry.
+      setTimeout(() => { const t = el('taskTitle'); if (t) t.focus(); }, 50);
+    });
+  }
 
   const tasksWrap = col.querySelector('.col-tasks');
   tasks.forEach(t => tasksWrap.appendChild(buildTaskCard(t)));
@@ -6835,7 +7035,7 @@ function buildPendingColumn() {
       </div>
       <div class="col-count">${tasks.length}</div>
     </div>
-    <div class="col-tasks" data-drop-zone="pending">
+    <div class="col-tasks" data-drop-zone="pending" data-col-key="pending">
       ${tasks.length === 0 ? `<div class="empty-col"><span class="emoji">🌙</span>Nothing waiting</div>` : ''}
       <div class="drop-hint">Drop to mark finished ♡</div>
     </div>
@@ -6876,7 +7076,7 @@ function buildFinishedColumn() {
       </div>
       <div class="col-count">${totalShown}</div>
     </div>
-    <div class="col-tasks" data-drop-zone="finished">
+    <div class="col-tasks" data-drop-zone="finished" data-col-key="finished">
       <div class="finished-filters" id="finishedFilters">
         <button type="button" class="finished-filter ${state.finishedFilterRange === 'day' ? 'active' : ''}" data-range="day">Day</button>
         <button type="button" class="finished-filter ${state.finishedFilterRange === 'week' ? 'active' : ''}" data-range="week">Week</button>
@@ -7002,7 +7202,7 @@ function buildClassContactsColumn() {
       </div>
       <div class="col-count">${total}</div>
     </div>
-    <div class="col-tasks">
+    <div class="col-tasks" data-col-key="class-contacts">
       ${bodyHtml}
     </div>
   `;
@@ -7013,6 +7213,9 @@ function buildClassContactsColumn() {
 function buildTaskCard(task) {
   const card = document.createElement('div');
   card.className = 'task-card';
+  if (task.urgency === 'red' || task.urgency === 'yellow' || task.urgency === 'blue') {
+    card.classList.add('urgency-' + task.urgency);
+  }
   card.draggable = true;
   card.dataset.taskId = task.id;
 
@@ -7080,7 +7283,18 @@ function buildTaskCard(task) {
     ? `<div class="private-badge" title="Only visible to participants and Boss/Manager">🔒 Private</div>`
     : '';
 
+  // Urgency dot — small circle in the top-right corner. Click cycles
+  // null → red → yellow → blue → null. Each card gets one regardless
+  // of current urgency state (no urgency = gray dot).
+  const urgencyClass = (task.urgency === 'red' || task.urgency === 'yellow' || task.urgency === 'blue')
+    ? 'urgency-' + task.urgency : '';
+  const urgencyTitle = task.urgency
+    ? `Urgency: ${task.urgency} (click to cycle)`
+    : 'Set urgency';
+  const urgencyDotHtml = `<button class="task-card-urgency-dot ${urgencyClass}" data-task-id="${escapeHtml(task.id)}" title="${urgencyTitle}"></button>`;
+
   card.innerHTML = `
+    ${urgencyDotHtml}
     ${privateBadgeHtml}
     <div class="task-title">${escapeHtml(task.title)}</div>
     ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
@@ -7094,6 +7308,19 @@ function buildTaskCard(task) {
       ${steps.length > 0 ? `<div class="task-progress">${doneCount}/${steps.length}</div>` : ''}
     </div>
   `;
+
+  // Wire urgency dot — cycles through the 4 states and saves to Firestore.
+  // Stops propagation so clicking the dot doesn't open the task detail.
+  const dot = card.querySelector('.task-card-urgency-dot');
+  if (dot) {
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cycleTaskUrgency(task.id);
+    });
+    // Also stop drag from starting on the dot — otherwise grabbing it
+    // would treat the dot as the drag source.
+    dot.addEventListener('dragstart', (e) => { e.preventDefault(); e.stopPropagation(); });
+  }
 
   // Drag handlers
   card.addEventListener('dragstart', (e) => {
@@ -7199,8 +7426,13 @@ async function handleTaskDrop(taskId, dropType, userId) {
 function openTaskModal() {
   if (!state.activeTeam) return;
   state.pendingSteps = [];
+  state.pendingUrgency = null;
   el('taskTitle').value = '';
   el('taskDesc').value = '';
+  refreshUrgencyPicker('newTaskUrgencyPicker', state.pendingUrgency, (val) => {
+    state.pendingUrgency = val;
+    refreshUrgencyPicker('newTaskUrgencyPicker', state.pendingUrgency);
+  });
 
   // Stage 3: timer fields - only show for Boss/Manager
   const canSetTimer = isBossOrManager(state.profile.role);
@@ -7231,7 +7463,31 @@ function openTaskModal() {
   show('taskModal');
 }
 
-function closeTaskModal() { hide('taskModal'); }
+// Returns true if the new-task form has any user input. Used to decide
+// whether closing the modal needs a confirm dialog.
+function taskModalHasContent() {
+  if ((el('taskTitle').value || '').trim().length > 0) return true;
+  if ((el('taskDesc').value || '').trim().length > 0) return true;
+  if ((state.pendingSteps || []).some(s => (s.text || '').trim().length > 0)) return true;
+  if ((el('newTaskHours').value || '').trim().length > 0) return true;
+  if ((el('newTaskMinutes').value || '').trim().length > 0) return true;
+  if ((el('newTaskDeadline').value || '').trim().length > 0) return true;
+  if (state.pendingUrgency) return true;
+  return false;
+}
+
+function closeTaskModal() {
+  // If the form has any content, require explicit confirmation before
+  // wiping it. Backdrop clicks are already disabled for this modal so
+  // the only ways to reach here are the ✕ icon and the Cancel button —
+  // both intentional but easy to mis-click on a touch device.
+  if (taskModalHasContent()) {
+    if (!confirm('Discard this new task? Anything you typed will be lost.')) {
+      return;
+    }
+  }
+  hide('taskModal');
+}
 
 function addStepInput() {
   state.pendingSteps.push({ text: '', done: false });
@@ -7292,6 +7548,9 @@ async function saveTask() {
     participants: Array.from(new Set([state.user.uid, assigneeId].filter(Boolean))),
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
+  if (state.pendingUrgency) {
+    taskData.urgency = state.pendingUrgency;
+  }
 
   if (isBossOrManager(state.profile.role)) {
     if (state.newTaskTimerMode === 'duration') {
@@ -7532,9 +7791,27 @@ function renderOverviewTab() {
     feedbackHtml = renderFeedbackDisplay(task.lastFeedback);
   }
 
+  // Urgency picker. Anyone with task access can change it; the Firestore
+  // rules already permit any task update from those viewers. Approved
+  // tasks lock urgency along with everything else.
+  const canEditUrgency = task.status !== 'approved';
+  const cur = task.urgency || '';
+  const urgencyHtml = canEditUrgency ? `
+    <div style="margin-bottom: 14px;">
+      <div style="font-weight: 600; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">Urgency</div>
+      <div class="urgency-picker" id="detailUrgencyPicker">
+        <button type="button" class="urgency-pick ${cur === '' ? 'selected' : ''}" data-urgency="" title="No urgency">None</button>
+        <button type="button" class="urgency-pick urgency-red ${cur === 'red' ? 'selected' : ''}" data-urgency="red" title="Most urgent">🔴 Red</button>
+        <button type="button" class="urgency-pick urgency-yellow ${cur === 'yellow' ? 'selected' : ''}" data-urgency="yellow" title="Mid urgency">🟡 Yellow</button>
+        <button type="button" class="urgency-pick urgency-blue ${cur === 'blue' ? 'selected' : ''}" data-urgency="blue" title="Least urgent">🔵 Blue</button>
+      </div>
+    </div>
+  ` : '';
+
   wrap.innerHTML = `
     ${feedbackHtml}
     ${timerHtml}
+    ${urgencyHtml}
     ${task.description ? `<div style="background: var(--bg); padding: 12px 14px; border-radius: 12px; font-size: 14px; color: var(--ink); margin-bottom: 14px; white-space: pre-wrap;">${escapeHtml(task.description)}</div>` : ''}
     ${(task.steps || []).length > 0 ? `
       <div style="margin-top: 4px;">
@@ -7557,6 +7834,21 @@ function renderOverviewTab() {
       });
     });
   });
+
+  // Wire urgency picker if present (any change writes immediately —
+  // unlike the create/edit modals, the detail tab is "live" data).
+  const urgPicker = el('detailUrgencyPicker');
+  if (urgPicker) {
+    urgPicker.querySelectorAll('.urgency-pick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const t = getCurrentTask();
+        if (!t) return;
+        const newVal = (btn.dataset.urgency || '') || null;
+        if ((t.urgency || null) === newVal) return; // no change
+        setTaskUrgency(t.id, newVal);
+      });
+    });
+  }
 
   // Wire edit timer button
   const editBtn = el('editTimerBtn');
@@ -8197,6 +8489,16 @@ function formatActivity(a) {
         : `${who} made this task <strong>public</strong> (visible to the whole team)`;
       return { icon, text };
     }
+    case 'urgency_changed': {
+      const labelFor = (v) => {
+        if (v === 'red') return '🔴 red (most urgent)';
+        if (v === 'yellow') return '🟡 yellow (mid)';
+        if (v === 'blue') return '🔵 blue (least urgent)';
+        return 'no urgency';
+      };
+      const text = `${who} set urgency to <strong>${labelFor(d.to)}</strong>`;
+      return { icon: '🚦', text };
+    }
     case 'sent_back': {
       const benefitsCount = (d.benefits || []).length;
       const improvementsCount = (d.improvements || []).length;
@@ -8242,6 +8544,73 @@ async function deleteCurrentTask() {
 /* ============================================
    Stage 6: Revive task + Full Archive
 ============================================ */
+// Cycle a task's urgency through null → red → yellow → blue → null.
+// Available to anyone who can update the task (assignee, creator, or
+// Boss/Manager — same constraints as any other task field).
+const URGENCY_CYCLE = [null, 'red', 'yellow', 'blue'];
+
+// Update the visual selected-state of an urgency picker (one of the 4
+// pill buttons). Wires click handlers (idempotent — safe to call repeatedly).
+// `onChange` is invoked with the new urgency value when a button is clicked;
+// pass null on the second call to skip re-binding (we re-bind every time
+// to keep the closure capturing the latest state).
+function refreshUrgencyPicker(pickerId, currentUrgency, onChange) {
+  const wrap = el(pickerId);
+  if (!wrap) return;
+  const current = currentUrgency || '';
+  wrap.querySelectorAll('.urgency-pick').forEach(btn => {
+    const v = btn.dataset.urgency || '';
+    btn.classList.toggle('selected', v === current);
+    if (onChange) {
+      // Replace handler each call so any stale closure doesn't survive.
+      btn.onclick = () => {
+        const newVal = (btn.dataset.urgency || '') || null;
+        onChange(newVal);
+      };
+    }
+  });
+}
+
+async function cycleTaskUrgency(taskId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  const currentIdx = URGENCY_CYCLE.indexOf(task.urgency || null);
+  const nextIdx = (currentIdx + 1) % URGENCY_CYCLE.length;
+  const next = URGENCY_CYCLE[nextIdx];
+  try {
+    await db.collection('tasks').doc(taskId).update({
+      urgency: next === null ? firebase.firestore.FieldValue.delete() : next,
+    });
+    // Activity log so changes are auditable.
+    logActivity(taskId, 'urgency_changed', {
+      from: task.urgency || null,
+      to: next,
+    }).catch(() => {});
+  } catch (err) {
+    console.error('cycleTaskUrgency failed:', err);
+    alert('Could not change urgency: ' + err.message);
+  }
+}
+
+// Set a task's urgency to an explicit value (used by the picker UI in
+// the create/edit/detail forms). Pass null to clear.
+async function setTaskUrgency(taskId, urgency) {
+  if (urgency !== null && !['red', 'yellow', 'blue'].includes(urgency)) return;
+  try {
+    await db.collection('tasks').doc(taskId).update({
+      urgency: urgency === null ? firebase.firestore.FieldValue.delete() : urgency,
+    });
+    const task = state.tasks.find(t => t.id === taskId);
+    logActivity(taskId, 'urgency_changed', {
+      from: task ? (task.urgency || null) : null,
+      to: urgency,
+    }).catch(() => {});
+  } catch (err) {
+    console.error('setTaskUrgency failed:', err);
+    alert('Could not change urgency: ' + err.message);
+  }
+}
+
 async function reviveCurrentTask() {
   if (!state.currentTaskId) return;
   const task = getCurrentTask();
@@ -8327,12 +8696,39 @@ function openEditTaskModal(taskId) {
     : 'Only the task creator (or Boss/Manager) can change a task between public and private.';
 
   state.editPendingSteps = (task.steps || []).map(s => ({ text: s.text, done: !!s.done }));
+  state.editPendingUrgency = task.urgency || null;
+  refreshUrgencyPicker('editTaskUrgencyPicker', state.editPendingUrgency, (val) => {
+    state.editPendingUrgency = val;
+    refreshUrgencyPicker('editTaskUrgencyPicker', state.editPendingUrgency);
+  });
   renderEditStepsList();
 
   show('editTaskModal');
 }
 
+// Returns true if the editing form differs from the original task data.
+// Compares the four user-editable fields: title, description, steps, timer.
+function editTaskModalHasUnsavedChanges() {
+  const id = state.editingTaskId;
+  if (!id) return false;
+  const orig = state.tasks.find(t => t.id === id);
+  if (!orig) return false;
+  if ((el('editTaskTitle').value || '') !== (orig.title || '')) return true;
+  if ((el('editTaskDesc').value || '') !== (orig.description || '')) return true;
+  // Steps comparison (text + done state, in order).
+  const a = (state.editPendingSteps || []).map(s => `${s.text || ''}|${s.done ? 1 : 0}`).join('\n');
+  const b = (orig.steps || []).map(s => `${s.text || ''}|${s.done ? 1 : 0}`).join('\n');
+  if (a !== b) return true;
+  if ((state.editPendingUrgency || null) !== (orig.urgency || null)) return true;
+  return false;
+}
+
 function closeEditTaskModal() {
+  if (editTaskModalHasUnsavedChanges()) {
+    if (!confirm('Discard your edits? Unsaved changes will be lost.')) {
+      return;
+    }
+  }
   hide('editTaskModal');
   state.editPendingSteps = [];
   // Reopen the task detail modal on the same task so the user lands back
@@ -8467,6 +8863,17 @@ async function saveTaskEdits() {
   if (stepsChanged) {
     updates.steps = newSteps;
     changes.push({ field: 'steps' });
+  }
+
+  // Urgency change. Compare the picker's selection against the original.
+  // Use FieldValue.delete() to actually clear the field when set to null.
+  const newUrgency = state.editPendingUrgency || null;
+  const oldUrgency = task.urgency || null;
+  if (newUrgency !== oldUrgency) {
+    updates.urgency = newUrgency === null
+      ? firebase.firestore.FieldValue.delete()
+      : newUrgency;
+    changes.push({ field: 'urgency', from: oldUrgency, to: newUrgency });
   }
 
   if (Object.keys(updates).length === 0) {
@@ -14649,16 +15056,22 @@ function initMusicPlayer() {
   renderMusicPlayer();
 }
 
-['taskModal', 'taskDetailModal', 'settingsModal', 'archiveModal', 'editTaskModal'].forEach(id => {
+// Backdrop-click closes most modals, but NOT taskModal/editTaskModal —
+// those are too easy to mis-click on a touch device and would silently
+// wipe a half-typed task. Use the explicit Cancel/✕ buttons for those
+// (which run a confirmation when there's content).
+['settingsModal', 'archiveModal'].forEach(id => {
   el(id).addEventListener('click', (e) => {
     if (e.target.id === id) {
-      if (id === 'taskModal') closeTaskModal();
-      else if (id === 'taskDetailModal') closeTaskDetail();
-      else if (id === 'settingsModal') closeSettings();
+      if (id === 'settingsModal') closeSettings();
       else if (id === 'archiveModal') closeArchive();
-      else if (id === 'editTaskModal') closeEditTaskModal();
     }
   });
+});
+// taskDetailModal has no destructive content (it's read-only when not in
+// the Review tab) so backdrop click is fine.
+el('taskDetailModal').addEventListener('click', (e) => {
+  if (e.target.id === 'taskDetailModal') closeTaskDetail();
 });
 
 // Music player init — runs immediately on page load, independent of auth
