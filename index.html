@@ -14536,7 +14536,6 @@ function initMusicPlayer() {
   playerEl.addEventListener('mouseenter', () => {
     music.collapsed = false;
     playerEl.classList.remove('collapsed');
-    document.body.classList.add('music-expanded');
   });
   playerEl.addEventListener('mouseleave', () => {
     // Don't collapse while the user is mid-interaction with playlists or
@@ -14548,7 +14547,6 @@ function initMusicPlayer() {
     if (!music.isPlaying && !listOpen && !pickerOpen && !formOpen && music.currentIdx < 0) {
       music.collapsed = true;
       playerEl.classList.add('collapsed');
-      document.body.classList.remove('music-expanded');
     }
   });
 
@@ -14556,7 +14554,36 @@ function initMusicPlayer() {
   if (music.currentIdx >= 0) {
     music.collapsed = false;
     playerEl.classList.remove('collapsed');
-    document.body.classList.add('music-expanded');
+  }
+
+  // Mirror the music player's "collapsed" class onto body.music-expanded
+  // so the floating thought bubble can re-position itself flush above the
+  // player. Using a MutationObserver instead of trying to remember to set
+  // the body class at every toggle point — this stays in sync no matter
+  // how/where the collapse state changes.
+  const syncMusicExpandedClass = () => {
+    const isExpanded = !playerEl.classList.contains('collapsed');
+    document.body.classList.toggle('music-expanded', isExpanded);
+  };
+  syncMusicExpandedClass();
+  new MutationObserver(syncMusicExpandedClass).observe(playerEl, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+
+  // Same idea for the tracklist's "open" state — when the playlist
+  // tracklist expands upward, push the bubble even higher.
+  const tracklistEl = el('musicTracklist');
+  if (tracklistEl) {
+    const syncTracklistOpenClass = () => {
+      const isOpen = tracklistEl.classList.contains('open');
+      document.body.classList.toggle('music-tracklist-open', isOpen);
+    };
+    syncTracklistOpenClass();
+    new MutationObserver(syncTracklistOpenClass).observe(tracklistEl, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
   }
 
   renderMusicPlayer();
