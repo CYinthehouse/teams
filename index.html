@@ -14317,19 +14317,30 @@ function subscribeThoughts() {
   if (!state.user) return;
   if (unsubs.thoughts) { unsubs.thoughts(); unsubs.thoughts = null; }
   const isBoss = state.profile && state.profile.role === 'Boss';
-  // Boss subscribes to ALL thoughts (sorted by author then time below);
-  // everyone else subscribes only to their own.
+  // Boss: no `where` clause, just orderBy. No composite index needed.
+  // Everyone else: where(userId == me). We DON'T orderBy the server here
+  // because that would require a composite index (userId + createdAt). We
+  // sort client-side instead — at most 200 personal thoughts, so the cost
+  // is negligible.
   const q = isBoss
     ? db.collection('random_thoughts').orderBy('createdAt', 'desc').limit(500)
     : db.collection('random_thoughts')
         .where('userId', '==', state.user.uid)
-        .orderBy('createdAt', 'desc').limit(200);
+        .limit(200);
   unsubs.thoughts = q.onSnapshot(snap => {
-    state.thoughts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!isBoss) {
+      // Sort newest first; null createdAt (unresolved server timestamp on
+      // a just-written doc) goes to the top so the user sees their new
+      // thought immediately.
+      items.sort((a, b) => {
+        const aMs = (a.createdAt && a.createdAt.toMillis) ? a.createdAt.toMillis() : Infinity;
+        const bMs = (b.createdAt && b.createdAt.toMillis) ? b.createdAt.toMillis() : Infinity;
+        return bMs - aMs;
+      });
+    }
+    state.thoughts = items;
     if (state.thoughtsPanelOpen) {
-      // Refresh the count on the toggle button. Only re-render the list
-      // body if it's currently expanded — otherwise the data stays in
-      // state.thoughts and renders next time the user expands.
       updateThoughtsViewToggleLabel();
       if (state.thoughtsListExpanded) renderThoughtsPanel();
     }
@@ -14493,13 +14504,20 @@ async function submitThought() {
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     inp.value = '';
-    // Auto-expand so the user can see the thought they just added.
+    // Auto-expand so the user can see the thought they just added. We
+    // intentionally don't call renderThoughtsPanel() directly here — the
+    // onSnapshot listener will fire (typically same tick or next) with
+    // the new state.thoughts and re-render the list. Calling render now
+    // could race with stale state and show "Nothing here yet" briefly.
     if (!state.thoughtsListExpanded) {
       state.thoughtsListExpanded = true;
       el('thoughtsList').style.display = '';
-      renderThoughtsPanel();
       updateThoughtsViewToggleLabel();
     }
+    // Force one render now in case the snapshot already fired during
+    // await (state.thoughts is current). If it didn't, the snapshot's
+    // onSnapshot callback will overwrite this momentarily.
+    renderThoughtsPanel();
   } catch (err) {
     console.error('submitThought failed:', err);
     alert('Could not save thought: ' + err.message);
