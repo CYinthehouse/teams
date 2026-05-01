@@ -4672,6 +4672,18 @@
 
   .col-tasks.drag-over .drop-hint { display: block; }
 
+  /* Insertion line shown between cards while dragging — a thin horizontal
+     bar at the spot the dragged card will land. Hidden until a drag is
+     actually in progress (added to the DOM by JS, removed on drop/leave). */
+  .drop-indicator {
+    height: 3px;
+    background: var(--pink-deep);
+    border-radius: 2px;
+    margin: 1px 0;
+    box-shadow: 0 0 6px var(--pink);
+    pointer-events: none;
+  }
+
   @media (max-width: 720px) {
     .topbar { padding: 12px 16px; gap: 12px; flex-wrap: wrap; }
     .brand { font-size: 22px; }
@@ -5932,16 +5944,23 @@ function taskCreatedAtMs(task) {
 
 // Sort comparator for tasks within a column. Order is:
 //   1. Urgency tier: red > yellow > blue > none
-//   2. Within tier: newest first (highest createdAt first)
-// Used in buildMemberColumn and buildPendingColumn so red-tagged tasks
-// always float to the top of every column.
+//   2. Within tier: manualOrder ascending if present (manual reorder via
+//      drag-drop sets this), else newest-first (highest createdAt).
+// Tasks WITH manualOrder always sort above tasks without it WITHIN the
+// same tier — manually-placed cards rise to the top of their tier.
 const URGENCY_RANK = { red: 0, yellow: 1, blue: 2 };
 function sortTasksForColumn(tasks) {
   return tasks.slice().sort((a, b) => {
     const aRank = URGENCY_RANK[a.urgency] ?? 3;
     const bRank = URGENCY_RANK[b.urgency] ?? 3;
     if (aRank !== bRank) return aRank - bRank;
-    // Newest first within the same urgency tier.
+    // Within the same tier, rank by manualOrder when set.
+    const aHasManual = typeof a.manualOrder === 'number';
+    const bHasManual = typeof b.manualOrder === 'number';
+    if (aHasManual && bHasManual) return a.manualOrder - b.manualOrder;
+    if (aHasManual) return -1;    // manually-ordered cards rise to top of tier
+    if (bHasManual) return 1;
+    // Neither has manualOrder → newest first.
     return taskCreatedAtMs(b) - taskCreatedAtMs(a);
   });
 }
@@ -7383,6 +7402,10 @@ function attachDropHandlers(zone) {
   zone.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    // Track which task card we'd insert BEFORE based on the cursor's
+    // vertical position within the column. Used by drop to compute the
+    // dropped task's new neighbors and assign a manualOrder.
+    updateDropIndicator(zone, e.clientY);
   });
 
   zone.addEventListener('dragleave', (e) => {
@@ -7390,6 +7413,7 @@ function attachDropHandlers(zone) {
     if (depth <= 0) {
       depth = 0;
       zone.classList.remove('drag-over');
+      clearDropIndicator(zone);
     }
   });
 
@@ -7398,14 +7422,56 @@ function attachDropHandlers(zone) {
     depth = 0;
     zone.classList.remove('drag-over');
     const taskId = e.dataTransfer.getData('text/plain');
+    clearDropIndicator(zone);
     if (!taskId) return;
     const dropType = zone.dataset.dropZone;
     const userId = zone.dataset.userId;
-    await handleTaskDrop(taskId, dropType, userId);
+    // Compute the index where the dropped card was hovering — used for
+    // intra-column reordering. null = end of zone.
+    const beforeTaskId = computeDropTargetTaskId(zone, e.clientY, taskId);
+    await handleTaskDrop(taskId, dropType, userId, beforeTaskId);
   });
 }
 
-async function handleTaskDrop(taskId, dropType, userId) {
+// Find the task ID we should insert BEFORE (i.e., the card just below
+// the cursor). Returns null if the cursor is below all cards (insert at
+// the end). Excludes the task being dragged itself so the algorithm
+// doesn't try to position a card relative to itself.
+function computeDropTargetTaskId(zone, clientY, draggedTaskId) {
+  const cards = Array.from(zone.querySelectorAll('.task-card[data-task-id]'))
+    .filter(c => c.dataset.taskId !== draggedTaskId);
+  for (const card of cards) {
+    const rect = card.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (clientY < midY) return card.dataset.taskId;
+  }
+  return null;
+}
+
+// Update the visual insertion indicator (a thin pink line between cards)
+// while dragging. Only shows when the drop zone is a regular tasks column.
+function updateDropIndicator(zone, clientY) {
+  // Remove any existing indicator first.
+  clearDropIndicator(zone);
+  const beforeTaskId = computeDropTargetTaskId(zone, clientY, null);
+  const indicator = document.createElement('div');
+  indicator.className = 'drop-indicator';
+  if (beforeTaskId) {
+    const target = zone.querySelector(`.task-card[data-task-id="${CSS.escape(beforeTaskId)}"]`);
+    if (target) zone.insertBefore(indicator, target);
+  } else {
+    // Append at the end, but BEFORE the trailing .drop-hint placeholder.
+    const hint = zone.querySelector('.drop-hint');
+    if (hint) zone.insertBefore(indicator, hint);
+    else zone.appendChild(indicator);
+  }
+}
+
+function clearDropIndicator(zone) {
+  zone.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+}
+
+async function handleTaskDrop(taskId, dropType, userId, beforeTaskId) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task) return;
 
@@ -7414,14 +7480,33 @@ async function handleTaskDrop(taskId, dropType, userId) {
   let activityDetails = {};
 
   if (dropType === 'member') {
-    // Skip if no actual change
-    if (task.assigneeId === userId && task.status === 'in_progress') return;
-    updates.assigneeId = userId;
-    updates.status = 'in_progress';
-    // Keep participants array in sync (used by Firestore rules + queries
-    // for private-task visibility). Always [creator, assignee] de-duplicated.
-    updates.participants = Array.from(new Set([task.creatorId, userId].filter(Boolean)));
-    if (task.assigneeId !== userId) {
+    // Build the column's other tasks (excluding the dragged one) so we can
+    // reason about the urgency tier at the drop position.
+    const colTasks = state.tasks.filter(t =>
+      t.assigneeId === userId &&
+      t.status !== 'pending_approval' &&
+      t.status !== 'approved' &&
+      t.id !== taskId
+    );
+
+    const sameAssignee = task.assigneeId === userId;
+    const sameStatus = task.status === 'in_progress';
+    const isReorderInPlace = sameAssignee && sameStatus;
+
+    // For reorders within the same column, compute a new manualOrder
+    // that puts the dragged card between its new neighbors WITHIN its
+    // own urgency tier. If the user dragged into a different tier, we
+    // snap to the boundary of the dragged card's existing tier (urgency
+    // is a hard barrier).
+    if (isReorderInPlace || (!isReorderInPlace && task.assigneeId !== userId)) {
+      const newOrder = computeManualOrderForDrop(task, colTasks, beforeTaskId);
+      if (newOrder !== null) updates.manualOrder = newOrder;
+    }
+
+    if (!sameAssignee) {
+      updates.assigneeId = userId;
+      updates.status = 'in_progress';
+      updates.participants = Array.from(new Set([task.creatorId, userId].filter(Boolean)));
       activityAction = 'assignee_changed';
       activityDetails = {
         fromId: task.assigneeId,
@@ -7429,9 +7514,16 @@ async function handleTaskDrop(taskId, dropType, userId) {
         toId: userId,
         toName: userNameById(userId),
       };
-    } else {
+    } else if (!sameStatus) {
+      updates.status = 'in_progress';
       activityAction = 'status_changed';
       activityDetails = { from: task.status, to: 'in_progress' };
+    } else if (updates.manualOrder !== undefined) {
+      // Pure intra-column reorder — no activity log entry (would spam
+      // the activity feed every time the user nudges a card).
+    } else {
+      // No-op (dropped on the exact same spot in the same column).
+      return;
     }
   } else if (dropType === 'pending') {
     if (task.status === 'pending_approval') return;
@@ -7445,6 +7537,87 @@ async function handleTaskDrop(taskId, dropType, userId) {
   await db.collection('tasks').doc(taskId).update(updates);
   if (activityAction) {
     await logActivity(taskId, activityAction, activityDetails);
+  }
+}
+
+// Compute a manualOrder value for a card being dropped into a column.
+// Constraint: the dropped card stays within its own urgency tier. If
+// the cursor pointed at a position in a different tier, snap to the
+// edge of the dragged card's own tier (top of its tier if it was
+// dragged toward higher-urgency tiers; bottom if toward lower).
+//
+// Returns a number to write to updates.manualOrder, or null if the
+// drop position is unchanged (no-op — leave manualOrder as it was).
+function computeManualOrderForDrop(draggedTask, otherTasks, beforeTaskId) {
+  const tier = URGENCY_RANK[draggedTask.urgency] ?? 3;
+
+  // Build the FULL ordered list as it currently appears in the column,
+  // excluding the dragged card. This is what the user sees, so positions
+  // are computed against this order.
+  const ordered = sortTasksForColumn(otherTasks);
+
+  // Find the index where we'd insert. beforeTaskId === null means "drop
+  // at the very end". Otherwise it's the id of the card we'd insert above.
+  let targetIdx;
+  if (beforeTaskId == null) {
+    targetIdx = ordered.length;
+  } else {
+    targetIdx = ordered.findIndex(t => t.id === beforeTaskId);
+    if (targetIdx < 0) targetIdx = ordered.length;
+  }
+
+  // Compute the tier of the slot we're trying to land in. Look at the
+  // tasks immediately above and below to determine that.
+  const above = targetIdx > 0 ? ordered[targetIdx - 1] : null;
+  const below = targetIdx < ordered.length ? ordered[targetIdx] : null;
+  const aboveTier = above ? (URGENCY_RANK[above.urgency] ?? 3) : -Infinity;
+  const belowTier = below ? (URGENCY_RANK[below.urgency] ?? 3) : Infinity;
+
+  // The slot's tier = whatever tier sits at this index. If the slot is
+  // between two cards of different tiers, the slot belongs to the upper
+  // one (it's a position within that tier just before the boundary).
+  // Test: is the dragged card's tier valid for this slot?
+  let snappedIdx = targetIdx;
+  if (tier < aboveTier) {
+    // Tried to drop a higher-urgency card below a lower-urgency one.
+    // Snap to the top of the dragged card's tier.
+    snappedIdx = ordered.findIndex(t => (URGENCY_RANK[t.urgency] ?? 3) >= tier);
+    if (snappedIdx < 0) snappedIdx = 0;
+  } else if (tier > belowTier) {
+    // Tried to drop a lower-urgency card above a higher-urgency one.
+    // Snap to the bottom of the dragged card's tier.
+    snappedIdx = ordered.length;
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      if ((URGENCY_RANK[ordered[i].urgency] ?? 3) <= tier) {
+        snappedIdx = i + 1;
+        break;
+      }
+    }
+  }
+
+  // Now produce a manualOrder number that lands the dragged card at
+  // snappedIdx. Strategy: midpoint between the manualOrder of the
+  // neighbors at that slot. If a neighbor lacks manualOrder, fall back
+  // to its createdAt-based pseudo-order so we still get a usable number.
+  const orderOf = (t) => {
+    if (typeof t.manualOrder === 'number') return t.manualOrder;
+    // Newest-first means newer tasks get LOWER numbers in our ordering
+    // convention. Use negative createdAt as a stable pseudo-order so
+    // older tasks have a higher pseudo-order than newer ones.
+    return -(taskCreatedAtMs(t) || 0);
+  };
+
+  const aboveOrd = snappedIdx > 0 ? orderOf(ordered[snappedIdx - 1]) : null;
+  const belowOrd = snappedIdx < ordered.length ? orderOf(ordered[snappedIdx]) : null;
+
+  if (aboveOrd === null && belowOrd === null) {
+    return 0;                    // empty column
+  } else if (aboveOrd === null) {
+    return belowOrd - 1;         // landing at the very top
+  } else if (belowOrd === null) {
+    return aboveOrd + 1;          // landing at the very bottom
+  } else {
+    return (aboveOrd + belowOrd) / 2;  // midpoint
   }
 }
 
