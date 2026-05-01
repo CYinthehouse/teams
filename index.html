@@ -7245,6 +7245,8 @@ function buildTaskCard(task) {
 
   const creator = state.allUsers.find(u => u.uid === task.creatorId);
   const creatorName = creator ? creator.name : '—';
+  const assignee = state.allUsers.find(u => u.uid === task.assigneeId);
+  const assigneeName = assignee ? assignee.name : '—';
 
   const steps = task.steps || [];
   const doneCount = steps.filter(s => s.done).length;
@@ -7328,7 +7330,9 @@ function buildTaskCard(task) {
     ${sentBackHtml}
     ${iconsHtml}
     <div class="task-footer">
-      <div class="task-creator">by ${escapeHtml(creatorName)}</div>
+      <div class="task-creator">
+        by ${escapeHtml(creatorName)}${task.status === 'approved' ? ` &middot; to ${escapeHtml(assigneeName)}` : ''}
+      </div>
       ${steps.length > 0 ? `<div class="task-progress">${doneCount}/${steps.length}</div>` : ''}
     </div>
   `;
