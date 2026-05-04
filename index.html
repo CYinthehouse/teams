@@ -4078,6 +4078,7 @@
   .music-player.collapsed .music-info,
   .music-player.collapsed .music-btn,
   .music-player.collapsed .music-volume-row,
+  .music-player.collapsed .music-seek-row,
   .music-player.collapsed .music-tracklist {
     display: none;
   }
@@ -4202,6 +4203,54 @@
     align-items: center;
     gap: 8px;
     padding: 0 12px 10px;
+  }
+  /* Seek slider row — sits above the volume row, lets the user scrub
+     through long tracks. Time labels show current position / duration. */
+  .music-seek-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 6px;
+  }
+  .music-time {
+    font-size: 10px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .music-seek-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--bg-2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  .music-seek-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--pink-deep);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(255, 140, 179, 0.4);
+  }
+  .music-seek-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--pink-deep);
+    border: none;
+    cursor: pointer;
+  }
+  .music-seek-slider:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   .music-volume-icon {
     font-size: 12px;
@@ -4861,6 +4910,12 @@
     <button class="music-btn" id="musicNextBtn" title="Next">⏭</button>
     <button class="music-btn music-btn-collapse" id="musicCollapseBtn" title="Collapse player">➖</button>
   </div>
+  <div class="music-seek-row" id="musicSeekRow">
+    <span class="music-time" id="musicTimeCur">0:00</span>
+    <input type="range" min="0" max="100" value="0" step="0.01" class="music-seek-slider" id="musicSeek" />
+    <span class="music-time" id="musicTimeDur">0:00</span>
+  </div>
+
   <div class="music-volume-row" id="musicVolumeRow">
     <span class="music-volume-icon">🔉</span>
     <input type="range" min="0" max="100" value="25" class="music-volume-slider" id="musicVolume" />
@@ -13496,6 +13551,10 @@ const music = {
   // Recent track-id history for shuffle "previous". When shuffle is off
   // this stays empty and we use sequential prev/next.
   shuffleHistory: [],
+  // Seek slider state.
+  currentDuration: 0,           // duration of the currently-playing track (sec)
+  userScrubbing: false,         // true while the user is dragging the seek slider
+  seekTickInterval: null,       // setInterval handle for the position updater
   // The user's own playlists (private + public). Each has a `visibility` field.
   playlists: [],
   // Public playlists created by OTHER users — read-only, visible to everyone.
@@ -13931,6 +13990,7 @@ function playMusicTrack(idx, fromUserClick = true) {
   const tracks = getAllTracks();
   if (idx < 0 || idx >= tracks.length) return;
   music.currentIdx = idx;
+  music.currentDuration = 0;   // will be filled in by updateMusicSeekUI once metadata loads
   saveMusicSettings();
 
   if (!music.apiReady) {
@@ -14059,6 +14119,59 @@ function setMusicVolume(vol) {
     try { music.player.setVolume(music.volume); } catch (e) {}
   }
   el('musicVolumeNum').textContent = music.volume + '%';
+}
+
+// Format a duration in seconds as M:SS or H:MM:SS for hour-long tracks.
+function formatTrackTime(s) {
+  if (!Number.isFinite(s) || s < 0) return '0:00';
+  const total = Math.floor(s);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const ss = String(sec).padStart(2, '0');
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${ss}`;
+  return `${m}:${ss}`;
+}
+
+// Tick handler — updates the seek slider position + time labels every
+// 500ms while a track is loaded. Skips the slider position update if
+// the user is actively scrubbing (so we don't fight their drag).
+function updateMusicSeekUI() {
+  const slider = el('musicSeek');
+  const cur = el('musicTimeCur');
+  const dur = el('musicTimeDur');
+  if (!slider || !cur || !dur) return;
+
+  if (!music.player || music.currentIdx < 0) {
+    slider.value = 0;
+    slider.disabled = true;
+    cur.textContent = '0:00';
+    dur.textContent = '0:00';
+    return;
+  }
+  let duration = 0;
+  let position = 0;
+  try {
+    duration = music.player.getDuration ? music.player.getDuration() : 0;
+    position = music.player.getCurrentTime ? music.player.getCurrentTime() : 0;
+  } catch (e) {
+    return;
+  }
+  music.currentDuration = duration;
+  if (!duration || !Number.isFinite(duration)) {
+    // Track not yet loaded enough to know its length.
+    slider.disabled = true;
+    cur.textContent = formatTrackTime(position);
+    dur.textContent = '0:00';
+    return;
+  }
+  slider.disabled = false;
+  dur.textContent = formatTrackTime(duration);
+  if (!music.userScrubbing) {
+    cur.textContent = formatTrackTime(position);
+    const pct = Math.max(0, Math.min(100, (position / duration) * 100));
+    slider.value = String(pct);
+  }
 }
 
 function toggleTrackList() {
@@ -15183,6 +15296,46 @@ function initMusicPlayer() {
   volumeSlider.addEventListener('input', () => {
     setMusicVolume(parseInt(volumeSlider.value, 10));
   });
+
+  // Seek slider. Two key behaviors:
+  //   1. While the user is dragging (mousedown / touchstart through input
+  //      events until mouseup), don't let the tick overwrite the slider's
+  //      position with the actual playback position — that fights with
+  //      the user's drag.
+  //   2. On release ('change' event), call YT player.seekTo() to jump.
+  //      We also seek live on input as a preview, so dragging gives
+  //      immediate audio scrubbing feedback.
+  const seekSlider = el('musicSeek');
+  seekSlider.addEventListener('mousedown', () => { music.userScrubbing = true; });
+  seekSlider.addEventListener('touchstart', () => { music.userScrubbing = true; }, { passive: true });
+  seekSlider.addEventListener('mouseup',   () => { music.userScrubbing = false; });
+  seekSlider.addEventListener('touchend',  () => { music.userScrubbing = false; });
+  seekSlider.addEventListener('input', () => {
+    // Live preview: update the time label as the user drags. We don't
+    // call seekTo on every keystroke (the YT player gets jittery if you
+    // hammer it); seek happens on `change` (release) below.
+    if (!music.player || !music.currentDuration) return;
+    const pct = parseFloat(seekSlider.value);
+    const seconds = (pct / 100) * music.currentDuration;
+    el('musicTimeCur').textContent = formatTrackTime(seconds);
+  });
+  seekSlider.addEventListener('change', () => {
+    if (!music.player || !music.currentDuration) return;
+    try {
+      const pct = parseFloat(seekSlider.value);
+      const seconds = (pct / 100) * music.currentDuration;
+      music.player.seekTo(seconds, true);
+    } catch (e) {
+      console.warn('seekTo failed:', e);
+    }
+  });
+
+  // Periodic tick updates the seek slider + time labels while playing.
+  // 500ms is plenty smooth without taxing the iframe API.
+  if (music.seekTickInterval) clearInterval(music.seekTickInterval);
+  music.seekTickInterval = setInterval(() => {
+    updateMusicSeekUI();
+  }, 500);
 
   // Click outside the tracklist closes it. We have to be careful here:
   // if the click target is a node that was REMOVED from the DOM during
