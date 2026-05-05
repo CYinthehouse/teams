@@ -3887,10 +3887,10 @@
     50%  { transform: translateY(-3px) rotate(2deg); }
     100% { transform: translateY(0) rotate(-2deg); }
   }
-  /* When the music player is expanded (showing controls + volume), the
-     bubble lifts up to clear the taller player. */
+  /* When the music player is expanded (showing controls + seek + volume),
+     the bubble lifts up to clear the taller player. */
   body.music-expanded .thought-bubble-btn {
-    bottom: 111px;
+    bottom: 133px;
   }
   /* When the music tracklist is open it floats up above the player by
      ~360px, so the bubble needs to clear that overlay. */
@@ -3917,7 +3917,7 @@
     transition: bottom 0.25s ease;
   }
   body.music-expanded .thoughts-panel {
-    bottom: 187px;
+    bottom: 209px;
   }
   body.music-tracklist-open .thoughts-panel {
     bottom: 548px;
