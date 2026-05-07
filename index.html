@@ -1053,6 +1053,27 @@
     color: var(--ink);
     transform: scale(1.08);
   }
+  /* Scripts button — same shape as quick-add but lavender on hover so it
+     reads as a different action. Only appears on Calvin's column. */
+  .col-scripts-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    margin-right: 4px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    color: var(--ink-soft);
+  }
+  .col-scripts-btn:hover {
+    background: var(--lavender-soft);
+    color: var(--ink);
+    transform: scale(1.08);
+  }
 
   .col-tasks {
     flex: 1;
@@ -1308,6 +1329,279 @@
     font-size: 28px;
     color: var(--ink);
     margin-bottom: 8px;
+  }
+
+  /* ---------- Script manager + teleprompter ---------- */
+  .script-manager-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+  }
+  .script-search {
+    flex: 1;
+    padding: 8px 10px;
+    border: 2px solid var(--bg-2);
+    border-radius: 10px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    background: var(--white);
+    color: var(--ink);
+    outline: none;
+  }
+  .script-search:focus { border-color: var(--pink); }
+  .script-tag-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .script-tag-chip {
+    background: var(--bg-2);
+    color: var(--ink);
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+  }
+  .script-tag-chip:hover { background: var(--lavender-soft); }
+  .script-tag-chip.active {
+    background: var(--lavender);
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+  .script-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+  .script-list-item {
+    background: var(--bg-3);
+    border: 1.5px solid var(--bg-2);
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    transition: border 0.15s;
+  }
+  .script-list-item:hover { border-color: var(--lavender); }
+  .script-list-item-main { min-width: 0; flex: 1; }
+  .script-list-item-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .script-list-item-sub {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .script-list-item-tags {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 6px;
+    flex-wrap: wrap;
+  }
+  .script-list-item-tag {
+    background: var(--lavender-soft);
+    color: var(--ink);
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .script-empty {
+    text-align: center;
+    color: var(--ink-light);
+    font-size: 12px;
+    padding: 24px 0;
+    font-style: italic;
+  }
+  /* Editor view (replaces the list when a script is open). */
+  .script-editor-back {
+    background: none;
+    border: none;
+    color: var(--pink-deep);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 10px;
+    padding: 0;
+  }
+  .script-editor-back:hover { text-decoration: underline; }
+  .script-editor-title {
+    width: 100%;
+    border: 2px solid var(--bg-2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    background: var(--white);
+    color: var(--ink);
+    outline: none;
+    font-family: var(--font-body);
+  }
+  .script-editor-title:focus { border-color: var(--pink); }
+  .script-editor-tags {
+    width: 100%;
+    border: 2px solid var(--bg-2);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    margin-bottom: 10px;
+    background: var(--white);
+    color: var(--ink);
+    outline: none;
+    font-family: var(--font-body);
+  }
+  .script-editor-tags:focus { border-color: var(--pink); }
+  .script-editor-body {
+    width: 100%;
+    min-height: 280px;
+    border: 2px solid var(--bg-2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    background: var(--white);
+    color: var(--ink);
+    outline: none;
+    font-family: var(--font-body);
+    resize: vertical;
+    margin-bottom: 12px;
+  }
+  .script-editor-body:focus { border-color: var(--pink); }
+  .script-editor-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .script-editor-meta {
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-top: 8px;
+  }
+
+  /* ---------- Teleprompter ---------- */
+  .teleprompter-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    background: #111;
+  }
+  .teleprompter-overlay.hidden { display: none; }
+  .teleprompter-bar {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: rgba(0, 0, 0, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 12px;
+    transition: opacity 0.3s;
+  }
+  .teleprompter-bar.hidden-bar { opacity: 0; pointer-events: none; }
+  .teleprompter-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .teleprompter-btn:hover { background: rgba(255, 255, 255, 0.22); }
+  .teleprompter-btn.active { background: var(--pink-deep); }
+  .teleprompter-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #ccc;
+  }
+  .teleprompter-control label { font-weight: 700; }
+  .teleprompter-control input[type="range"] {
+    width: 100px;
+    accent-color: var(--pink-deep);
+  }
+  .teleprompter-control select {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 12px;
+  }
+  .teleprompter-help {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
+    font-weight: 700;
+    margin-left: auto;
+  }
+  .teleprompter-stage {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: auto;
+    padding: 0 8vw;
+  }
+  .teleprompter-stage::-webkit-scrollbar { width: 0px; }
+  .teleprompter-text {
+    color: #fff;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 48px;
+    line-height: 1.5;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    white-space: pre-wrap;
+    /* Top spacer = half a viewport so the first line starts in the
+       middle of the screen. Bottom spacer too so the last line scrolls
+       all the way up. The actual text wraps in spacers via JS. */
+    padding-top: 50vh;
+    padding-bottom: 50vh;
+    text-align: center;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  /* Theme variants — applied to .teleprompter-overlay */
+  .teleprompter-overlay.theme-dark .teleprompter-stage { background: #111; }
+  .teleprompter-overlay.theme-dark .teleprompter-text { color: #fff; }
+  .teleprompter-overlay.theme-light .teleprompter-stage { background: #fff; }
+  .teleprompter-overlay.theme-light .teleprompter-text { color: #111; text-shadow: none; }
+  .teleprompter-overlay.theme-sepia .teleprompter-stage { background: #f4ecd8; }
+  .teleprompter-overlay.theme-sepia .teleprompter-text { color: #4a3825; text-shadow: none; }
+  /* Mirror mode flips horizontally — for use with off-camera glass rigs. */
+  .teleprompter-overlay.mirror .teleprompter-text {
+    transform: scaleX(-1);
   }
 
   /* ---------- Modals ---------- */
@@ -3895,7 +4189,7 @@
   /* When the music tracklist is open it floats up above the player by
      ~360px, so the bubble needs to clear that overlay. */
   body.music-tracklist-open .thought-bubble-btn {
-    bottom: 480px;
+    bottom: 510px;
   }
 
   /* Thoughts panel — opens from the bubble. */
@@ -3920,7 +4214,7 @@
     bottom: 209px;
   }
   body.music-tracklist-open .thoughts-panel {
-    bottom: 548px;
+    bottom: 578px;
   }
   .thoughts-panel.hidden { display: none; }
   .thoughts-panel-head {
@@ -4954,6 +5248,51 @@
 </div>
 
 <!-- Poke character strip (bottom-right) -->
+<!-- Script Manager: list view + editor for Calvin's video scripts.
+     Hidden by default; opened from the 📄 button on Calvin's column. -->
+<div id="scriptManagerModal" class="modal-backdrop hidden" style="z-index: 240;">
+  <div class="modal" style="max-width: 720px;">
+    <div class="modal-head">
+      <div class="modal-title">📄 Scripts</div>
+      <button class="modal-close" onclick="closeScriptManager()">✕</button>
+    </div>
+    <div class="modal-body" id="scriptManagerBody"></div>
+  </div>
+</div>
+
+<!-- Teleprompter — full-screen overlay for reading scripts on camera.
+     Auto-scrolls at adjustable WPM, supports font size + theme + mirror. -->
+<div id="teleprompterOverlay" class="teleprompter-overlay hidden">
+  <div class="teleprompter-bar" id="teleprompterBar">
+    <button class="teleprompter-btn" id="tpExitBtn" title="Exit (Esc)">✕</button>
+    <button class="teleprompter-btn" id="tpPlayBtn" title="Play / Pause (Space)">▶</button>
+    <div class="teleprompter-control">
+      <label>Speed</label>
+      <input type="range" min="60" max="320" step="5" value="160" id="tpSpeed" />
+      <span id="tpSpeedNum">160</span> wpm
+    </div>
+    <div class="teleprompter-control">
+      <label>Size</label>
+      <input type="range" min="20" max="120" step="2" value="48" id="tpFontSize" />
+      <span id="tpFontSizeNum">48</span>px
+    </div>
+    <div class="teleprompter-control">
+      <label>Theme</label>
+      <select id="tpTheme">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="sepia">Sepia</option>
+      </select>
+    </div>
+    <button class="teleprompter-btn" id="tpMirrorBtn" title="Mirror (M)">🪞</button>
+    <button class="teleprompter-btn" id="tpRestartBtn" title="Restart (R)">⟲</button>
+    <span class="teleprompter-help" title="Space: play/pause · ↑↓: speed · +/-: font · M: mirror · R: restart · Esc: exit">?</span>
+  </div>
+  <div class="teleprompter-stage" id="teleprompterStage">
+    <div class="teleprompter-text" id="teleprompterText"></div>
+  </div>
+</div>
+
 <div id="pokeStrip" class="poke-strip"></div>
 
 <!-- Poke compose modal -->
@@ -7078,7 +7417,21 @@ function buildMemberColumn(member, isGhost) {
     isBossOrManager(state.profile.role)
   );
   const quickAddBtn = showQuickAdd
-    ? `<button class="col-quick-add" data-quick-add-uid="${escapeHtml(member.uid)}" title="New task assigned to ${escapeHtml(member.name)}">✏️</button>`
+    ? `<button class="col-quick-add" data-quick-add-uid="${escapeHtml(member.uid)}" title="Create task">✏️</button>`
+    : '';
+
+  // Scripts button — only on Calvin's column (matched by email so this
+  // works even if the team adds another Boss). Visible to Calvin himself
+  // and to any Boss or Manager (per spec: B/M can edit Calvin's scripts).
+  const isCalvinColumn = !isGhost
+    && member.email
+    && member.email.toLowerCase() === BOSS_EMAIL.toLowerCase();
+  const canSeeScripts = isCalvinColumn && (
+    member.uid === state.user.uid ||
+    isBossOrManager(state.profile.role)
+  );
+  const scriptsBtn = canSeeScripts
+    ? `<button class="col-scripts-btn" data-scripts-owner="${escapeHtml(member.uid)}" title="Create / manage scripts">📄</button>`
     : '';
 
   col.innerHTML = `
@@ -7089,6 +7442,7 @@ function buildMemberColumn(member, isGhost) {
         <div class="col-meta">${escapeHtml(member.role || '—')}${isGhost ? ' · not on team' : ''}</div>
       </div>
       ${quickAddBtn}
+      ${scriptsBtn}
       <div class="col-count">${tasks.length}</div>
     </div>
     <div class="col-tasks" data-drop-zone="member" data-user-id="${member.uid}" data-col-key="member:${escapeHtml(member.uid)}">
@@ -7114,6 +7468,18 @@ function buildMemberColumn(member, isGhost) {
 
   const tasksWrap = col.querySelector('.col-tasks');
   tasks.forEach(t => tasksWrap.appendChild(buildTaskCard(t)));
+
+  // Wire the scripts button (Calvin's column only). Opens the script
+  // manager scoped to the column's owner — for Boss/Manager viewing
+  // Calvin's column, this still loads HIS scripts since they're pinned
+  // to his uid.
+  const sc = col.querySelector('.col-scripts-btn');
+  if (sc) {
+    sc.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openScriptManager(sc.dataset.scriptsOwner);
+    });
+  }
 
   attachDropHandlers(tasksWrap);
   return col;
@@ -15258,6 +15624,504 @@ async function deleteThought(thoughtId) {
     console.error('deleteThought failed:', err);
     alert('Could not delete: ' + err.message);
   }
+}
+
+/* ============================================
+   Script Manager + Teleprompter
+   - Owner-pinned scripts in the `scripts` collection
+   - Read/write: owner OR Boss/Manager
+   - Currently scoped to Calvin's column only (per spec)
+   - Editor with title/body/tags
+   - Teleprompter with auto-scroll, font size, color theme, mirror,
+     keyboard shortcuts
+============================================ */
+
+// --- State
+const scriptManager = {
+  ownerId: null,             // whose scripts we're viewing (Calvin's uid)
+  unsub: null,               // Firestore subscription handle
+  scripts: [],               // loaded scripts for that owner
+  searchQuery: '',
+  activeTagFilter: null,     // single tag string, or null = show all
+  view: 'list',              // 'list' or 'editor'
+  editingId: null,           // when in editor view: id of the script being edited (null = new)
+  editorDirty: false,
+};
+
+// --- Manager open/close
+function openScriptManager(ownerId) {
+  scriptManager.ownerId = ownerId;
+  scriptManager.searchQuery = '';
+  scriptManager.activeTagFilter = null;
+  scriptManager.view = 'list';
+  scriptManager.editingId = null;
+  scriptManager.editorDirty = false;
+  // Subscribe to this owner's scripts.
+  if (scriptManager.unsub) { scriptManager.unsub(); scriptManager.unsub = null; }
+  scriptManager.unsub = db.collection('scripts')
+    .where('ownerId', '==', ownerId)
+    .limit(500)
+    .onSnapshot(snap => {
+      let items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Newest-first by updatedAt (fallback createdAt).
+      items.sort((a, b) => {
+        const aMs = (a.updatedAt && a.updatedAt.toMillis) ? a.updatedAt.toMillis() :
+                    (a.createdAt && a.createdAt.toMillis) ? a.createdAt.toMillis() : 0;
+        const bMs = (b.updatedAt && b.updatedAt.toMillis) ? b.updatedAt.toMillis() :
+                    (b.createdAt && b.createdAt.toMillis) ? b.createdAt.toMillis() : 0;
+        return bMs - aMs;
+      });
+      scriptManager.scripts = items;
+      if (!el('scriptManagerModal').classList.contains('hidden')) {
+        renderScriptManagerBody();
+      }
+    }, err => {
+      console.error('scripts subscription error:', err.code, err.message);
+    });
+  show('scriptManagerModal');
+  renderScriptManagerBody();
+}
+
+function closeScriptManager() {
+  if (scriptManager.view === 'editor' && scriptManager.editorDirty) {
+    if (!confirm('Discard unsaved changes to this script?')) return;
+  }
+  if (scriptManager.unsub) { scriptManager.unsub(); scriptManager.unsub = null; }
+  scriptManager.scripts = [];
+  hide('scriptManagerModal');
+}
+
+// --- Manager render
+function renderScriptManagerBody() {
+  const body = el('scriptManagerBody');
+  if (!body) return;
+  if (scriptManager.view === 'editor') {
+    renderScriptEditorView(body);
+  } else {
+    renderScriptListView(body);
+  }
+}
+
+function renderScriptListView(body) {
+  const all = scriptManager.scripts;
+  // Collect unique tags from all scripts.
+  const tagSet = new Set();
+  all.forEach(s => (s.tags || []).forEach(t => tagSet.add(t)));
+  const allTags = Array.from(tagSet).sort();
+
+  const q = scriptManager.searchQuery.toLowerCase().trim();
+  const tag = scriptManager.activeTagFilter;
+  const filtered = all.filter(s => {
+    if (tag && !(s.tags || []).includes(tag)) return false;
+    if (q && !((s.title || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  const tagChipsHtml = allTags.length === 0 ? '' : `
+    <div class="script-tag-filters">
+      <button class="script-tag-chip ${tag === null ? 'active' : ''}" data-tag="">all</button>
+      ${allTags.map(t => `<button class="script-tag-chip ${tag === t ? 'active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}
+    </div>
+  `;
+
+  const listHtml = filtered.length === 0
+    ? `<div class="script-empty">${all.length === 0 ? 'No scripts yet — create one!' : 'No scripts match your filters.'}</div>`
+    : filtered.map(s => {
+        const tags = (s.tags || []).slice(0, 4).map(t =>
+          `<span class="script-list-item-tag">${escapeHtml(t)}</span>`
+        ).join('');
+        const updated = (s.updatedAt && s.updatedAt.toMillis)
+          ? formatTime(s.updatedAt) : 'just now';
+        const wordCount = (s.body || '').split(/\s+/).filter(Boolean).length;
+        return `
+          <div class="script-list-item" data-script-id="${escapeHtml(s.id)}">
+            <div class="script-list-item-main">
+              <div class="script-list-item-title">${escapeHtml(s.title || 'Untitled')}</div>
+              <div class="script-list-item-sub">
+                ${wordCount} word${wordCount === 1 ? '' : 's'} · ${escapeHtml(updated)}
+                ${tags ? `<span class="script-list-item-tags">${tags}</span>` : ''}
+              </div>
+            </div>
+            <button class="btn-action secondary" data-tp-id="${escapeHtml(s.id)}" title="Open in teleprompter">▶ Tele</button>
+          </div>
+        `;
+      }).join('');
+
+  body.innerHTML = `
+    <div class="script-manager-toolbar">
+      <input type="text" class="script-search" id="scriptSearchInput" placeholder="Search by title…" value="${escapeHtml(scriptManager.searchQuery)}" />
+      <button class="btn-action primary" onclick="openScriptEditor(null)">+ New Script</button>
+    </div>
+    ${tagChipsHtml}
+    <div class="script-list">${listHtml}</div>
+  `;
+
+  // Wire interactions
+  el('scriptSearchInput').addEventListener('input', (e) => {
+    scriptManager.searchQuery = e.target.value;
+    renderScriptManagerBody();
+    // Re-focus input since rerender swapped it.
+    setTimeout(() => {
+      const inp = el('scriptSearchInput');
+      if (inp) {
+        inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+      }
+    }, 0);
+  });
+  body.querySelectorAll('.script-tag-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const t = chip.dataset.tag || null;
+      scriptManager.activeTagFilter = t || null;
+      renderScriptManagerBody();
+    });
+  });
+  body.querySelectorAll('.script-list-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      // Tele button click handled separately.
+      if (e.target.closest('[data-tp-id]')) return;
+      const id = item.dataset.scriptId;
+      openScriptEditor(id);
+    });
+  });
+  body.querySelectorAll('[data-tp-id]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.tpId;
+      const s = scriptManager.scripts.find(x => x.id === id);
+      if (s) openTeleprompter(s);
+    });
+  });
+}
+
+// --- Editor view
+function openScriptEditor(scriptId) {
+  scriptManager.view = 'editor';
+  scriptManager.editingId = scriptId;
+  scriptManager.editorDirty = false;
+  renderScriptManagerBody();
+}
+
+function renderScriptEditorView(body) {
+  const id = scriptManager.editingId;
+  const s = id ? scriptManager.scripts.find(x => x.id === id) : null;
+  const title = s ? (s.title || '') : '';
+  const tagsStr = s ? (s.tags || []).join(', ') : '';
+  const bodyText = s ? (s.body || '') : '';
+  const isOwner = state.user && scriptManager.ownerId === state.user.uid;
+  const updated = (s && s.updatedAt && s.updatedAt.toMillis)
+    ? formatTimeFull(s.updatedAt) : '';
+
+  body.innerHTML = `
+    <button class="script-editor-back" onclick="goBackToScriptList()">← Back to list</button>
+    <input type="text" class="script-editor-title" id="scriptEditTitle" placeholder="Title…" value="${escapeHtml(title)}" maxlength="200" />
+    <input type="text" class="script-editor-tags" id="scriptEditTags" placeholder="Tags (comma-separated)" value="${escapeHtml(tagsStr)}" />
+    <textarea class="script-editor-body" id="scriptEditBody" placeholder="Write your script here…">${escapeHtml(bodyText)}</textarea>
+    <div class="script-editor-actions">
+      <button class="btn-action primary" onclick="saveCurrentScript()">${id ? '💾 Save' : '+ Create'}</button>
+      <button class="btn-action secondary" onclick="openTeleprompterFromEditor()">▶ Open Teleprompter</button>
+      ${id ? `<button class="btn-action secondary" style="background: linear-gradient(135deg, #e75577, #ff8caa); color:#fff;" onclick="deleteCurrentScript()">🗑 Delete</button>` : ''}
+    </div>
+    ${updated ? `<div class="script-editor-meta">Last updated: ${escapeHtml(updated)}</div>` : ''}
+  `;
+
+  // Track dirty state so closing the manager prompts.
+  ['scriptEditTitle', 'scriptEditTags', 'scriptEditBody'].forEach(eid => {
+    const inp = el(eid);
+    if (inp) inp.addEventListener('input', () => { scriptManager.editorDirty = true; });
+  });
+}
+
+function goBackToScriptList() {
+  if (scriptManager.editorDirty) {
+    if (!confirm('Discard unsaved changes?')) return;
+  }
+  scriptManager.view = 'list';
+  scriptManager.editingId = null;
+  scriptManager.editorDirty = false;
+  renderScriptManagerBody();
+}
+
+async function saveCurrentScript() {
+  const title = (el('scriptEditTitle').value || '').trim() || 'Untitled';
+  const body = el('scriptEditBody').value || '';
+  const tags = (el('scriptEditTags').value || '')
+    .split(',').map(t => t.trim()).filter(Boolean).slice(0, 12);
+
+  const id = scriptManager.editingId;
+  try {
+    if (id) {
+      await db.collection('scripts').doc(id).update({
+        title, body, tags,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      const docRef = await db.collection('scripts').add({
+        ownerId: scriptManager.ownerId,
+        title, body, tags,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastEditedBy: state.user.uid,
+        lastEditedByName: state.profile.name || '—',
+      });
+      scriptManager.editingId = docRef.id;
+    }
+    scriptManager.editorDirty = false;
+    showToast({ title: '📄 Saved', text: title, kind: 'default' });
+  } catch (err) {
+    console.error('saveCurrentScript failed:', err);
+    alert('Could not save: ' + err.message);
+  }
+}
+
+async function deleteCurrentScript() {
+  const id = scriptManager.editingId;
+  if (!id) return;
+  if (!confirm('Delete this script? This cannot be undone.')) return;
+  try {
+    await db.collection('scripts').doc(id).delete();
+    scriptManager.view = 'list';
+    scriptManager.editingId = null;
+    scriptManager.editorDirty = false;
+    renderScriptManagerBody();
+  } catch (err) {
+    console.error('deleteCurrentScript failed:', err);
+    alert('Could not delete: ' + err.message);
+  }
+}
+
+function openTeleprompterFromEditor() {
+  const title = (el('scriptEditTitle').value || '').trim() || 'Untitled';
+  const body = el('scriptEditBody').value || '';
+  if (!body.trim()) {
+    alert('Add some text first — there is nothing to teleprompt.');
+    return;
+  }
+  openTeleprompter({ title, body });
+}
+
+/* --- Teleprompter --- */
+const teleprompter = {
+  playing: false,
+  rafId: null,
+  lastTimestamp: 0,
+  speedWpm: 160,
+  fontSize: 48,
+  theme: 'dark',
+  mirror: false,
+  hideBarTimer: null,
+};
+
+function openTeleprompter(script) {
+  // Apply persisted prefs (or fallback defaults).
+  try {
+    const prefs = JSON.parse(localStorage.getItem('tp_prefs') || '{}');
+    if (typeof prefs.speedWpm === 'number') teleprompter.speedWpm = prefs.speedWpm;
+    if (typeof prefs.fontSize === 'number') teleprompter.fontSize = prefs.fontSize;
+    if (typeof prefs.theme === 'string') teleprompter.theme = prefs.theme;
+    if (typeof prefs.mirror === 'boolean') teleprompter.mirror = prefs.mirror;
+  } catch (e) {}
+
+  const overlay = el('teleprompterOverlay');
+  const textEl = el('teleprompterText');
+  const stageEl = el('teleprompterStage');
+
+  textEl.textContent = script.body || '';
+
+  // Apply current settings to the DOM.
+  applyTeleprompterPrefs();
+
+  el('tpSpeed').value = teleprompter.speedWpm;
+  el('tpSpeedNum').textContent = teleprompter.speedWpm;
+  el('tpFontSize').value = teleprompter.fontSize;
+  el('tpFontSizeNum').textContent = teleprompter.fontSize;
+  el('tpTheme').value = teleprompter.theme;
+  el('tpMirrorBtn').classList.toggle('active', teleprompter.mirror);
+
+  overlay.classList.remove('hidden');
+  // Reset scroll to top.
+  stageEl.scrollTop = 0;
+  teleprompter.playing = false;
+  el('tpPlayBtn').textContent = '▶';
+
+  // Wire all controls (idempotent — onclick replaces).
+  el('tpExitBtn').onclick = closeTeleprompter;
+  el('tpPlayBtn').onclick = teleprompterTogglePlay;
+  el('tpRestartBtn').onclick = () => { stageEl.scrollTop = 0; };
+  el('tpMirrorBtn').onclick = () => {
+    teleprompter.mirror = !teleprompter.mirror;
+    applyTeleprompterPrefs();
+    saveTeleprompterPrefs();
+  };
+  el('tpSpeed').oninput = () => {
+    teleprompter.speedWpm = parseInt(el('tpSpeed').value, 10);
+    el('tpSpeedNum').textContent = teleprompter.speedWpm;
+    saveTeleprompterPrefs();
+  };
+  el('tpFontSize').oninput = () => {
+    teleprompter.fontSize = parseInt(el('tpFontSize').value, 10);
+    el('tpFontSizeNum').textContent = teleprompter.fontSize;
+    applyTeleprompterPrefs();
+    saveTeleprompterPrefs();
+  };
+  el('tpTheme').onchange = () => {
+    teleprompter.theme = el('tpTheme').value;
+    applyTeleprompterPrefs();
+    saveTeleprompterPrefs();
+  };
+
+  // Auto-hide the bar after 3 seconds of mouse inactivity.
+  scheduleTeleprompterBarHide();
+  overlay.onmousemove = scheduleTeleprompterBarHide;
+
+  // Keyboard shortcuts.
+  document.addEventListener('keydown', teleprompterKeyHandler);
+}
+
+function closeTeleprompter() {
+  el('teleprompterOverlay').classList.add('hidden');
+  teleprompter.playing = false;
+  if (teleprompter.rafId) {
+    cancelAnimationFrame(teleprompter.rafId);
+    teleprompter.rafId = null;
+  }
+  document.removeEventListener('keydown', teleprompterKeyHandler);
+  if (teleprompter.hideBarTimer) {
+    clearTimeout(teleprompter.hideBarTimer);
+    teleprompter.hideBarTimer = null;
+  }
+}
+
+function applyTeleprompterPrefs() {
+  const overlay = el('teleprompterOverlay');
+  const textEl = el('teleprompterText');
+  if (!overlay || !textEl) return;
+  overlay.classList.remove('theme-dark', 'theme-light', 'theme-sepia');
+  overlay.classList.add('theme-' + (teleprompter.theme || 'dark'));
+  overlay.classList.toggle('mirror', !!teleprompter.mirror);
+  textEl.style.fontSize = teleprompter.fontSize + 'px';
+  // Mirror button visual state (called when mirror toggled too).
+  const mb = el('tpMirrorBtn');
+  if (mb) mb.classList.toggle('active', !!teleprompter.mirror);
+}
+
+function saveTeleprompterPrefs() {
+  try {
+    localStorage.setItem('tp_prefs', JSON.stringify({
+      speedWpm: teleprompter.speedWpm,
+      fontSize: teleprompter.fontSize,
+      theme: teleprompter.theme,
+      mirror: teleprompter.mirror,
+    }));
+  } catch (e) {}
+}
+
+function teleprompterTogglePlay() {
+  teleprompter.playing = !teleprompter.playing;
+  el('tpPlayBtn').textContent = teleprompter.playing ? '⏸' : '▶';
+  if (teleprompter.playing) {
+    teleprompter.lastTimestamp = 0;
+    teleprompter.rafId = requestAnimationFrame(teleprompterTick);
+  } else if (teleprompter.rafId) {
+    cancelAnimationFrame(teleprompter.rafId);
+    teleprompter.rafId = null;
+  }
+}
+
+function teleprompterTick(ts) {
+  if (!teleprompter.playing) return;
+  const stage = el('teleprompterStage');
+  const textEl = el('teleprompterText');
+  if (!stage || !textEl) return;
+  if (!teleprompter.lastTimestamp) teleprompter.lastTimestamp = ts;
+  const dt = ts - teleprompter.lastTimestamp;
+  teleprompter.lastTimestamp = ts;
+  // Translate WPM → pixels per second using the current font size and a
+  // rough average of ~5 chars/word, ~0.55em average glyph width, and
+  // ~1.5 line-height. Tuned by feel — this lands close to the speed
+  // a reader would naturally pace at the displayed WPM.
+  const linesPerMinute = teleprompter.speedWpm / 8;       // ~8 words per line at large size
+  const lineHeightPx = teleprompter.fontSize * 1.5;
+  const pxPerSec = (linesPerMinute / 60) * lineHeightPx;
+  stage.scrollTop += pxPerSec * (dt / 1000);
+  // Stop when we've scrolled past the end.
+  if (stage.scrollTop + stage.clientHeight >= stage.scrollHeight - 4) {
+    teleprompter.playing = false;
+    el('tpPlayBtn').textContent = '▶';
+    return;
+  }
+  teleprompter.rafId = requestAnimationFrame(teleprompterTick);
+}
+
+function teleprompterKeyHandler(e) {
+  // Don't intercept keys when typing into a control inside the bar.
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) {
+    return;
+  }
+  switch (e.key) {
+    case ' ':
+      e.preventDefault();
+      teleprompterTogglePlay();
+      break;
+    case 'Escape':
+      e.preventDefault();
+      closeTeleprompter();
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      teleprompter.speedWpm = Math.min(320, teleprompter.speedWpm + 10);
+      el('tpSpeed').value = teleprompter.speedWpm;
+      el('tpSpeedNum').textContent = teleprompter.speedWpm;
+      saveTeleprompterPrefs();
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      teleprompter.speedWpm = Math.max(60, teleprompter.speedWpm - 10);
+      el('tpSpeed').value = teleprompter.speedWpm;
+      el('tpSpeedNum').textContent = teleprompter.speedWpm;
+      saveTeleprompterPrefs();
+      break;
+    case '+':
+    case '=':
+      e.preventDefault();
+      teleprompter.fontSize = Math.min(120, teleprompter.fontSize + 4);
+      el('tpFontSize').value = teleprompter.fontSize;
+      el('tpFontSizeNum').textContent = teleprompter.fontSize;
+      applyTeleprompterPrefs();
+      saveTeleprompterPrefs();
+      break;
+    case '-':
+    case '_':
+      e.preventDefault();
+      teleprompter.fontSize = Math.max(20, teleprompter.fontSize - 4);
+      el('tpFontSize').value = teleprompter.fontSize;
+      el('tpFontSizeNum').textContent = teleprompter.fontSize;
+      applyTeleprompterPrefs();
+      saveTeleprompterPrefs();
+      break;
+    case 'm':
+    case 'M':
+      e.preventDefault();
+      teleprompter.mirror = !teleprompter.mirror;
+      applyTeleprompterPrefs();
+      saveTeleprompterPrefs();
+      break;
+    case 'r':
+    case 'R':
+      e.preventDefault();
+      el('teleprompterStage').scrollTop = 0;
+      break;
+  }
+}
+
+function scheduleTeleprompterBarHide() {
+  const bar = el('teleprompterBar');
+  if (!bar) return;
+  bar.classList.remove('hidden-bar');
+  if (teleprompter.hideBarTimer) clearTimeout(teleprompter.hideBarTimer);
+  teleprompter.hideBarTimer = setTimeout(() => {
+    if (teleprompter.playing) bar.classList.add('hidden-bar');
+  }, 3000);
 }
 
 function initMusicPlayer() {
