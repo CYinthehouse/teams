@@ -946,6 +946,9 @@
 
   .column {
     flex: 0 0 230px;
+    width: 230px;
+    min-width: 230px;
+    max-width: 230px;
     background: var(--white);
     border-radius: var(--radius);
     padding: 12px 10px;
@@ -955,6 +958,8 @@
     max-height: 75vh;
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 
   .column.drag-over {
@@ -1075,6 +1080,65 @@
     transform: scale(1.08);
   }
 
+  /* Instant-on hover tooltip — appears immediately above any element with
+     `class="has-tooltip"` and `data-tooltip="..."`. Styled to match the
+     kawaii aesthetic and stays readable in dark mode. */
+  .has-tooltip {
+    position: relative;
+  }
+  .has-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--white);
+    padding: 4px 9px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease 0.05s;
+    z-index: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    /* Reset font-family in case the host has a fancy font set on it. */
+    font-family: var(--font-body);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .has-tooltip:hover::after,
+  .has-tooltip:focus-visible::after {
+    opacity: 1;
+  }
+  /* Little arrow pointer below the tooltip body. */
+  .has-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 1px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--ink);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s ease 0.05s;
+    z-index: 500;
+  }
+  .has-tooltip:hover::before,
+  .has-tooltip:focus-visible::before {
+    opacity: 1;
+  }
+  body.dark .has-tooltip::after {
+    background: var(--white);
+    color: var(--ink);
+  }
+  body.dark .has-tooltip::before {
+    border-top-color: var(--white);
+  }
+
   .col-tasks {
     flex: 1;
     overflow-y: auto;
@@ -1099,6 +1163,15 @@
     transition: all 0.2s;
     box-shadow: 0 2px 6px rgba(180, 120, 160, 0.08);
     position: relative;
+    /* Never let a card push its column wider — wrap long words so a
+       single unbreakable string (URL, no-space title) doesn't expand
+       the column. */
+    width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+    min-width: 0;
   }
 
   .task-card:hover {
@@ -2788,7 +2861,8 @@
     margin-bottom: 10px;
   }
   .finished-filter {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     padding: 5px 4px;
     border-radius: 8px;
     font-weight: 600;
@@ -2797,6 +2871,13 @@
     transition: all 0.15s;
     text-transform: uppercase;
     letter-spacing: 0.4px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    /* Make sure width fills the flex slot regardless of inherited reset. */
+    width: 100%;
+    box-sizing: border-box;
   }
   .finished-filter.active {
     background: var(--white);
@@ -7417,7 +7498,7 @@ function buildMemberColumn(member, isGhost) {
     isBossOrManager(state.profile.role)
   );
   const quickAddBtn = showQuickAdd
-    ? `<button class="col-quick-add" data-quick-add-uid="${escapeHtml(member.uid)}" title="Create task">✏️</button>`
+    ? `<button class="col-quick-add has-tooltip" data-quick-add-uid="${escapeHtml(member.uid)}" data-tooltip="Create task">✏️</button>`
     : '';
 
   // Scripts button — only on Calvin's column (matched by email so this
@@ -7431,7 +7512,7 @@ function buildMemberColumn(member, isGhost) {
     isBossOrManager(state.profile.role)
   );
   const scriptsBtn = canSeeScripts
-    ? `<button class="col-scripts-btn" data-scripts-owner="${escapeHtml(member.uid)}" title="Create / manage scripts">📄</button>`
+    ? `<button class="col-scripts-btn has-tooltip" data-scripts-owner="${escapeHtml(member.uid)}" data-tooltip="Create / manage scripts">📄</button>`
     : '';
 
   col.innerHTML = `
@@ -8433,10 +8514,45 @@ function renderOverviewTab() {
     </div>
   ` : '';
 
+  // Completion section — shows what the assignee did + a link to the
+  // work. Visible only on tasks that have been submitted (pending) or
+  // approved (in Finished). Editable by assignee, creator, or Boss/Mgr.
+  let completionHtml = '';
+  if (task.status === 'pending_approval' || task.status === 'approved') {
+    const canEdit = task.assigneeId === state.user.uid
+                 || task.creatorId === state.user.uid
+                 || isBossOrManager(state.profile.role);
+    const note = task.completionNote || '';
+    const url  = task.completionUrl  || '';
+    if (canEdit) {
+      completionHtml = `
+        <div style="background: var(--bg-3); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px;">
+          <div style="font-weight: 600; font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">✅ What was done</div>
+          <textarea id="completionNoteInput" placeholder="What did you do?" maxlength="2000"
+            style="width:100%; min-height: 60px; border: 2px solid var(--bg-2); border-radius: 8px; padding: 8px 10px; font-family: var(--font-body); font-size: 13px; background: var(--white); color: var(--ink); outline: none; resize: vertical; margin-bottom: 6px;">${escapeHtml(note)}</textarea>
+          <input type="url" id="completionUrlInput" placeholder="Link to the work (optional)" value="${escapeHtml(url)}"
+            style="width:100%; border: 2px solid var(--bg-2); border-radius: 8px; padding: 8px 10px; font-family: var(--font-body); font-size: 12px; background: var(--white); color: var(--ink); outline: none; margin-bottom: 6px;" />
+          <button class="btn-action primary" id="completionSaveBtn" style="font-size:12px; padding: 6px 12px;">💾 Save</button>
+          <span id="completionSavedNote" style="margin-left: 8px; font-size: 11px; color: var(--ink-light);"></span>
+        </div>
+      `;
+    } else if (note || url) {
+      // Read-only view for users without edit rights but who can see the task.
+      completionHtml = `
+        <div style="background: var(--bg-3); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px;">
+          <div style="font-weight: 600; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">✅ What was done</div>
+          ${note ? `<div style="font-size: 13px; color: var(--ink); white-space: pre-wrap; margin-bottom: 6px;">${escapeHtml(note)}</div>` : ''}
+          ${url ? `<div style="font-size: 12px;">🔗 <a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color: var(--pink-deep); word-break: break-all;">${escapeHtml(url)}</a></div>` : ''}
+        </div>
+      `;
+    }
+  }
+
   wrap.innerHTML = `
     ${feedbackHtml}
     ${timerHtml}
     ${urgencyHtml}
+    ${completionHtml}
     ${task.description ? `<div style="background: var(--bg); padding: 12px 14px; border-radius: 12px; font-size: 14px; color: var(--ink); margin-bottom: 14px; white-space: pre-wrap;">${escapeHtml(task.description)}</div>` : ''}
     ${(task.steps || []).length > 0 ? `
       <div style="margin-top: 4px;">
@@ -8472,6 +8588,43 @@ function renderOverviewTab() {
         if ((t.urgency || null) === newVal) return; // no change
         setTaskUrgency(t.id, newVal);
       });
+    });
+  }
+
+  // Wire completion save button (visible on pending/approved tasks).
+  const completionSave = el('completionSaveBtn');
+  if (completionSave) {
+    completionSave.addEventListener('click', async () => {
+      const t = getCurrentTask();
+      if (!t) return;
+      const noteEl = el('completionNoteInput');
+      const urlEl = el('completionUrlInput');
+      const note = (noteEl.value || '').trim();
+      let url = (urlEl.value || '').trim();
+      // Mild URL sanity: prepend https:// if user typed a bare domain.
+      if (url && !/^https?:\/\//i.test(url) && /\./.test(url)) {
+        url = 'https://' + url;
+      }
+      completionSave.disabled = true;
+      const orig = completionSave.textContent;
+      completionSave.textContent = 'Saving…';
+      try {
+        await db.collection('tasks').doc(t.id).update({
+          completionNote: note,
+          completionUrl: url,
+        });
+        const noteSpan = el('completionSavedNote');
+        if (noteSpan) {
+          noteSpan.textContent = '✓ Saved';
+          setTimeout(() => { if (noteSpan) noteSpan.textContent = ''; }, 2000);
+        }
+      } catch (err) {
+        console.error('completion save failed:', err);
+        alert('Could not save: ' + err.message);
+      } finally {
+        completionSave.disabled = false;
+        completionSave.textContent = orig;
+      }
     });
   }
 
