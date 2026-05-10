@@ -2251,6 +2251,65 @@
     gap: 3px;
   }
 
+  /* ---- Completion preview on the task card ---- */
+  /* Mint-tinted block on pending/approved cards that have completion
+     content. Clearly visible signal that someone wrote down what they
+     did — and a 🔗 view button if there's a link attached. */
+  .task-completion-preview {
+    background: var(--mint-soft);
+    border: 1.5px solid var(--mint);
+    border-radius: 8px;
+    padding: 6px 8px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #2a6b48;
+  }
+  body.dark .task-completion-preview {
+    background: rgba(60, 140, 100, 0.18);
+    border-color: rgba(110, 200, 160, 0.55);
+    color: #b5e6cf;
+  }
+  .task-completion-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 11px;
+  }
+  .task-completion-link {
+    background: var(--white);
+    border: 1px solid var(--mint);
+    color: #2a6b48;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .task-completion-link:hover {
+    background: var(--mint);
+    color: var(--white);
+  }
+  body.dark .task-completion-link {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(110, 200, 160, 0.55);
+    color: #b5e6cf;
+  }
+  body.dark .task-completion-link:hover {
+    background: rgba(110, 200, 160, 0.4);
+    color: var(--white);
+  }
+  .task-completion-note {
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    font-weight: 500;
+    overflow-wrap: break-word;
+  }
+
   /* ---------- Stage 3: Timer + Bell + Toasts ---------- */
 
   /* Timer pill on task card */
@@ -6126,6 +6185,11 @@ const state = {
   pendingSteps: [],
   pendingUrgency: null,         // selected urgency in the new-task modal
   editPendingUrgency: null,     // selected urgency in the edit-task modal
+  // Drafts of unsaved "What was done" inputs, keyed by task id. Survives
+  // tab switches inside the task detail modal so the user doesn't lose
+  // typing when they navigate away before clicking Save. Cleared on save
+  // and on detail-modal close.
+  completionDrafts: {},
   currentTaskId: null,
   editingTaskId: null,
   currentEditingTeamId: null,
@@ -7840,6 +7904,27 @@ function buildTaskCard(task) {
     : 'Set urgency';
   const urgencyDotHtml = `<button class="task-card-urgency-dot ${urgencyClass}" data-task-id="${escapeHtml(task.id)}" title="${urgencyTitle}"></button>`;
 
+  // Completion preview — visible on pending/approved cards that have a
+  // note and/or link saved. Clicking the link opens it directly (the
+  // surrounding card click still opens the task detail). Makes "what was
+  // done" discoverable without opening every card.
+  let completionPreviewHtml = '';
+  if ((task.status === 'pending_approval' || task.status === 'approved') &&
+      (task.completionNote || task.completionUrl)) {
+    const noteFull = task.completionNote || '';
+    const note = noteFull.length > 120 ? noteFull.slice(0, 117) + '…' : noteFull;
+    const url = task.completionUrl || '';
+    completionPreviewHtml = `
+      <div class="task-completion-preview">
+        <div class="task-completion-head">
+          <span>✅ What was done</span>
+          ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="task-completion-link" title="Open link in new tab">🔗 view</a>` : ''}
+        </div>
+        ${note ? `<div class="task-completion-note">${escapeHtml(note)}</div>` : ''}
+      </div>
+    `;
+  }
+
   card.innerHTML = `
     ${urgencyDotHtml}
     ${privateBadgeHtml}
@@ -7849,6 +7934,7 @@ function buildTaskCard(task) {
     ${timerHtml}
     ${awaitingHtml}
     ${sentBackHtml}
+    ${completionPreviewHtml}
     ${iconsHtml}
     <div class="task-footer">
       <div class="task-creator">
@@ -7881,9 +7967,11 @@ function buildTaskCard(task) {
     card.classList.remove('dragging');
   });
 
-  // Click for detail
+  // Click for detail (but not when the user clicks the completion link
+  // — that should open the URL in a new tab instead).
   card.addEventListener('click', (e) => {
     if (card.classList.contains('dragging')) return;
+    if (e.target.closest('.task-completion-link')) return;
     openTaskDetail(task.id);
   });
 
@@ -8522,12 +8610,20 @@ function renderOverviewTab() {
     const canEdit = task.assigneeId === state.user.uid
                  || task.creatorId === state.user.uid
                  || isBossOrManager(state.profile.role);
-    const note = task.completionNote || '';
-    const url  = task.completionUrl  || '';
+    // Use the unsaved draft if one exists for this task, otherwise the
+    // saved value. Without this, switching tabs in the detail modal
+    // re-renders the textarea with the saved value and discards typing.
+    const draft = state.completionDrafts[task.id];
+    const note = (draft && typeof draft.note === 'string') ? draft.note : (task.completionNote || '');
+    const url  = (draft && typeof draft.url  === 'string') ? draft.url  : (task.completionUrl  || '');
+    const hasUnsaved = !!draft && (
+      note !== (task.completionNote || '') ||
+      url  !== (task.completionUrl  || '')
+    );
     if (canEdit) {
       completionHtml = `
         <div style="background: var(--bg-3); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px;">
-          <div style="font-weight: 600; font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">✅ What was done</div>
+          <div style="font-weight: 600; font-size: 13px; color: var(--ink-soft); margin-bottom: 8px;">✅ What was done${hasUnsaved ? ' <span style="color: var(--pink-deep); font-weight: 700; font-size: 11px;">· unsaved</span>' : ''}</div>
           <textarea id="completionNoteInput" placeholder="What did you do?" maxlength="2000"
             style="width:100%; min-height: 60px; border: 2px solid var(--bg-2); border-radius: 8px; padding: 8px 10px; font-family: var(--font-body); font-size: 13px; background: var(--white); color: var(--ink); outline: none; resize: vertical; margin-bottom: 6px;">${escapeHtml(note)}</textarea>
           <input type="url" id="completionUrlInput" placeholder="Link to the work (optional)" value="${escapeHtml(url)}"
@@ -8591,8 +8687,34 @@ function renderOverviewTab() {
     });
   }
 
-  // Wire completion save button (visible on pending/approved tasks).
+  // Wire completion save button + draft-tracking inputs (visible on
+  // pending/approved tasks). Inputs write to state.completionDrafts so
+  // unsaved typing survives tab switches and re-renders. Save clears
+  // the draft once the data lands in Firestore.
   const completionSave = el('completionSaveBtn');
+  const completionNoteEl = el('completionNoteInput');
+  const completionUrlEl  = el('completionUrlInput');
+  if (completionNoteEl && completionUrlEl) {
+    const t = getCurrentTask();
+    const taskId = t ? t.id : null;
+    const captureDraft = () => {
+      if (!taskId) return;
+      const cur = getCurrentTask();
+      if (!cur) return;
+      const note = completionNoteEl.value;
+      const url  = completionUrlEl.value;
+      // Only store a draft if the live values differ from what's saved
+      // on the doc. That way the "unsaved" indicator and discard-on-save
+      // logic stay accurate.
+      if (note === (cur.completionNote || '') && url === (cur.completionUrl || '')) {
+        delete state.completionDrafts[taskId];
+      } else {
+        state.completionDrafts[taskId] = { note, url };
+      }
+    };
+    completionNoteEl.addEventListener('input', captureDraft);
+    completionUrlEl.addEventListener('input', captureDraft);
+  }
   if (completionSave) {
     completionSave.addEventListener('click', async () => {
       const t = getCurrentTask();
@@ -8613,6 +8735,8 @@ function renderOverviewTab() {
           completionNote: note,
           completionUrl: url,
         });
+        // Successful save — drop the draft for this task.
+        delete state.completionDrafts[t.id];
         const noteSpan = el('completionSavedNote');
         if (noteSpan) {
           noteSpan.textContent = '✓ Saved';
