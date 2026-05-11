@@ -8117,9 +8117,39 @@ async function handleTaskDrop(taskId, dropType, userId, beforeTaskId) {
     }
   } else if (dropType === 'pending') {
     if (task.status === 'pending_approval') return;
-    updates.status = 'pending_approval';
-    activityAction = 'status_changed';
-    activityDetails = { from: task.status, to: 'pending_approval' };
+    // Boss/Manager bouncing their OWN work through Pending is just
+    // ceremonial — they'd just approve it themselves. Skip Pending and
+    // go straight to Approved (Finished column) when the dragger is
+    // both Boss/Mgr AND the task's assignee.
+    if (isBossOrManager(state.profile.role) && task.assigneeId === state.user.uid) {
+      updates.status = 'approved';
+      updates.approvedAt = firebase.firestore.FieldValue.serverTimestamp();
+      updates.approvedBy = state.user.uid;
+      updates.approvedByName = state.profile.name;
+      updates.lastFeedback = firebase.firestore.FieldValue.delete();
+      activityAction = 'approved';
+      activityDetails = { taskTitle: task.title };
+    } else {
+      updates.status = 'pending_approval';
+      activityAction = 'status_changed';
+      activityDetails = { from: task.status, to: 'pending_approval' };
+    }
+  } else if (dropType === 'finished') {
+    // Drag-to-Finished is an approval shortcut. Only Boss/Manager can
+    // approve tasks — anyone else trying to drop here is silently
+    // ignored. Works from either in_progress or pending_approval.
+    if (!isBossOrManager(state.profile.role)) {
+      console.warn('drop to finished blocked: not Boss/Mgr (role:', state.profile.role, ')');
+      return;
+    }
+    if (task.status === 'approved') return;
+    updates.status = 'approved';
+    updates.approvedAt = firebase.firestore.FieldValue.serverTimestamp();
+    updates.approvedBy = state.user.uid;
+    updates.approvedByName = state.profile.name;
+    updates.lastFeedback = firebase.firestore.FieldValue.delete();
+    activityAction = 'approved';
+    activityDetails = { taskTitle: task.title };
   }
 
   if (Object.keys(updates).length === 0) return;
@@ -8502,6 +8532,12 @@ function renderDetailHead(task) {
   // Stage 4: show Review tab only when pending_approval AND I'm Boss/Manager
   const showReview = task.status === 'pending_approval' && isBossOrManager(state.profile.role);
   el('tabBtnReview').style.display = showReview ? 'flex' : 'none';
+  // Diagnostic: if a Boss/Mgr can't see Review on a pending task, the
+  // most likely cause is the role string not being exactly 'Boss' or
+  // 'Manager' in their users doc. Log it so it's easy to spot in console.
+  if (task.status === 'pending_approval' && !showReview) {
+    console.log('Review tab hidden. Role:', JSON.stringify(state.profile.role), 'expected: "Boss" or "Manager"');
+  }
 
   // If Review tab was active but no longer applicable, fall back to overview
   if (!showReview && state.currentTab === 'review') {
@@ -8519,21 +8555,28 @@ function renderDetailHead(task) {
      isBossOrManager(state.profile.role));
   el('taskEditBtn').style.display = canEdit ? 'flex' : 'none';
 
-  // Mark-as-Done button: visible only on in_progress tasks, and only to the
-  // assignee, creator, or Boss/Manager. Boss/Mgr with the button click
-  // jumps straight to "approved" since they don't need their own review;
-  // for everyone else it submits to pending_approval. Logic is in
-  // markCurrentTaskDone().
-  const canMarkDone = task.status === 'in_progress' &&
-    (task.assigneeId === state.user.uid ||
-     task.creatorId === state.user.uid ||
-     isBossOrManager(state.profile.role));
+  // Mark-as-Done / Mark-Approved button: shown in the modal footer.
+  // - On in_progress tasks: visible to assignee, creator, or Boss/Mgr.
+  //   Boss/Mgr → goes straight to 'approved' (skips review).
+  //   Everyone else → goes to 'pending_approval'.
+  // - On pending_approval tasks: visible ONLY to Boss/Mgr — gives them
+  //   a one-click approve action right from the Overview tab (so they
+  //   don't have to discover the separate "Review" tab).
+  let canMarkDone = false;
+  let markBtnLabel = '✓ Mark as Done';
+  if (task.status === 'in_progress') {
+    canMarkDone = task.assigneeId === state.user.uid
+               || task.creatorId === state.user.uid
+               || isBossOrManager(state.profile.role);
+    markBtnLabel = isBossOrManager(state.profile.role) ? '✅ Mark Approved' : '✓ Mark as Done';
+  } else if (task.status === 'pending_approval') {
+    canMarkDone = isBossOrManager(state.profile.role);
+    markBtnLabel = '✅ Approve';
+  }
   const markBtn = el('taskMarkDoneBtn');
   if (canMarkDone) {
     markBtn.style.display = 'flex';
-    markBtn.textContent = isBossOrManager(state.profile.role)
-      ? '✅ Mark Approved'
-      : '✓ Mark as Done';
+    markBtn.textContent = markBtnLabel;
   } else {
     markBtn.style.display = 'none';
   }
@@ -10078,28 +10121,33 @@ async function approveTask(taskId) {
   }
 }
 
-// Triggered by the "Mark as Done" / "Mark Approved" footer button on the
-// task detail modal. Picks the destination status based on role:
-//  - Boss/Manager → goes straight to 'approved' (skips review)
-//  - Assignee/creator (Teacher/Support) → goes to 'pending_approval'
+// Triggered by the "Mark as Done" / "Mark Approved" / "Approve" footer
+// button on the task detail modal. Behavior depends on the current
+// status and role:
+//  - in_progress + Boss/Mgr → goes straight to 'approved'
+//  - in_progress + worker (assignee/creator) → goes to 'pending_approval'
+//  - pending_approval + Boss/Mgr → approves directly (button label "Approve")
 async function markCurrentTaskDone() {
   const task = getCurrentTask();
   if (!task) return;
-  if (task.status !== 'in_progress') return;
-
-  const allowed = task.assigneeId === state.user.uid
-               || task.creatorId === state.user.uid
-               || isBossOrManager(state.profile.role);
-  if (!allowed) return;
+  const isBM = isBossOrManager(state.profile.role);
+  // Validate this is a state where the button should have been clickable.
+  const validInProgress = task.status === 'in_progress' && (
+    task.assigneeId === state.user.uid ||
+    task.creatorId === state.user.uid ||
+    isBM
+  );
+  const validPending = task.status === 'pending_approval' && isBM;
+  if (!validInProgress && !validPending) return;
 
   const btn = el('taskMarkDoneBtn');
   btn.disabled = true;
   const origText = btn.textContent;
   btn.textContent = 'Saving…';
   try {
-    if (isBossOrManager(state.profile.role)) {
-      // Skip pending — Boss/Mgr approving their own work or someone else's
-      // shouldn't have to bounce through review.
+    // Boss/Mgr always lands on 'approved' (from either starting state).
+    // Workers always land on 'pending_approval' (from in_progress only).
+    if (isBM) {
       await db.collection('tasks').doc(task.id).update({
         status: 'approved',
         approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
