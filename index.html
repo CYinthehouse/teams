@@ -1185,6 +1185,53 @@
     cursor: grabbing;
   }
 
+  /* Touch drag: while a long-press is building, a subtle scale-down hints
+     that the card is becoming "pickable". Cancelled if the user lifts or
+     starts scrolling before the long-press threshold. */
+  .task-card.touch-press {
+    transform: scale(0.97);
+    transition: transform 0.18s ease;
+  }
+
+  /* The floating "ghost" that follows the finger during an active touch
+     drag. Built from a clone of the original card so it visually matches.
+     Positioned via inline style by JS (top/left updated on touchmove). */
+  .touch-drag-ghost {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;          /* don't intercept elementFromPoint */
+    opacity: 0.92;
+    transform: rotate(2deg) scale(1.04);
+    box-shadow: 0 12px 32px rgba(180, 120, 160, 0.45);
+    transition: none;              /* movement is direct via style */
+    /* Width is set from the original card on creation so the ghost
+       matches the column width. */
+  }
+
+  /* While the user is actively touch-dragging anywhere, suppress text
+     selection and the long-press magnifier (iOS Safari). Applied via
+     a body class so it covers the whole page during drag. */
+  body.touch-dragging,
+  body.touch-dragging * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  body.touch-dragging {
+    /* Block iOS Safari's pull-to-refresh and double-tap zoom while a
+       card is in flight. We don't set overflow:hidden because the touch
+       drag handler implements its own auto-scroll near viewport edges,
+       and overflow:hidden would block that programmatic scroll. Native
+       scroll from touchmove is already prevented in the move handler. */
+    touch-action: none;
+  }
+
+  /* Task cards become long-press targets on touch — manipulation lets
+     taps still fire normally but disables double-tap zoom. */
+  .task-card {
+    touch-action: manipulation;
+  }
+
   /* ---- Urgency tints ----
      Three levels, each with light + dark mode variants tuned for legibility.
      The whole card background tints; borders pick up a darker version of
@@ -5167,12 +5214,239 @@
     pointer-events: none;
   }
 
-  @media (max-width: 720px) {
-    .topbar { padding: 12px 16px; gap: 12px; flex-wrap: wrap; }
-    .brand { font-size: 22px; }
-    .board-area { padding: 16px; }
-    .board-title { font-size: 28px; }
-    .column { flex: 0 0 250px; }
+  /* ============================================
+     Responsive breakpoints
+     - ≤640px       → phone (iPhone portrait, small Android)
+     - 641–1080px   → small tablet (iPad portrait, iPhone landscape, iPad Pro 13" portrait)
+     - ≥1081px      → desktop / iPad landscape (no overrides; default layout)
+
+     Verified viewport widths these target (CSS pixels):
+       iPhone portrait:        375–440px   → phone
+       iPhone landscape:       667–956px   → small tablet (+ short-viewport)
+       iPad mini portrait:     744px       → small tablet
+       iPad 10.9"/Air 11":     820px port. → small tablet
+       iPad Pro 11" portrait:  834px       → small tablet
+       iPad Air 13" portrait:  1024px      → small tablet
+       iPad Pro 13" portrait:  1032px      → small tablet (we bumped the bound to catch this)
+       iPad 11" landscape:     1180–1210px → desktop
+       iPad 13" landscape:     1366–1376px → desktop
+
+     Notes on layout choices:
+     - Phone stacks the board columns vertically since 5 columns can't fit
+       at any usable width. Each column gets full width and a smaller
+       max-height so scrolling within a column is contained, not the whole
+       page.
+     - Small-tablet keeps the horizontal columns but narrower (200px), so
+       3 fit on iPad portrait without horizontal scroll.
+     - Modals, the chat panel, and the music player all collapse to
+       phone-friendly dimensions independently of the board layout — they
+       use the same breakpoints but the rules are scoped to those classes.
+     - iPhone landscape (~844×390) falls into small-tablet by width but
+       has tiny height, so a separate (max-height: 480px) block trims
+       vertical padding regardless of width.
+  ============================================ */
+
+  /* ----- Phone (≤640px) ----- */
+  @media (max-width: 640px) {
+    /* Topbar: tighter, allow wrap so right-side buttons drop below brand */
+    .topbar { padding: 10px 14px; gap: 10px; flex-wrap: wrap; }
+    .brand { font-size: 20px; }
+    .brand-icon { font-size: 22px; }
+    .team-switcher { order: 3; flex-basis: 100%; }
+    .topbar-right { gap: 8px; }
+    .user-chip { padding: 4px 10px 4px 4px; font-size: 13px; }
+    .avatar { width: 28px; height: 28px; }
+
+    /* Board area: tighter padding */
+    .board-area { padding: 14px; }
+    .board-title { font-size: 24px; }
+    .board-title-emoji { font-size: 22px; }
+    .board-header { gap: 10px; margin-bottom: 14px; }
+
+    /* Columns: stack vertically, each takes full width. The .columns
+       container uses column flex direction so they read top-to-bottom.
+       width:max-content from the desktop layout is overridden. */
+    .columns {
+      flex-direction: column;
+      width: 100%;
+      max-width: 100%;
+      gap: 12px;
+    }
+    .column {
+      flex: 1 1 100%;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      /* Cap vertical height so a tall column doesn't push everything off-
+         screen — internal .col-tasks scrolls instead. */
+      max-height: 55vh;
+    }
+
+    /* Modals: less padding, more vertical room */
+    .modal-backdrop { padding: 10px; }
+    .modal { padding: 20px; max-height: 95vh; border-radius: 20px; }
+    .modal-title { font-size: 22px; }
+    .modal-head { margin-bottom: 14px; }
+
+    /* Auth screen */
+    .auth-card { padding: 28px 22px; }
+    .auth-title { font-size: 32px; }
+
+    /* Chat panel: full-width on phones */
+    .chat-panel { width: 100%; max-width: 100%; }
+    /* Poke strip aligns with chat: full-width means strip should hide
+       (no room for it next to the panel). */
+    body.chat-open .poke-strip { display: none; }
+
+    /* Music player: force-collapsed on phones (saves screen real estate).
+       Users can still expand by tapping the icon — the existing
+       .collapsed class toggle still works. */
+    .music-player:not(.collapsed) {
+      width: 240px;
+    }
+
+    /* Notifications panel: full-width-ish */
+    .notifications-panel {
+      width: calc(100vw - 20px);
+      right: 10px;
+      top: 64px;
+    }
+
+    /* Poke strip: shrink characters so they don't dominate the screen */
+    .poke-char { width: 40px; height: 40px; }
+    .poke-strip { max-width: 90vw; gap: 4px; }
+
+    /* Tabs inside modals: smaller, allow wrap */
+    .tabs { flex-wrap: wrap; }
+    .tab-btn { font-size: 11px; padding: 7px 4px; }
+  }
+
+  /* ----- Small tablet / iPad portrait / iPhone landscape (641–1080px) ----- */
+  @media (min-width: 641px) and (max-width: 1080px) {
+    .topbar { padding: 12px 18px; gap: 14px; }
+    .brand { font-size: 24px; }
+
+    .board-area { padding: 18px; }
+    .board-title { font-size: 30px; }
+
+    /* Narrower columns so 3 fit comfortably in 768–1024px width */
+    .column {
+      flex: 0 0 210px;
+      width: 210px;
+      min-width: 210px;
+      max-width: 210px;
+    }
+
+    /* Modal padding still generous but slightly tighter */
+    .modal { padding: 26px; }
+  }
+
+  /* ----- Short viewport (iPhone landscape, small notebooks) ----- */
+  /* Independent of width — fires whenever the viewport is shorter than
+     480px. iPhone landscape (~390px tall) is the main target. Trims
+     vertical padding so modals, the topbar, and the board header don't
+     swallow half the visible area. */
+  @media (max-height: 480px) {
+    .topbar { padding: 8px 16px; }
+    .brand { font-size: 20px; }
+    .board-area { padding: 12px 16px 20px; }
+    .board-header { margin-bottom: 10px; }
+    .board-title { font-size: 22px; }
+    .modal { padding: 18px; max-height: 92vh; }
+    .modal-head { margin-bottom: 10px; }
+    .auth-card { padding: 22px 28px; }
+    .auth-title { font-size: 28px; margin-bottom: 4px; }
+    .auth-sub { margin-bottom: 14px; }
+    /* Keep the column max-height tied to viewport so it's actually usable */
+    .column { max-height: 78vh; }
+  }
+
+  /* ============================================
+     Touch-device overlay — fires on any device whose PRIMARY input is
+     touch (no hover, coarse pointer), independent of viewport width.
+
+     This matters for tablets that fall into the "desktop" width bucket
+     but are still touch-only: iPad Air 11" / Pro 11" / Pro 13" landscape
+     (1180–1376px), and Android tablets like the Honor Pad 9 landscape
+     (~1280px). On these devices the desktop layout was designed for
+     mouse-precision and assumes hover states; both fail on touch.
+
+     Two things this fixes:
+     1. HOVER STYLES STICK after a tap on touch. We don't reach into
+        every :hover rule to gate it — there are 80+. Instead we use a
+        narrower targeted fix: cancel the *visual* hover changes on the
+        most prominent interactive elements (cards, pills, buttons),
+        which are the ones whose stuck-hover state is most noticeable.
+        For the rest, the lingering hover-tint after a tap is mild
+        enough to live with and would multiply our CSS surface area.
+     2. TAP TARGETS BELOW 44PX are below Apple HIG and Material Design
+        recommendations. We grow them on touch so fingers can hit them
+        reliably. Visual size mostly unchanged — we expand the hit area
+        with padding where the layout permits, otherwise increase the
+        visible size.
+  ============================================ */
+  @media (hover: none) and (pointer: coarse) {
+    /* --- Suppress sticky hover on the most-noticed elements --- */
+    /* Cards: opacity/transform changes on hover linger after a tap. */
+    .task-card:hover { transform: none; }
+    .task-card.urgency-red:hover { border-color: #ff8aa6; }
+    .task-card.urgency-yellow:hover { border-color: #f3c93a; }
+    .task-card.urgency-blue:hover { border-color: #7fb3e8; }
+    /* Buttons & pills */
+    .icon-btn:hover { background: var(--bg-2); transform: none; }
+    .btn-action:hover { transform: none; }
+    .team-pill:hover { background: var(--bg-2); color: var(--ink-soft); }
+    .team-pill.active:hover {
+      background: linear-gradient(135deg, var(--pink) 0%, var(--lavender) 100%);
+      color: var(--white);
+    }
+    .task-card-urgency-dot:hover { transform: none; }
+    /* Music player + poke characters */
+    .music-player:hover { box-shadow: 0 6px 20px rgba(180, 120, 160, 0.25); }
+
+    /* --- Grow tap targets --- */
+    /* Topbar icon buttons: 38px → 44px */
+    .icon-btn { width: 44px; height: 44px; font-size: 18px; }
+    #fontDecBtn, #fontIncBtn { font-size: 15px; }
+
+    /* Urgency dot: keep the 16px visual but expand the hit area to 32px.
+       The button itself becomes transparent and larger; the visible dot
+       is rendered as a centered pseudo-element with the original border
+       and background, so users still see the same little 16px circle
+       they're used to but get a fat finger-sized tap target. */
+    .task-card-urgency-dot {
+      width: 32px;
+      height: 32px;
+      top: 0;
+      right: 0;
+      background: transparent;
+      border: none;
+      transition: none;       /* the hover-scale was on the button itself */
+    }
+    .task-card-urgency-dot::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--bg-2);
+      border: 1.5px solid var(--ink-light);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .task-card-urgency-dot.urgency-red::before    { background: #ff5e87; border-color: #c43560; }
+    .task-card-urgency-dot.urgency-yellow::before { background: #f3c93a; border-color: #b08a18; }
+    .task-card-urgency-dot.urgency-blue::before   { background: #4f93dc; border-color: #2c6db0; }
+    /* Bump title padding to clear the bigger hit area (was 22px) */
+    .task-card .task-title { padding-right: 36px; }
+
+    /* Tab buttons inside modals: bump min height */
+    .tab-btn { min-height: 40px; }
+
+    /* Music player tiny buttons */
+    .music-btn { min-width: 36px; min-height: 36px; }
   }
 
   /* ---------- Display-font outline (readability) ---------- */
@@ -6390,6 +6664,26 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// Validate a URL is safe to use as an href. Blocks `javascript:`, `data:`,
+// `vbscript:`, etc. Allows http/https/mailto/tel and relative URLs (which
+// resolve against the current page). Returns '#' for anything else so the
+// link still renders but does nothing dangerous. Always wrap the result in
+// escapeHtml() at the call site.
+function safeHref(u) {
+  if (u == null) return '#';
+  const s = String(u).trim();
+  if (!s) return '#';
+  // Relative URLs (no scheme) are safe — they can't introduce javascript:.
+  // Quick check: if there's no colon before the first slash/?/#, it's relative.
+  const colon = s.indexOf(':');
+  const firstPathChar = s.search(/[/?#]/);
+  if (colon === -1 || (firstPathChar !== -1 && firstPathChar < colon)) return s;
+  // Has a scheme — only allow the safe ones.
+  const scheme = s.slice(0, colon).toLowerCase();
+  if (scheme === 'http' || scheme === 'https' || scheme === 'mailto' || scheme === 'tel') return s;
+  return '#';
+}
+
 function isBossOrManager(role) {
   return role === 'Boss' || role === 'Manager';
 }
@@ -6456,7 +6750,9 @@ async function logActivity(taskId, action, details = {}) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
     });
   } catch (err) {
-
+    // Non-fatal: don't surface in UI, but log so rules denials etc. are
+    // visible during development instead of silently disappearing.
+    console.warn('activity log failed', err);
   }
 }
 
@@ -6574,7 +6870,9 @@ function getTaskExpiry(task) {
 }
 
 function formatRemaining(ms) {
-  if (ms <= 0) return 'expired';
+  // Under one minute left reads as effectively over — flip straight to
+  // "expired" instead of showing "0m left" for a confusing 60-second window.
+  if (ms < 60000) return 'expired';
   const totalMin = Math.floor(ms / 60000);
   if (totalMin < 60) return `${totalMin}m left`;
   const totalHr = Math.floor(totalMin / 60);
@@ -6608,6 +6906,55 @@ function getTimerState(task) {
   else if (total > 0 && remaining / total <= 0.25) severity = 'warning';
 
   return { hasTimer: true, expiry, remainingMs: remaining, severity, total };
+}
+
+// Lightweight tick: walk existing task cards in the DOM and update just the
+// timer pill text + severity class, without rebuilding the entire board.
+// Avoids the destroy-and-recreate thrash of renderBoard() on every tick —
+// preserves focus, text selection, in-flight drags, and saves CPU.
+//
+// Handles three cases per card:
+//   1. Card has a pill and task still has a timer  → update label + class.
+//   2. Card has a pill but timer is now gone       → remove the pill.
+//   3. Card has no pill but task gained a timer    → fall back to full
+//      renderBoard() (rare, and inserting at the right slot is fiddly).
+function refreshTimerPills() {
+  const cards = document.querySelectorAll('.task-card[data-task-id]');
+  if (!cards.length) return;
+  const tasksById = new Map(state.tasks.map(t => [t.id, t]));
+  let needsFullRender = false;
+
+  cards.forEach(card => {
+    const taskId = card.dataset.taskId;
+    const task = tasksById.get(taskId);
+    if (!task) return;
+
+    const pill = card.querySelector('.timer-pill');
+    const ts = getTimerState(task);
+    const showPill = ts.hasTimer && task.status !== 'approved';
+
+    if (showPill && pill) {
+      // Case 1: update existing pill in place.
+      const label = ts.severity === 'expired'
+        ? '⏰ Overdue'
+        : '⏰ ' + formatRemaining(ts.remainingMs);
+      if (pill.textContent !== label) pill.textContent = label;
+      // Reset to the canonical class set (preserves whatever non-severity
+      // classes might exist; in practice the pill only carries severity).
+      pill.className = 'timer-pill ' + ts.severity;
+      card.classList.toggle('expired', ts.severity === 'expired');
+    } else if (!showPill && pill) {
+      // Case 2: timer was cleared on the task — drop the stale pill.
+      pill.remove();
+      card.classList.remove('expired');
+    } else if (showPill && !pill) {
+      // Case 3: timer appeared. Insertion order matters for layout, so
+      // defer to a full render for this tick.
+      needsFullRender = true;
+    }
+  });
+
+  if (needsFullRender) renderBoard();
 }
 
 /* ---- Stage 3: bell audio ---- */
@@ -7168,12 +7515,14 @@ auth.onAuthStateChanged(async (user) => {
     checkAndFireProgramContacts();
   }, 3000);
 
-  // Stage 3: start periodic tick (1 minute) to refresh timer pills and detect expiries
+  // Stage 3: start periodic tick (30 seconds) to refresh timer pills and detect expiries
   if (state.tickInterval) clearInterval(state.tickInterval);
   state.tickInterval = setInterval(() => {
-    // Re-render board to update timer pills; also check for newly-expired tasks
+    // Update timer pill text/severity in-place instead of rebuilding the
+    // whole board — preserves drags, focus, and text selection. Falls back
+    // to a full renderBoard() only if a card needs a pill it doesn't have.
     checkExpiredTasksForNotifications();
-    renderBoard();
+    refreshTimerPills();
     // Refresh poke strip (so online dots update as users go in/out of presence)
     renderPokeStrip();
     // Check whether any class reminder is due to fire (10 min before class).
@@ -7779,8 +8128,8 @@ function buildClassContactsColumn() {
         ? `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
            <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`
         : `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
-           <div class="contact-card-detail"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(c.homeworkUrl) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
-           <div class="contact-card-detail"><strong>Loom:</strong> <a href="${escapeHtml(c.loomUrl || '#')}" target="_blank" rel="noopener">link</a></div>
+           <div class="contact-card-detail"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(safeHref(c.homeworkUrl)) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
+           <div class="contact-card-detail"><strong>Loom:</strong> <a href="${escapeHtml(safeHref(c.loomUrl))}" target="_blank" rel="noopener">link</a></div>
            <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`;
       return `
         <details class="contact-card${isEOP ? ' contact-card-eop' : ''}">
@@ -7918,7 +8267,7 @@ function buildTaskCard(task) {
       <div class="task-completion-preview">
         <div class="task-completion-head">
           <span>✅ What was done</span>
-          ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="task-completion-link" title="Open link in new tab">🔗 view</a>` : ''}
+          ${url ? `<a href="${escapeHtml(safeHref(url))}" target="_blank" rel="noopener" class="task-completion-link" title="Open link in new tab">🔗 view</a>` : ''}
         </div>
         ${note ? `<div class="task-completion-note">${escapeHtml(note)}</div>` : ''}
       </div>
@@ -7967,10 +8316,25 @@ function buildTaskCard(task) {
     card.classList.remove('dragging');
   });
 
+  // Touch drag (long-press → drag → drop) for iOS/Android/iPadOS. HTML5
+  // drag events don't fire on touch, so without this the board is
+  // unusable on phones and tablets. Runs alongside the desktop handlers
+  // above — a touch device just never fires `dragstart` and a mouse
+  // device never fires `touchstart`, so they don't conflict.
+  attachTouchDragHandlers(card, task.id);
+
   // Click for detail (but not when the user clicks the completion link
-  // — that should open the URL in a new tab instead).
+  // — that should open the URL in a new tab instead). On touch, a click
+  // event still fires after touchend; if a drag picked up we set
+  // `_suppressClick` so we don't open the detail right after dropping.
   card.addEventListener('click', (e) => {
     if (card.classList.contains('dragging')) return;
+    if (card._suppressClick) {
+      card._suppressClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (e.target.closest('.task-completion-link')) return;
     openTaskDetail(task.id);
   });
@@ -8023,6 +8387,313 @@ function attachDropHandlers(zone) {
   });
 }
 
+/* ============================================
+   Touch drag — long-press → drag → drop pipeline that mirrors the
+   HTML5 desktop pipeline above. Needed because iOS/Android don't fire
+   HTML5 drag events on touch, so without this the board is unusable
+   on phones and tablets.
+
+   Pickup:    long-press 350ms with finger still down within 8px of start
+   Cancel:    finger moves >8px before pickup (user is scrolling), or
+              finger lifts before pickup, or the user touches a child
+              control like the urgency dot
+   Active:    a floating "ghost" clone follows the finger; underneath,
+              we resolve `elementFromPoint` to find the drop zone, fire
+              the same drop-indicator/highlight logic the desktop path
+              uses, and auto-scroll when the finger is near a viewport edge
+   Drop:      runs the same handleTaskDrop() the desktop path runs
+============================================ */
+const TOUCH_DRAG = {
+  LONG_PRESS_MS: 350,          // matches iOS native long-press
+  MOVE_CANCEL_PX: 8,           // movement before pickup → treat as scroll
+  EDGE_SCROLL_PX: 60,          // distance from viewport edge that triggers auto-scroll
+  EDGE_SCROLL_SPEED: 12,       // px per animation frame when auto-scrolling
+};
+
+// Module-level state for the in-flight touch drag. Only one drag can be
+// active at a time (a touch session = a single finger here).
+let touchDragState = null;
+
+function attachTouchDragHandlers(card, taskId) {
+  // touchstart: start the long-press timer. Skip if the touch started on
+  // a child control that has its own touch behavior (urgency dot, etc.).
+  card.addEventListener('touchstart', (e) => {
+    // Mirror the desktop behavior where dragstart on the urgency dot is
+    // suppressed — the dot has its own click semantics (cycle urgency).
+    if (e.target.closest('.task-card-urgency-dot')) return;
+    // Ignore multi-touch (pinch zoom, etc.) — only a single-finger
+    // long-press counts as a drag intent.
+    if (e.touches.length !== 1) {
+      cancelTouchDrag();
+      return;
+    }
+
+    const t = e.touches[0];
+    touchDragState = {
+      card,
+      taskId,
+      startX: t.clientX,
+      startY: t.clientY,
+      pickedUp: false,
+      ghost: null,
+      lastZone: null,
+      pressTimer: null,
+      autoScrollRAF: null,
+      autoScrollDir: 0,           // -1 up, 1 down, 0 none
+    };
+
+    // Visual feedback that a long-press is building.
+    card.classList.add('touch-press');
+
+    touchDragState.pressTimer = setTimeout(() => {
+      // The user kept their finger still long enough — promote to drag.
+      if (!touchDragState) return;
+      pickupTouchDrag(t.clientX, t.clientY);
+    }, TOUCH_DRAG.LONG_PRESS_MS);
+  }, { passive: true });
+
+  // touchmove: before pickup, cancel if the user is scrolling. After
+  // pickup, update ghost position and resolve the drop zone.
+  card.addEventListener('touchmove', (e) => {
+    if (!touchDragState) return;
+    const t = e.touches[0];
+    if (!t) return;
+
+    if (!touchDragState.pickedUp) {
+      // Pre-pickup: any meaningful movement means the user is trying to
+      // scroll, not drag — abort so native scroll keeps working.
+      const dx = t.clientX - touchDragState.startX;
+      const dy = t.clientY - touchDragState.startY;
+      if (Math.hypot(dx, dy) > TOUCH_DRAG.MOVE_CANCEL_PX) {
+        cancelTouchDrag();
+      }
+      return;
+    }
+
+    // Active drag: prevent native scroll, move the ghost, update zone state.
+    e.preventDefault();
+    updateTouchDragPosition(t.clientX, t.clientY);
+  }, { passive: false });
+
+  // touchend / touchcancel: finalize (drop) or just clean up.
+  card.addEventListener('touchend', (e) => {
+    if (!touchDragState) return;
+    if (touchDragState.pickedUp) {
+      // Use changedTouches because by touchend, touches[] is empty.
+      const t = e.changedTouches[0];
+      finishTouchDrag(t ? t.clientX : null, t ? t.clientY : null);
+    } else {
+      cancelTouchDrag();
+    }
+  });
+  card.addEventListener('touchcancel', () => {
+    cancelTouchDrag();
+  });
+}
+
+function pickupTouchDrag(clientX, clientY) {
+  if (!touchDragState) return;
+  const { card } = touchDragState;
+  touchDragState.pickedUp = true;
+  card.classList.remove('touch-press');
+  card.classList.add('dragging');           // reuses desktop opacity-0.4 style
+  document.body.classList.add('touch-dragging');
+  // Suppress the synthetic click that fires after touchend so dropping
+  // a card doesn't also open its detail modal.
+  card._suppressClick = true;
+
+  // Haptic feedback — short pulse so the user feels the pickup. Only
+  // present on devices that expose the Vibration API (Android, some
+  // others); iOS Safari ignores it silently, which is fine.
+  if (navigator.vibrate) {
+    try { navigator.vibrate(15); } catch (e) {}
+  }
+
+  // Build the floating ghost from a clone of the original card. Matching
+  // width keeps the visual consistent with the column it came from.
+  const rect = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.classList.remove('dragging', 'touch-press');
+  ghost.classList.add('touch-drag-ghost');
+  ghost.style.width = rect.width + 'px';
+  ghost.style.left = rect.left + 'px';
+  ghost.style.top = rect.top + 'px';
+  // Remember the offset from the touch point to the ghost's top-left so
+  // the ghost stays anchored to the same spot the user grabbed.
+  touchDragState.offsetX = clientX - rect.left;
+  touchDragState.offsetY = clientY - rect.top;
+  document.body.appendChild(ghost);
+  touchDragState.ghost = ghost;
+
+  // Kick off the auto-scroll loop. It runs every frame and is a no-op
+  // unless the finger is near a viewport edge.
+  startAutoScrollLoop();
+
+  // Position once now so the ghost doesn't pop at (rect.left, rect.top)
+  // before the first move.
+  updateTouchDragPosition(clientX, clientY);
+}
+
+function updateTouchDragPosition(clientX, clientY) {
+  if (!touchDragState || !touchDragState.pickedUp) return;
+  // Remember the most recent finger position so the auto-scroll loop
+  // can re-resolve the drop zone after content scrolls under a finger
+  // that's being held still near a viewport edge.
+  touchDragState.lastClientX = clientX;
+  touchDragState.lastClientY = clientY;
+
+  const { ghost } = touchDragState;
+  ghost.style.left = (clientX - touchDragState.offsetX) + 'px';
+  ghost.style.top = (clientY - touchDragState.offsetY) + 'px';
+
+  // Find the drop zone under the finger. The ghost has pointer-events:none
+  // so elementFromPoint sees through it to the column underneath.
+  const under = document.elementFromPoint(clientX, clientY);
+  const zone = under ? under.closest('.col-tasks[data-drop-zone]') : null;
+
+  // Manage drag-over highlight transitions between zones.
+  if (zone !== touchDragState.lastZone) {
+    if (touchDragState.lastZone) {
+      touchDragState.lastZone.classList.remove('drag-over');
+      clearDropIndicator(touchDragState.lastZone);
+    }
+    if (zone) {
+      zone.classList.add('drag-over');
+    }
+    touchDragState.lastZone = zone;
+  }
+
+  if (zone) {
+    // Same indicator logic the desktop path uses — accepts a clientY and
+    // figures out which task to insert before.
+    updateDropIndicator(zone, clientY);
+  }
+
+  // Update auto-scroll direction based on proximity to viewport edges.
+  // The actual scrolling happens in the RAF loop.
+  const vh = window.innerHeight;
+  if (clientY < TOUCH_DRAG.EDGE_SCROLL_PX) {
+    touchDragState.autoScrollDir = -1;
+  } else if (clientY > vh - TOUCH_DRAG.EDGE_SCROLL_PX) {
+    touchDragState.autoScrollDir = 1;
+  } else {
+    touchDragState.autoScrollDir = 0;
+  }
+}
+
+function startAutoScrollLoop() {
+  if (!touchDragState) return;
+  // Track the last known finger position so we can re-resolve the drop
+  // zone after the page scrolls (content moves under a stationary finger).
+  const step = () => {
+    if (!touchDragState || !touchDragState.pickedUp) return;
+    if (touchDragState.autoScrollDir !== 0) {
+      const dir = touchDragState.autoScrollDir;
+      const speed = TOUCH_DRAG.EDGE_SCROLL_SPEED;
+      const page = document.scrollingElement || document.documentElement;
+      const canScrollPage = dir < 0
+        ? page.scrollTop > 0
+        : page.scrollTop + page.clientHeight < page.scrollHeight;
+      let scrolled = false;
+      if (canScrollPage) {
+        const before = page.scrollTop;
+        page.scrollTop += dir * speed;
+        scrolled = page.scrollTop !== before;
+      } else {
+        const col = findVerticalScrollContainer(touchDragState.lastZone);
+        if (col) {
+          const before = col.scrollTop;
+          col.scrollTop += dir * speed;
+          scrolled = col.scrollTop !== before;
+        }
+      }
+      // If we actually scrolled, re-resolve the zone under the finger
+      // so the drop indicator tracks the newly-revealed content. Uses
+      // the last known finger position (touchmove doesn't fire while
+      // the finger is held still).
+      if (scrolled && touchDragState.lastClientX != null) {
+        updateTouchDragPosition(touchDragState.lastClientX, touchDragState.lastClientY);
+      }
+    }
+    touchDragState.autoScrollRAF = requestAnimationFrame(step);
+  };
+  touchDragState.autoScrollRAF = requestAnimationFrame(step);
+}
+
+function findVerticalScrollContainer(start) {
+  let node = start;
+  while (node && node !== document.body) {
+    const cs = getComputedStyle(node);
+    if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+async function finishTouchDrag(clientX, clientY) {
+  // Snapshot the drag state before teardown so async handleTaskDrop has
+  // what it needs. Named `snapshot` (not `state`) to avoid shadowing the
+  // global app state object.
+  const snapshot = touchDragState;
+  if (!snapshot || !snapshot.pickedUp) {
+    cancelTouchDrag();
+    return;
+  }
+
+  const zone = snapshot.lastZone;
+  const taskId = snapshot.taskId;
+
+  // Tear down the visual state first so the UI is responsive even if
+  // the Firestore write takes a moment.
+  teardownTouchDragVisuals();
+
+  if (zone && clientY != null) {
+    const dropType = zone.dataset.dropZone;
+    const userId = zone.dataset.userId;
+    const beforeTaskId = computeDropTargetTaskId(zone, clientY, taskId);
+    try {
+      await handleTaskDrop(taskId, dropType, userId, beforeTaskId);
+    } catch (err) {
+      console.warn('touch drop failed', err);
+    }
+  }
+  // Drop outside any zone = cancel (just teardown, no write).
+
+  touchDragState = null;
+}
+
+function cancelTouchDrag() {
+  teardownTouchDragVisuals();
+  touchDragState = null;
+}
+
+function teardownTouchDragVisuals() {
+  if (!touchDragState) return;
+  if (touchDragState.pressTimer) {
+    clearTimeout(touchDragState.pressTimer);
+    touchDragState.pressTimer = null;
+  }
+  if (touchDragState.autoScrollRAF) {
+    cancelAnimationFrame(touchDragState.autoScrollRAF);
+    touchDragState.autoScrollRAF = null;
+  }
+  if (touchDragState.card) {
+    touchDragState.card.classList.remove('touch-press', 'dragging');
+  }
+  if (touchDragState.ghost) {
+    touchDragState.ghost.remove();
+    touchDragState.ghost = null;
+  }
+  if (touchDragState.lastZone) {
+    touchDragState.lastZone.classList.remove('drag-over');
+    clearDropIndicator(touchDragState.lastZone);
+    touchDragState.lastZone = null;
+  }
+  document.body.classList.remove('touch-dragging');
+}
+
 // Find the task ID we should insert BEFORE (i.e., the card just below
 // the cursor). Returns null if the cursor is below all cards (insert at
 // the end). Excludes the task being dragged itself so the algorithm
@@ -8068,6 +8739,9 @@ async function handleTaskDrop(taskId, dropType, userId, beforeTaskId) {
   const updates = {};
   let activityAction = null;
   let activityDetails = {};
+  // Set by the 'member' drop branch when float-collapse forces a
+  // tier-wide renumber; applied alongside the main task update below.
+  let renumberWrites = null;
 
   if (dropType === 'member') {
     // Build the column's other tasks (excluding the dragged one) so we can
@@ -8088,9 +8762,26 @@ async function handleTaskDrop(taskId, dropType, userId, beforeTaskId) {
     // own urgency tier. If the user dragged into a different tier, we
     // snap to the boundary of the dragged card's existing tier (urgency
     // is a hard barrier).
+    //
+    // computeManualOrderForDrop may return either a plain number (the
+    // common case — assign as the dragged card's manualOrder) or a
+    // { kind: 'renumber', writes: [...] } object indicating the float
+    // midpoint between neighbors has collapsed. In the renumber case we
+    // pull the dragged card's value from the writes and apply the rest
+    // to its tier-mates after the main task update lands.
     if (isReorderInPlace || (!isReorderInPlace && task.assigneeId !== userId)) {
-      const newOrder = computeManualOrderForDrop(task, colTasks, beforeTaskId);
-      if (newOrder !== null) updates.manualOrder = newOrder;
+      const result = computeManualOrderForDrop(task, colTasks, beforeTaskId);
+      if (result !== null) {
+        if (typeof result === 'object' && result.kind === 'renumber') {
+          // Pull the dragged card's own new order out of the writes;
+          // the remaining entries are sibling renumbers to apply after.
+          const selfEntry = result.writes.find(w => w.self);
+          if (selfEntry) updates.manualOrder = selfEntry.manualOrder;
+          renumberWrites = result.writes.filter(w => !w.self);
+        } else {
+          updates.manualOrder = result;
+        }
+      }
     }
 
     if (!sameAssignee) {
@@ -8155,6 +8846,16 @@ async function handleTaskDrop(taskId, dropType, userId, beforeTaskId) {
   if (Object.keys(updates).length === 0) return;
 
   await db.collection('tasks').doc(taskId).update(updates);
+  // If the float gap between neighbors collapsed, also renumber the
+  // tier-mates onto fresh evenly-spaced integers. Fired-and-forget per
+  // task — they're independent updates and a failure on one shouldn't
+  // block the others. (One-off cost, only when collapse triggers.)
+  if (renumberWrites && renumberWrites.length) {
+    renumberWrites.forEach(w => {
+      db.collection('tasks').doc(w.id).update({ manualOrder: w.manualOrder })
+        .catch(err => console.warn('renumber update failed for', w.id, err));
+    });
+  }
   if (activityAction) {
     await logActivity(taskId, activityAction, activityDetails);
   }
@@ -8166,8 +8867,14 @@ async function handleTaskDrop(taskId, dropType, userId, beforeTaskId) {
 // edge of the dragged card's own tier (top of its tier if it was
 // dragged toward higher-urgency tiers; bottom if toward lower).
 //
-// Returns a number to write to updates.manualOrder, or null if the
-// drop position is unchanged (no-op — leave manualOrder as it was).
+// Returns one of:
+//   - null   → drop position is unchanged (no-op).
+//   - number → assign as updates.manualOrder for the dragged card.
+//   - { kind: 'renumber', writes: [{id, manualOrder}, ...] } → the gap
+//     between neighbors has collapsed (too many midpoints in a row, so
+//     (a+b)/2 === a in float). Renumber the dragged card's whole tier
+//     onto integers, with the dragged card inserted at snappedIdx.
+//     handleTaskDrop applies these writes alongside the normal updates.
 function computeManualOrderForDrop(draggedTask, otherTasks, beforeTaskId) {
   const tier = URGENCY_RANK[draggedTask.urgency] ?? 3;
 
@@ -8230,14 +8937,58 @@ function computeManualOrderForDrop(draggedTask, otherTasks, beforeTaskId) {
   const aboveOrd = snappedIdx > 0 ? orderOf(ordered[snappedIdx - 1]) : null;
   const belowOrd = snappedIdx < ordered.length ? orderOf(ordered[snappedIdx]) : null;
 
+  // Detect float-collapse: if the two neighbors are so close that the
+  // midpoint can't be distinguished from either endpoint, repeatedly
+  // dropping here would produce identical manualOrder values and the
+  // column would render in nondeterministic order. Renumber the dragged
+  // card's tier onto fresh integers (spaced by 1000 so future midpoints
+  // have plenty of room) and place the dragged card at snappedIdx.
+  if (aboveOrd !== null && belowOrd !== null) {
+    const mid = (aboveOrd + belowOrd) / 2;
+    if (mid === aboveOrd || mid === belowOrd) {
+      // Walk the dragged card's tier in `ordered`, insert the dragged
+      // card at the position within that tier matching snappedIdx, and
+      // hand back a write list. handleTaskDrop will fire these along
+      // with the normal task update.
+      const tierMembers = [];
+      for (let i = 0; i < ordered.length; i++) {
+        if ((URGENCY_RANK[ordered[i].urgency] ?? 3) === tier) {
+          tierMembers.push({ task: ordered[i], idx: i });
+        }
+      }
+      // Position within the tier where the dragged card lands: count
+      // how many tier members sit at idx < snappedIdx.
+      const insertAt = tierMembers.filter(m => m.idx < snappedIdx).length;
+      const writes = [];
+      const STEP = 1000;
+      let pos = 0;
+      for (let i = 0; i < tierMembers.length + 1; i++) {
+        if (i === insertAt) {
+          // Slot for the dragged card — its update is returned via the
+          // top-level manualOrder field, not in `writes` (handleTaskDrop
+          // already sets updates.manualOrder from the function return).
+          pos += STEP;
+          // Stash the dragged-card value at the end of writes so the
+          // caller can pull it; tag the entry with `self: true`.
+          writes.push({ id: draggedTask.id, manualOrder: pos, self: true });
+        } else {
+          const m = tierMembers[i < insertAt ? i : i - 1];
+          if (!m) break;
+          pos += STEP;
+          writes.push({ id: m.task.id, manualOrder: pos });
+        }
+      }
+      return { kind: 'renumber', writes };
+    }
+    return mid;
+  }
+
   if (aboveOrd === null && belowOrd === null) {
     return 0;                    // empty column
   } else if (aboveOrd === null) {
     return belowOrd - 1;         // landing at the very top
-  } else if (belowOrd === null) {
-    return aboveOrd + 1;          // landing at the very bottom
   } else {
-    return (aboveOrd + belowOrd) / 2;  // midpoint
+    return aboveOrd + 1;         // landing at the very bottom (belowOrd === null)
   }
 }
 
@@ -8681,7 +9432,7 @@ function renderOverviewTab() {
         <div style="background: var(--bg-3); padding: 12px 14px; border-radius: 12px; margin-bottom: 14px;">
           <div style="font-weight: 600; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px;">✅ What was done</div>
           ${note ? `<div style="font-size: 13px; color: var(--ink); white-space: pre-wrap; margin-bottom: 6px;">${escapeHtml(note)}</div>` : ''}
-          ${url ? `<div style="font-size: 12px;">🔗 <a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color: var(--pink-deep); word-break: break-all;">${escapeHtml(url)}</a></div>` : ''}
+          ${url ? `<div style="font-size: 12px;">🔗 <a href="${escapeHtml(safeHref(url))}" target="_blank" rel="noopener" style="color: var(--pink-deep); word-break: break-all;">${escapeHtml(url)}</a></div>` : ''}
         </div>
       `;
     }
@@ -9146,7 +9897,7 @@ function renderFilesTab() {
             <div class="attach-item ${a.isRecording ? 'is-recording' : ''}">
               <button class="attach-remove" data-idx="${i}" title="Remove">✕</button>
               ${recBadge}
-              <a href="${escapeHtml(a.url)}" target="_blank" rel="noopener" style="text-decoration: none; color: inherit; display: block;">
+              <a href="${escapeHtml(safeHref(a.url))}" target="_blank" rel="noopener" style="text-decoration: none; color: inherit; display: block;">
                 ${visual}
                 <div class="attach-name" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}</div>
                 <div class="attach-size">${sizeStr}</div>
@@ -11310,7 +12061,7 @@ function openAttContactHomework() {
     bodyEl.innerHTML = `
       <p>This week's homework PDF for <strong>Absolute Beginner Week ${payload.week}</strong>:</p>
       <div class="att-homework-link">
-        <a href="${escapeHtml(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
+        <a href="${escapeHtml(safeHref(hw.url))}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
       </div>
       <button class="btn-action secondary" id="attHomeworkCopyBtn">📋 Copy Link</button>
     `;
@@ -11325,7 +12076,7 @@ function openAttContactHomework() {
     bodyEl.innerHTML = `
       <p>For ${escapeHtml(hw.day)} Novice classes, this week's homework lives in the Discord chat:</p>
       <div class="att-homework-link">
-        <a href="${escapeHtml(hw.url)}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
+        <a href="${escapeHtml(safeHref(hw.url))}" target="_blank" rel="noopener">${escapeHtml(hw.url)}</a>
       </div>
       <p style="font-size: 12px; color: var(--ink-light);">If the homework isn't in the chat, please ask Mr. Calvin.</p>
       <button class="btn-action secondary" id="attHomeworkCopyBtn">📋 Copy Link</button>
@@ -12868,21 +13619,27 @@ async function sendChatMessage() {
   if (!state.activeTeamId) return;
   if (state.chatChannel === 'workers' && !canAccessWorkersChannel()) return;
 
+  // Pin the team + channel at the moment of send. If the user switches
+  // channels or teams while the await is in flight, the message still
+  // lands where they typed it (and saveChatLastSeen marks the right one).
+  const teamId = state.activeTeamId;
+  const channel = state.chatChannel;
+
   const sendBtn = el('chatSendBtn');
   sendBtn.disabled = true;
 
   try {
-    await db.collection('chats').doc(state.activeTeamId).collection(state.chatChannel).add({
+    await db.collection('chats').doc(teamId).collection(channel).add({
       text,
       userId: state.user.uid,
       userName: state.profile.name,
-      teamId: state.activeTeamId,
-      channel: state.chatChannel,
+      teamId: teamId,
+      channel: channel,
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       reactions: {},
     });
     input.value = '';
-    saveChatLastSeen(state.chatChannel);
+    saveChatLastSeen(channel);
   } catch (err) {
     alert('Could not send: ' + err.message);
   } finally {
