@@ -4,6 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KoreanLearnin Teams</title>
+
+<!-- PWA setup: manifest + iOS-specific meta tags. iOS requires
+     apple-mobile-web-app-capable + a touch icon; Android picks up the
+     manifest. The theme-color tints the browser chrome on Android and
+     the status bar inside an installed iOS PWA. -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#ff8cb3" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Teams" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -6870,6 +6884,26 @@
         </div>
       </div>
 
+      <!-- Push notifications (per-device) — sends pushes to your phone/tablet
+           home-screen even when the app is closed. Status, enable/disable
+           toggle, and a "test push" button. Populated by renderPushSettings(). -->
+      <div class="settings-section" id="pushSection">
+        <h4>📱 Push Notifications</h4>
+        <div class="asset-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="asset-preview" id="pushStatusIcon">📵</div>
+            <div class="asset-info" style="flex: 1;">
+              <div class="asset-label" id="pushStatusLabel">Checking…</div>
+              <div class="asset-status" id="pushStatusDetail">—</div>
+            </div>
+          </div>
+          <div id="pushActionsRow" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <!-- Buttons injected by renderPushSettings() -->
+          </div>
+          <div id="pushHelpText" style="font-size: 11px; color: var(--ink-light); margin-top: 4px; line-height: 1.4;"></div>
+        </div>
+      </div>
+
       <div class="settings-section" id="pokeLogSection" style="display:none;">
         <h4>👋 Poke Log</h4>
         <div style="display:flex; gap:6px; margin-bottom:10px;" id="pokeLogFilters">
@@ -6910,6 +6944,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<!-- Firebase Cloud Messaging — for push notifications. Loads alongside the
+     other compat SDKs; the service worker (firebase-messaging-sw.js) handles
+     background pushes, while this module handles foreground delivery and
+     token registration. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 
 <!-- YouTube IFrame API (for music player) -->
 <script src="https://www.youtube.com/iframe_api"></script>
@@ -6937,6 +6977,34 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
+// FCM messaging instance. Some browsers (older Firefox, Safari pre-16.4)
+// don't support push, in which case getMessaging throws — guard with a
+// support check. The actual permission/token logic runs later, gated on
+// pushSupported below.
+let messaging = null;
+let pushSupported = false;
+try {
+  if ('serviceWorker' in navigator
+      && 'PushManager' in window
+      && 'Notification' in window
+      && firebase.messaging.isSupported && firebase.messaging.isSupported()) {
+    messaging = firebase.messaging();
+    pushSupported = true;
+  }
+} catch (e) {
+  console.warn('Firebase messaging not supported in this browser:', e.message);
+}
+
+// Callable Cloud Functions handle (us-central1 by default; pass a region
+// string here if your functions live elsewhere — e.g. 'us-east1').
+const functions = firebase.app().functions();
+
+// VAPID public key from Firebase Console → Project Settings → Cloud
+// Messaging → Web configuration → "Web Push certificates". You generate
+// this once per project; the same key works on every device.
+// REPLACE THIS PLACEHOLDER before deploying. Until it's set, registration
+// will fail and the in-app status will show the reason.
+const VAPID_PUBLIC_KEY = 'REPLACE_WITH_VAPID_KEY_FROM_FIREBASE_CONSOLE';
 
 // Secondary Firebase app pointing at the korean-ta-evaluator project, where
 // scheduler_classes, scheduler_students, and scheduler_teachers live.
@@ -7572,6 +7640,311 @@ function dismissToast(toast) {
   }, 220);
 }
 
+/* ============================================
+   Push notifications (FCM / Web Push)
+   - Service worker is firebase-messaging-sw.js at /teams/
+   - Tokens are stored under users/{uid}/fcmTokens/{token} so Cloud
+     Functions can fan out to all of a user's devices.
+   - On iOS, push requires the user to first "Add to Home Screen" and
+     OPEN the installed PWA — Safari tab pushes don't work.
+============================================ */
+
+const pushState = {
+  // 'unknown' before we've checked, 'unsupported' on old browsers,
+  // 'unregistered' if the user hasn't enabled push yet,
+  // 'denied' if they actively said no,
+  // 'enabled' if we have a current token saved.
+  status: 'unknown',
+  token: null,
+  error: null,
+  swRegistration: null,
+};
+
+// Per-platform detection used to gate UI hints.
+const PUSH_UA = (() => {
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  // navigator.standalone is iOS-specific; matches display-mode picks up
+  // Android + desktop PWAs.
+  const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                       || window.navigator.standalone === true;
+  return { isIOS, isStandalone };
+})();
+
+// Register the service worker as early as possible — Firebase Messaging
+// will reuse this registration when getToken is called.
+async function registerPushServiceWorker() {
+  if (!pushSupported) return null;
+  if (pushState.swRegistration) return pushState.swRegistration;
+  try {
+    // The scope ('/teams/') must match where this site is hosted on the
+    // GitHub Pages repo. If you change the repo name, update both this
+    // path AND the manifest.json's "scope" / "start_url".
+    const reg = await navigator.serviceWorker.register('/teams/firebase-messaging-sw.js', {
+      scope: '/teams/',
+    });
+    pushState.swRegistration = reg;
+    return reg;
+  } catch (err) {
+    console.error('Service worker registration failed:', err);
+    pushState.error = 'Service worker failed to register: ' + err.message;
+    pushState.status = 'unsupported';
+    return null;
+  }
+}
+
+// Reflect current state without prompting. Called on every page load to
+// figure out whether the "Enable" button should show "Enable" or
+// "Disable" (or be hidden entirely on unsupported browsers).
+async function refreshPushStatus() {
+  if (!pushSupported) {
+    pushState.status = 'unsupported';
+    return;
+  }
+  // iOS only allows push from a PWA added to home screen. If they're in
+  // Safari, the API will reject getToken — surface a hint instead of
+  // letting them tap a button that can't work.
+  if (PUSH_UA.isIOS && !PUSH_UA.isStandalone) {
+    pushState.status = 'ios-needs-install';
+    return;
+  }
+  const perm = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
+  if (perm === 'denied') {
+    pushState.status = 'denied';
+    return;
+  }
+  // If we have a saved token for this user that matches the current
+  // browser registration, we're enabled. We don't re-verify with FCM on
+  // every load (expensive); a stale token will simply fail to deliver
+  // and get cleaned up by the cloud-side onTokenDelete.
+  if (state.user) {
+    try {
+      const snap = await db.collection('users').doc(state.user.uid)
+        .collection('fcmTokens').limit(1).get();
+      if (!snap.empty) {
+        pushState.token = snap.docs[0].data().token;
+        pushState.status = 'enabled';
+        return;
+      }
+    } catch (e) {}
+  }
+  pushState.status = perm === 'granted' ? 'unregistered' : 'unregistered';
+}
+
+// Prompt for permission + register a token + save it to Firestore.
+async function enablePushNotifications() {
+  if (!pushSupported) {
+    showToast({
+      title: 'Push not supported',
+      text: 'Your browser doesn\'t support push notifications.',
+      kind: 'warning',
+    });
+    return false;
+  }
+  if (PUSH_UA.isIOS && !PUSH_UA.isStandalone) {
+    showToast({
+      title: 'iOS: install first',
+      text: 'Tap Share → "Add to Home Screen", then open the installed app and try again.',
+      kind: 'warning',
+      durationMs: 9000,
+    });
+    return false;
+  }
+  if (VAPID_PUBLIC_KEY === 'REPLACE_WITH_VAPID_KEY_FROM_FIREBASE_CONSOLE') {
+    showToast({
+      title: 'Setup incomplete',
+      text: 'VAPID key not configured. See deployment notes.',
+      kind: 'danger',
+      durationMs: 8000,
+    });
+    return false;
+  }
+  if (!state.user) {
+    showToast({
+      title: 'Sign in first',
+      text: 'Sign in before enabling notifications so we can save the token to your account.',
+      kind: 'warning',
+    });
+    return false;
+  }
+
+  try {
+    const reg = await registerPushServiceWorker();
+    if (!reg) return false;
+
+    // Request permission. Browsers REQUIRE this be called in direct
+    // response to a user gesture (button click) — calling it on page
+    // load is silently denied on Safari.
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      pushState.status = perm === 'denied' ? 'denied' : 'unregistered';
+      if (perm === 'denied') {
+        showToast({
+          title: 'Permission denied',
+          text: 'You blocked notifications. Re-enable them in your browser settings.',
+          kind: 'warning',
+          durationMs: 7000,
+        });
+      }
+      return false;
+    }
+
+    // getToken returns the FCM registration token for this device+SW
+    // combo. Same device + same SW = same token (idempotent). Pass our
+    // already-registered SW so FCM doesn't try to register its own.
+    const token = await messaging.getToken({
+      vapidKey: VAPID_PUBLIC_KEY,
+      serviceWorkerRegistration: reg,
+    });
+    if (!token) {
+      showToast({
+        title: 'Could not get push token',
+        text: 'No registration token returned. Try again.',
+        kind: 'danger',
+      });
+      return false;
+    }
+
+    // Save under users/{uid}/fcmTokens/{token}. Using the token itself
+    // as the doc ID means multiple devices = multiple docs naturally,
+    // and re-enabling on the same device overwrites cleanly instead of
+    // piling up duplicates.
+    await db.collection('users').doc(state.user.uid)
+      .collection('fcmTokens').doc(token).set({
+        token,
+        platform: PUSH_UA.isIOS ? 'ios' : (/Android/i.test(navigator.userAgent) ? 'android' : 'web'),
+        userAgent: (navigator.userAgent || '').slice(0, 256),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+    pushState.token = token;
+    pushState.status = 'enabled';
+    pushState.error = null;
+
+    // Foreground message handler — when the app IS open and visible, FCM
+    // doesn't show a system notification; it calls this instead. We
+    // surface it as the in-app toast we already have.
+    messaging.onMessage((payload) => {
+      const notif = payload.notification || {};
+      const data = payload.data || {};
+      showToast({
+        title: notif.title || 'Notification',
+        text: notif.body || '',
+        kind: data.kind === 'task_approved' ? 'morale'
+            : data.kind === 'class_reminder' ? 'warning'
+            : data.kind === 'task_sent_back' ? 'danger'
+            : 'default',
+        taskId: data.taskId || null,
+      });
+    });
+
+    showToast({
+      title: '🔔 Notifications enabled',
+      text: 'You\'ll get push notifications on this device.',
+      kind: 'morale',
+    });
+    return true;
+  } catch (err) {
+    console.error('enablePushNotifications failed:', err);
+    pushState.error = err.message || String(err);
+    showToast({
+      title: 'Could not enable',
+      text: err.message || 'Unknown error',
+      kind: 'danger',
+      durationMs: 7000,
+    });
+    return false;
+  }
+}
+
+// Revoke the token on this device (deletes Firestore doc + tells FCM).
+async function disablePushNotifications() {
+  if (!pushSupported) return;
+  if (!state.user) return;
+  try {
+    const token = pushState.token;
+    if (token) {
+      try { await messaging.deleteToken(); } catch (e) {}
+      await db.collection('users').doc(state.user.uid)
+        .collection('fcmTokens').doc(token).delete().catch(() => {});
+    }
+    pushState.token = null;
+    pushState.status = 'unregistered';
+    showToast({
+      title: 'Notifications disabled',
+      text: 'You won\'t get pushes on this device anymore.',
+      kind: 'default',
+    });
+  } catch (err) {
+    console.error('disablePushNotifications failed:', err);
+  }
+}
+
+// Heartbeat: every time the app loads while signed in, bump the token's
+// lastSeenAt so cleanupStaleTokens doesn't reap it. Cheap, idempotent.
+async function touchPushTokenHeartbeat() {
+  if (!state.user || !pushState.token) return;
+  try {
+    await db.collection('users').doc(state.user.uid)
+      .collection('fcmTokens').doc(pushState.token).set({
+        lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+  } catch (e) {}
+}
+
+// Listen for messages from the service worker (clicking a notification
+// posts one). When we receive 'notification-click' with a taskId, open
+// that task's detail modal.
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    const data = event.data || {};
+    if (data.type === 'notification-click' && data.taskId) {
+      // Defer briefly so the app has time to be in its "ready" state.
+      setTimeout(() => {
+        const task = state.tasks.find(t => t.id === data.taskId);
+        if (task) openTaskDetail(data.taskId);
+        else findAndOpenTaskAcrossTeams(data.taskId);
+      }, 300);
+    }
+  });
+}
+
+// Send a test push to my own devices via the Cloud Function. Used by the
+// "🧪 Test push" button in Settings.
+async function sendTestPushToSelf() {
+  if (!state.user) {
+    alert('Sign in first.');
+    return;
+  }
+  try {
+    const callable = functions.httpsCallable('sendTestPush');
+    const result = await callable({});
+    const r = result.data || {};
+    if (r.success) {
+      showToast({
+        title: '🧪 Test push sent',
+        text: r.message || `Sent to ${r.successCount} device(s).`,
+        kind: 'morale',
+      });
+    } else {
+      showToast({
+        title: 'Test push failed',
+        text: r.message || 'Unknown reason. Check function logs.',
+        kind: 'danger',
+        durationMs: 7000,
+      });
+    }
+  } catch (err) {
+    console.error('sendTestPushToSelf failed:', err);
+    showToast({
+      title: 'Test push error',
+      text: err.message || 'Could not reach Cloud Function.',
+      kind: 'danger',
+    });
+  }
+}
+
 /* ---- Notification history ---- */
 
 const NOTIF_LIMIT = 50;
@@ -8084,6 +8457,35 @@ auth.onAuthStateChanged(async (user) => {
 
   show('app');
   hide('loadingScreen');
+
+  // Push notifications: kick off SW registration in the background and
+  // bring our status into sync with what's already stored for this user.
+  // Permission prompting is gated on a button click, not done here.
+  registerPushServiceWorker().catch(() => {});
+  refreshPushStatus().then(() => {
+    // If we already have a token saved, bump its lastSeenAt and also
+    // re-attach the foreground message handler so toasts show.
+    if (pushState.status === 'enabled' && messaging) {
+      touchPushTokenHeartbeat();
+      try {
+        messaging.onMessage((payload) => {
+          const notif = payload.notification || {};
+          const data = payload.data || {};
+          showToast({
+            title: notif.title || 'Notification',
+            text: notif.body || '',
+            kind: data.kind === 'task_approved' ? 'morale'
+                : data.kind === 'class_reminder' ? 'warning'
+                : data.kind === 'task_sent_back' ? 'danger'
+                : 'default',
+            taskId: data.taskId || null,
+          });
+        });
+      } catch (e) {}
+    }
+    // Refresh settings UI if it happens to be open.
+    if (!el('settingsModal').classList.contains('hidden')) renderAppSettings();
+  });
 });
 
 /* ============================================
@@ -12174,6 +12576,39 @@ function occurrenceKey(programId, dateStr, classId) {
   return `${programId}__${dateStr}__${classId}`;
 }
 
+// Write a reminder-outbox doc so the Cloud Function fans this out to the
+// assignee's other devices via FCM. Uses .set() with a check: if a doc
+// with the same occKey already exists, it means another device beat us
+// to it and we skip. The Cloud Function deletes the doc after a
+// successful send, so subsequent firings of the same occKey from the
+// same device won't pile up either (de-dup already happens in the in-app
+// remindersFired set).
+async function writeReminderOutbox(payload) {
+  if (!payload || !payload.occKey || !payload.assigneeId) return;
+  try {
+    // Strip undefined values — Firestore rejects them inside .set().
+    const data = {
+      occKey: payload.occKey,
+      assigneeId: payload.assigneeId,
+      type: payload.type || 'reminder',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    if (payload.teacherName) data.teacherName = payload.teacherName;
+    if (payload.channelUrl) data.channelUrl = payload.channelUrl;
+    if (typeof payload.absentCount === 'number') data.absentCount = payload.absentCount;
+    if (typeof payload.studentCount === 'number') data.studentCount = payload.studentCount;
+    // Use create() semantics by treating "doc exists" as success-noop.
+    const ref = db.collection('reminder_outbox').doc(payload.occKey);
+    const existing = await ref.get();
+    if (existing.exists) return; // another device already wrote it
+    await ref.set(data);
+  } catch (err) {
+    // Non-fatal: in-app popup still shows; we just don't fan out a push
+    // to other devices for this occurrence.
+    console.warn('writeReminderOutbox failed:', err.message);
+  }
+}
+
 // For each active program assigned to me, scan today + tomorrow's NY-local
 // classes and figure out which ones should be firing now (target time was
 // REMINDER_LEAD_MIN before class start, fire window = REMINDER_LATE_WINDOW_MIN).
@@ -12342,6 +12777,20 @@ function buildReminderMessage({ teacherName, channelUrl, studentDiscords }) {
 function showReminderPopup(reminder) {
   // Stash so the engine doesn't pile up another popup on top.
   state.pendingReminder = reminder;
+
+  // Fan-out to other devices via FCM. Skip in test mode (test pushes
+  // would clutter Calvin's phone). Idempotent via the .create() guard
+  // inside writeReminderOutbox — if another device wrote this occKey's
+  // doc first, ours fails silently.
+  if (!reminder.testMode) {
+    writeReminderOutbox({
+      occKey: reminder.occKey,
+      assigneeId: state.user && state.user.uid,
+      type: 'class_10min_before',
+      teacherName: reminder.teacherName,
+      channelUrl: reminder.channelUrl,
+    });
+  }
 
   const message = buildReminderMessage(reminder);
   el('reminderPopupTeacher').textContent = reminder.teacherName;
@@ -12777,6 +13226,16 @@ function showAttendanceContactPopup(payload) {
     contactedText: false,
   }));
 
+  // Fan out to other devices via FCM — see note in showReminderPopup.
+  if (!payload.testMode) {
+    writeReminderOutbox({
+      occKey: 'att__' + payload.occKey,
+      assigneeId: state.user && state.user.uid,
+      type: 'class_end_attendance_contact',
+      absentCount: payload.absentStudents.length,
+    });
+  }
+
   // Render the info-view first.
   renderAttContactInfoView();
   show('attContactModal');
@@ -13068,6 +13527,16 @@ function showProgramContactPopup(payload) {
     contactedDiscord: false,
     contactedText: false,
   }));
+
+  // Fan out to other devices via FCM — see note in showReminderPopup.
+  if (!payload.testMode) {
+    writeReminderOutbox({
+      occKey: 'eop__' + payload.occKey,
+      assigneeId: state.user && state.user.uid,
+      type: 'class_end_program_contact',
+      studentCount: payload.students.length,
+    });
+  }
 
   renderProgContactInfoView();
   show('progContactModal');
@@ -14070,6 +14539,116 @@ function renderAppSettings() {
     state.pokeSoundAudio = null;
     playPokeSound();
   };
+
+  // Push notifications panel — always rendered, gates itself by browser
+  // capability and current permission state.
+  renderPushSettings();
+}
+
+function renderPushSettings() {
+  const icon = el('pushStatusIcon');
+  const label = el('pushStatusLabel');
+  const detail = el('pushStatusDetail');
+  const actions = el('pushActionsRow');
+  const help = el('pushHelpText');
+  if (!icon || !label || !detail || !actions || !help) return;
+
+  // Re-check status synchronously from what we know. (refreshPushStatus
+  // is the async source of truth; this just renders the latest.)
+  const status = pushState.status;
+  const isVapidSet = VAPID_PUBLIC_KEY !== 'REPLACE_WITH_VAPID_KEY_FROM_FIREBASE_CONSOLE';
+  let buttonsHtml = '';
+  let helpHtml = '';
+
+  if (!isVapidSet) {
+    icon.textContent = '⚠️';
+    label.textContent = 'Setup incomplete';
+    detail.textContent = 'VAPID key not configured by the admin yet.';
+    helpHtml = 'Calvin needs to paste the Firebase Web Push certificate (VAPID key) into the source. Until then, push notifications can\'t be enabled.';
+  } else if (status === 'unsupported') {
+    icon.textContent = '🚫';
+    label.textContent = 'Not supported';
+    detail.textContent = 'This browser doesn\'t support push notifications.';
+    helpHtml = 'Try Chrome, Edge, or Firefox on desktop. On iPhone/iPad, install the app to your home screen and open it from there.';
+  } else if (status === 'ios-needs-install') {
+    icon.textContent = '📲';
+    label.textContent = 'Install to home screen first';
+    detail.textContent = 'iOS requires you to install the app before allowing notifications.';
+    helpHtml = 'Tap the Share button (square with arrow up) at the bottom of Safari, then "Add to Home Screen". Open the installed app and come back to this screen.';
+  } else if (status === 'denied') {
+    icon.textContent = '🔕';
+    label.textContent = 'Permission denied';
+    detail.textContent = 'You previously blocked notifications.';
+    helpHtml = 'Re-enable them in your browser settings: tap the lock icon next to the URL, find "Notifications", and switch to "Allow".';
+  } else if (status === 'enabled') {
+    icon.textContent = '🔔';
+    label.textContent = 'Enabled on this device';
+    detail.textContent = 'You\'ll get pushes when the app is closed.';
+    buttonsHtml = `
+      <button class="btn-action secondary" id="pushTestBtn" style="padding:6px 12px;font-size:12px;">🧪 Test Push</button>
+      <button class="btn-action secondary" id="pushDisableBtn" style="padding:6px 12px;font-size:12px;">Disable on this device</button>
+    `;
+    helpHtml = 'You\'ll receive: task assignments, send-backs, approvals (teamwide), pokes, and class reminders. Each device needs to enable separately.';
+  } else {
+    // unregistered / unknown / default
+    icon.textContent = '📵';
+    label.textContent = 'Notifications off';
+    detail.textContent = 'Tap to enable on this device.';
+    buttonsHtml = `<button class="btn-action primary" id="pushEnableBtn" style="padding:8px 18px;font-size:13px;">🔔 Enable Notifications</button>`;
+    if (PUSH_UA.isIOS && PUSH_UA.isStandalone) {
+      helpHtml = 'You\'re running the installed app — perfect. Tap Enable and allow the prompt.';
+    } else if (PUSH_UA.isIOS) {
+      helpHtml = 'Tip: for iOS to deliver notifications when the tab is closed, install the app to home screen first.';
+    } else {
+      helpHtml = 'Each device needs to be enabled separately. After tapping enable, your browser will ask for permission.';
+    }
+  }
+
+  actions.innerHTML = buttonsHtml;
+  help.textContent = helpHtml;
+
+  // Wire buttons (innerHTML wipes any previous handlers — re-bind each render).
+  const enableBtn = el('pushEnableBtn');
+  if (enableBtn) {
+    enableBtn.onclick = async () => {
+      enableBtn.disabled = true;
+      enableBtn.textContent = 'Working…';
+      try {
+        await enablePushNotifications();
+      } finally {
+        // Re-render with new status (success → 'enabled' branch; failure → unchanged).
+        await refreshPushStatus();
+        renderPushSettings();
+      }
+    };
+  }
+  const disableBtn = el('pushDisableBtn');
+  if (disableBtn) {
+    disableBtn.onclick = async () => {
+      if (!confirm('Stop receiving push notifications on this device?')) return;
+      disableBtn.disabled = true;
+      try {
+        await disablePushNotifications();
+      } finally {
+        await refreshPushStatus();
+        renderPushSettings();
+      }
+    };
+  }
+  const testBtn = el('pushTestBtn');
+  if (testBtn) {
+    testBtn.onclick = async () => {
+      testBtn.disabled = true;
+      const orig = testBtn.textContent;
+      testBtn.textContent = 'Sending…';
+      try {
+        await sendTestPushToSelf();
+      } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = orig;
+      }
+    };
+  }
 }
 
 async function handleBellAssetUpload(kind, file) {
