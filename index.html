@@ -7846,15 +7846,6 @@ async function enablePushNotifications() {
     });
     return false;
   }
-  if (VAPID_PUBLIC_KEY === 'REPLACE_WITH_VAPID_KEY_FROM_FIREBASE_CONSOLE') {
-    showToast({
-      title: 'Setup incomplete',
-      text: 'VAPID key not configured. See deployment notes.',
-      kind: 'danger',
-      durationMs: 8000,
-    });
-    return false;
-  }
   if (!state.user) {
     showToast({
       title: 'Sign in first',
@@ -12782,6 +12773,11 @@ async function writeReminderOutbox(payload) {
     if (payload.channelUrl) data.channelUrl = payload.channelUrl;
     if (typeof payload.absentCount === 'number') data.absentCount = payload.absentCount;
     if (typeof payload.studentCount === 'number') data.studentCount = payload.studentCount;
+    if (typeof payload.lateCount === 'number') data.lateCount = payload.lateCount;
+    // classLevel + classTime power the push-notification titles on phones.
+    // The Cloud Function formats e.g. "Novice 6:30 PM" from these.
+    if (payload.classLevel) data.classLevel = payload.classLevel;
+    if (payload.classTime) data.classTime = payload.classTime;
     // Use create() semantics by treating "doc exists" as success-noop.
     const ref = db.collection('reminder_outbox').doc(payload.occKey);
     const existing = await ref.get();
@@ -12886,6 +12882,9 @@ async function checkAndFireReminders() {
         studentDiscords,
         targetMs,
         lateMinutes,
+        // For the push-notification title on phones.
+        classLevel: cls.level,
+        classTime: cls.time,
       });
       return; // one at a time
     }
@@ -12974,6 +12973,8 @@ function showReminderPopup(reminder) {
       type: 'class_10min_before',
       teacherName: reminder.teacherName,
       channelUrl: reminder.channelUrl,
+      classLevel: reminder.classLevel,
+      classTime: reminder.classTime,
     });
   }
 
@@ -13466,6 +13467,8 @@ function showLateCheckPopup(payload) {
       assigneeId: state.user && state.user.uid,
       type: 'class_late_check',
       lateCount: payload.lateStudents.length,
+      classLevel: payload.classLevel,
+      classTime: payload.classTime,
     });
   }
 
@@ -13783,6 +13786,8 @@ function showAttendanceContactPopup(payload) {
       assigneeId: state.user && state.user.uid,
       type: 'class_end_attendance_contact',
       absentCount: payload.absentStudents.length,
+      classLevel: payload.classLevel,
+      classTime: payload.classTime,
     });
   }
 
@@ -14085,6 +14090,8 @@ function showProgramContactPopup(payload) {
       assigneeId: state.user && state.user.uid,
       type: 'class_end_program_contact',
       studentCount: payload.students.length,
+      classLevel: payload.classLevel,
+      classTime: payload.classTime,
     });
   }
 
@@ -15213,16 +15220,10 @@ function renderPushSettings() {
   // Re-check status synchronously from what we know. (refreshPushStatus
   // is the async source of truth; this just renders the latest.)
   const status = pushState.status;
-  const isVapidSet = VAPID_PUBLIC_KEY !== 'REPLACE_WITH_VAPID_KEY_FROM_FIREBASE_CONSOLE';
   let buttonsHtml = '';
   let helpHtml = '';
 
-  if (!isVapidSet) {
-    icon.textContent = '⚠️';
-    label.textContent = 'Setup incomplete';
-    detail.textContent = 'VAPID key not configured by the admin yet.';
-    helpHtml = 'Calvin needs to paste the Firebase Web Push certificate (VAPID key) into the source. Until then, push notifications can\'t be enabled.';
-  } else if (status === 'unsupported') {
+  if (status === 'unsupported') {
     icon.textContent = '🚫';
     label.textContent = 'Not supported';
     detail.textContent = 'This browser doesn\'t support push notifications.';
