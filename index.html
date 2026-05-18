@@ -1967,7 +1967,12 @@
     inset: 0;
     background: rgba(74, 53, 80, 0.35);
     backdrop-filter: blur(4px);
-    z-index: 200;
+    /* Above all floating chrome (music 380, thoughts 385, tracklist 390,
+       chat 395, notifications 396, hamburger 400) so generic modals like
+       "New Task", "Task Detail", "Settings" — which use the default
+       backdrop with no inline z-index — never get covered by the floating
+       UI. Critical modals override this with inline styles 460-490. */
+    z-index: 450;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3486,7 +3491,9 @@
     background: var(--white);
     border-left: 3px solid var(--pink-soft);
     box-shadow: -8px 0 30px rgba(180, 120, 160, 0.2);
-    z-index: 350;
+    /* Sits above music player (380), thoughts panel (385), tracklist
+       (390) so the chat slide-out covers the floating chrome when open. */
+    z-index: 395;
     display: flex;
     flex-direction: column;
     transform: translateX(100%);
@@ -3508,7 +3515,12 @@
     border: 2.5px solid var(--pink-soft);
     border-radius: 18px;
     box-shadow: 0 10px 30px rgba(180, 120, 160, 0.25);
-    z-index: 355;
+    /* Sits above music player (380), thoughts panel (385), tracklist
+       (390) so the panel is actually visible when opened — previously
+       at z=355 it could open behind the music player or poke chars on
+       phones where there's overlap, making it look like "nothing happens"
+       when the user tapped Notifications in the hamburger. */
+    z-index: 396;
     display: none;
     flex-direction: column;
     animation: fade-in 0.18s ease;
@@ -3957,13 +3969,14 @@
   }
   .emoji-picker-overlay button:hover { background: var(--bg-2); }
 
-  /* Backdrop when chat panel is open */
+  /* Backdrop when chat panel is open. Sits just below the chat panel
+     (z=395) so taps outside the panel close it. */
   .chat-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(74, 53, 80, 0.2);
     backdrop-filter: blur(2px);
-    z-index: 340;
+    z-index: 394;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s;
@@ -3986,7 +3999,10 @@
     flex-wrap: wrap-reverse;
     justify-content: flex-end;
     max-width: 70vw;
-    z-index: 380;
+    /* Sits below all critical chrome (music player, chat, notifications,
+       menus, modals). Chars are ambient decoration — they shouldn't
+       cover functional UI when it opens over them. */
+    z-index: 300;
     pointer-events: none;
     transition: right 0.3s ease;
   }
@@ -4786,7 +4802,14 @@
     border-radius: 18px;
     box-shadow: 0 6px 20px rgba(180, 120, 160, 0.25);
     z-index: 380;
-    width: 280px;
+    /* Wider than the original 280px so the song title has actual room
+       to display. With the icon (36) + 5 buttons + gaps consuming
+       ~210px of the row, the title's flex-1 area needs the remaining
+       width to be meaningful — at 280 it was ~30px (5 letters maybe).
+       At 340 it's about 90px which fits a useful chunk. For really
+       long titles a marquee animation (.marquee class) scrolls the
+       text horizontally. */
+    width: 340px;
     transition: width 0.25s ease, box-shadow 0.2s;
   }
   .music-player:hover {
@@ -4853,6 +4876,23 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* Marquee: when the title overflows its container, JS adds .marquee
+     which removes the ellipsis and animates the text horizontally.
+     Slides left to reveal the tail, pauses, returns, pauses, repeats.
+     Only used on desktop + landscape — portrait stays with the static
+     ellipsis truncation to avoid distracting motion at narrow widths. */
+  .music-title.marquee {
+    text-overflow: clip;
+    /* The animation translates the text node by negative its overflow
+       distance. JS sets --marquee-distance based on the actual scrollWidth
+       vs clientWidth diff, so any title length works. */
+    animation: music-title-marquee 8s ease-in-out infinite;
+  }
+  @keyframes music-title-marquee {
+    0%, 15%   { transform: translateX(0); }
+    50%, 65%  { transform: translateX(var(--marquee-distance, 0)); }
+    100%      { transform: translateX(0); }
   }
   .music-status {
     font-size: 10px;
@@ -5525,9 +5565,14 @@
       max-height: 55vh;
     }
 
-    /* Modals: less padding, more vertical room */
-    .modal-backdrop { padding: 10px; }
-    .modal { padding: 20px; max-height: 95vh; border-radius: 20px; }
+    /* Modals: less padding, more vertical room. Cap height tighter than
+       desktop default (90vh) because zoomed-down portrait UI + a modal
+       backdrop with align-items:center can result in part of the modal
+       extending above the viewport when content overflows. The modal's
+       overflow-y:auto handles internal scroll, and a stretch alignment
+       on the backdrop puts the modal at the top of the safe area. */
+    .modal-backdrop { padding: 10px; align-items: flex-start; padding-top: 16px; }
+    .modal { padding: 20px; max-height: calc(100vh - 32px); border-radius: 20px; }
     .modal-title { font-size: 22px; }
     .modal-head { margin-bottom: 14px; }
 
@@ -5685,10 +5730,22 @@
       top: 10px;
       bottom: 10px;
     }
-    /* Music tracklist (opens above the player) — clamp so it doesn't
-       run above the top of the viewport. */
+    /* Music tracklist (normally opens above the player via position:
+       absolute) — in short landscape, switch to fixed positioning so it
+       can anchor to the viewport top, not the music player. The music
+       player sits at bottom:16 + ~80px = ~96px tall, so put tracklist
+       bottom at 110px (16 + 80 + 14 gap) from viewport bottom and top
+       at 10px. Internal scroll handles overflow. */
     .music-tracklist {
-      max-height: calc(100vh - 90px);
+      position: fixed;
+      top: 10px;
+      bottom: 110px;
+      left: 16px;
+      width: 340px;
+      max-width: calc(100vw - 32px);
+      right: auto;
+      max-height: none;
+      height: auto;
     }
     /* Hamburger menu — desktop sizing is fine vertically (8 items fit
        in ~400px) but landscape phone is only ~390px tall. Clamp + scroll. */
@@ -6108,7 +6165,7 @@
 <!-- Poke character strip (bottom-right) -->
 <!-- Script Manager: list view + editor for Calvin's video scripts.
      Hidden by default; opened from the 📄 button on Calvin's column. -->
-<div id="scriptManagerModal" class="modal-backdrop hidden" style="z-index: 240;">
+<div id="scriptManagerModal" class="modal-backdrop hidden" style="z-index: 455;">
   <div class="modal" style="max-width: 720px;">
     <div class="modal-head">
       <div class="modal-title">📄 Scripts</div>
@@ -6394,7 +6451,7 @@
 </div>
 
 <!-- Edit task modal (Feature 1) -->
-<div id="editTaskModal" class="modal-backdrop hidden" style="z-index: 250;">
+<div id="editTaskModal" class="modal-backdrop hidden" style="z-index: 455;">
   <div class="modal">
     <div class="modal-head">
       <div class="modal-title">✏️ Edit Task</div>
@@ -6611,7 +6668,7 @@
 <!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
 <!-- Test Reminder modal — Boss/Mgr picks day + time + recipient,
      fires a one-off test popup on the recipient's device -->
-<div id="testReminderModal" class="modal-backdrop hidden" style="z-index: 250;">
+<div id="testReminderModal" class="modal-backdrop hidden" style="z-index: 455;">
   <div class="modal" style="max-width: 460px;">
     <div class="modal-head">
       <div class="modal-title">🧪 Test Class Reminder</div>
@@ -6684,7 +6741,7 @@
   </div>
 </div>
 
-<div id="addReminderProgramModal" class="modal-backdrop hidden" style="z-index: 250;">
+<div id="addReminderProgramModal" class="modal-backdrop hidden" style="z-index: 455;">
   <div class="modal" style="max-width: 420px;">
     <div class="modal-head">
       <div class="modal-title">📢 Assign Class Reminders</div>
@@ -17204,6 +17261,25 @@ function renderMusicPlayer() {
     playBtn.textContent = '▶';
     icon.classList.remove('playing');
   }
+
+  // Marquee: if the title overflows its container, animate it horizontally
+  // so the full song name becomes readable. Portrait UI is too narrow for
+  // marquee motion to feel anything but distracting, so we skip it there
+  // and let the ellipsis truncation handle it. Measured in RAF so the
+  // browser has finished laying out the new textContent.
+  requestAnimationFrame(() => {
+    if (!title.isConnected) return;
+    // Reset first so re-measuring is accurate (a previously-applied
+    // marquee class would distort scrollWidth via the transform).
+    title.classList.remove('marquee');
+    title.style.removeProperty('--marquee-distance');
+    if (document.body.classList.contains('portrait-shrink')) return;
+    const overflow = title.scrollWidth - title.clientWidth;
+    if (overflow > 4) {
+      title.style.setProperty('--marquee-distance', `-${overflow}px`);
+      title.classList.add('marquee');
+    }
+  });
 
   // Refresh playing indicators in the open track list
   if (el('musicTracklist').classList.contains('open')) {
