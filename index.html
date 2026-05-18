@@ -14639,7 +14639,11 @@ async function handleIncomingTestProgContact(requestId, data) {
       return;
     }
     const cls = { id: classDoc.id, ...classDoc.data() };
-    const week = data.week || PROG_DEFAULT_WEEKS;
+    // End-of-program ALWAYS runs in the final week — ignore data.week
+    // (which might be sitting around from a stale request doc). Use the
+    // class's totalWeeks if set, else the default of 6.
+    const week = (typeof cls.totalWeeks === 'number' && cls.totalWeeks > 0)
+      ? cls.totalWeeks : PROG_DEFAULT_WEEKS;
 
     const studentRefs = Array.isArray(cls.students) ? cls.students : [];
     let fullList = await fetchFullStudents(studentRefs);
@@ -14877,12 +14881,15 @@ function openTestReminderModal() {
     sel.value = state.user.uid;
   }
   // Type toggle: show the week picker for attendance-contact AND end-of-program.
+  // Week selector visibility: attendance and late check are per-week, so
+  // we ask which week to simulate. End-of-program ALWAYS runs in the final
+  // week (defaulting to 6) — testing other weeks would misrepresent the
+  // real behavior, so we hide the selector and force week 6 server-side.
   // Class-reminder (10-min-before) doesn't care about week.
   const typeSel = el('testReminderType');
   const updateTypeUI = () => {
     const t = typeSel.value;
     const showWeek = t === 'class_end_attendance_contact'
-                  || t === 'class_end_program_contact'
                   || t === 'class_late_check';
     el('testReminderWeekWrap').style.display = showWeek ? '' : 'none';
   };
@@ -14898,7 +14905,9 @@ async function submitTestReminder() {
   const day = el('testReminderDay').value;
   const time = el('testReminderTime').value;
   const assigneeId = el('testReminderAssignee').value;
-  // Week is only used for attendance-contact tests; ignored otherwise.
+  // Week is used for attendance-contact and late-check tests. Ignored for
+  // class-reminder (no week) and end-of-program (always the final week,
+  // forced server-side in handleIncomingTestProgContact).
   const week = parseInt(el('testReminderWeek').value, 10) || 1;
   const errBox = el('testReminderError');
   const submitBtn = el('testReminderSubmitBtn');
