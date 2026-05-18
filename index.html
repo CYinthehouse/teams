@@ -940,12 +940,20 @@
     right: 12px;
     width: 260px;
     max-width: calc(100vw - 24px);
+    /* Always cap height so a content overflow doesn't push items off-
+       screen on any device. The landscape-short override above tightens
+       this further. */
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
     background: var(--white);
     border: 2px solid var(--pink-soft);
     border-radius: 18px;
     box-shadow: var(--shadow-deep);
     padding: 8px;
-    z-index: 360;
+    /* Raise above music player (380) and other floating UI so it always
+       takes precedence when open. Stays below modal-backdrop (470) so
+       genuine modals still cover it. */
+    z-index: 400;
     display: none;
     animation: fade-in 0.18s ease;
   }
@@ -4310,6 +4318,11 @@
     padding: 28px;
     width: 100%;
     max-width: 420px;
+    /* Defensive height cap — the popup centers in a backdrop and on
+       short viewports (landscape phones, foldables) without this the
+       emoji+title+textarea+actions can exceed available height. */
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: var(--shadow-deep);
     border: 3px solid var(--pink-soft);
     text-align: center;
@@ -5530,9 +5543,12 @@
 
     /* Music player: force-collapsed on phones (saves screen real estate).
        Users can still expand by tapping the icon — the existing
-       .collapsed class toggle still works. */
+       .collapsed class toggle still works. Width bumped from 240px →
+       296px so the touch-sized control row (shuffle/prev/play/next/
+       collapse) actually fits without overflowing — at 240 the collapse
+       button got pushed outside the visible container. */
     .music-player:not(.collapsed) {
-      width: 240px;
+      width: 296px;
     }
 
     /* Notifications panel: full-width-ish */
@@ -5649,6 +5665,48 @@
     .auth-sub { margin-bottom: 14px; }
     /* Keep the column max-height tied to viewport so it's actually usable */
     .column { max-height: 78vh; }
+
+    /* Floating panels that anchor to the music player or topbar need
+       their own height constraints in landscape phones — at ~390px tall
+       a panel sized for desktop (e.g. thoughts 70vh + 162px from bottom)
+       overflows above the viewport and can't be scrolled. Anchor from
+       BOTH top and bottom so the panel sizes to whatever fits, with its
+       own internal scroll. */
+    .thoughts-panel {
+      top: 10px;
+      bottom: 10px;
+      max-height: none;        /* let top/bottom drive the height instead */
+      height: auto;
+    }
+    /* Override the music-expanded / tracklist-open offsets which were
+       designed for tall viewports and shove the thoughts panel offscreen. */
+    body.music-expanded .thoughts-panel,
+    body.music-tracklist-open .thoughts-panel {
+      top: 10px;
+      bottom: 10px;
+    }
+    /* Music tracklist (opens above the player) — clamp so it doesn't
+       run above the top of the viewport. */
+    .music-tracklist {
+      max-height: calc(100vh - 90px);
+    }
+    /* Hamburger menu — desktop sizing is fine vertically (8 items fit
+       in ~400px) but landscape phone is only ~390px tall. Clamp + scroll. */
+    .hamburger-menu {
+      max-height: calc(100vh - 70px);
+      overflow-y: auto;
+    }
+    /* Poke compose + edit character popups: same .poke-popup component,
+       both can be too tall for landscape phones. */
+    .poke-popup {
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+    /* Trim the giant 56px emoji and 30px title that eat vertical space. */
+    .poke-popup { padding: 18px 22px; }
+    .poke-popup-emoji { font-size: 36px; margin-bottom: 0; }
+    .poke-popup-title { font-size: 20px; margin-bottom: 4px; }
+    .poke-popup-sub { font-size: 12px; margin-bottom: 12px; }
   }
 
   /* ============================================
@@ -5733,6 +5791,10 @@
 
     /* Music player tiny buttons */
     .music-btn { min-width: 36px; min-height: 36px; }
+    /* But keep the collapse button compact — it's a small end-of-row
+       dismiss control. Growing it to 36px makes the music row overflow
+       the 296px portrait width. */
+    .music-btn-collapse { min-width: 26px; min-height: 26px; }
   }
 
   /* ---------- Display-font outline (readability) ---------- */
