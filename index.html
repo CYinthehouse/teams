@@ -758,35 +758,106 @@
     font-size: 26px;
   }
 
-  .team-switcher {
-    display: flex;
-    gap: 8px;
+  /* Team switcher — a single button that shows the active team's name
+     with a dropdown caret. Tap opens .team-menu below. Replaces the old
+     horizontal pill row, which wrapped awkwardly on narrow screens. */
+  .team-switcher-host {
+    position: relative;
     flex: 1;
-    overflow-x: auto;
-    padding: 4px 0;
+    min-width: 0;
   }
-
-  .team-pill {
-    padding: 8px 18px;
-    background: var(--bg-2);
-    border-radius: 20px;
-    font-weight: 600;
-    font-size: 14px;
-    color: var(--ink-soft);
-    white-space: nowrap;
-    transition: all 0.2s;
-    border: 2px solid transparent;
-  }
-
-  .team-pill:hover {
-    background: var(--pink-soft);
-    color: var(--pink-deep);
-  }
-
-  .team-pill.active {
+  .team-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
     background: linear-gradient(135deg, var(--pink) 0%, var(--lavender) 100%);
     color: var(--white);
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 14px;
     box-shadow: var(--shadow-soft);
+    max-width: 100%;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.2s;
+  }
+  .team-trigger:hover { transform: translateY(-1px); box-shadow: var(--shadow-card); }
+  .team-trigger.disabled {
+    background: var(--bg-2);
+    color: var(--ink-soft);
+    box-shadow: none;
+    cursor: default;
+  }
+  .team-trigger-sep { opacity: 0.7; }
+  .team-trigger-name {
+    /* Truncate long team names with ellipsis so the trigger stays a
+       single line on narrow screens. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  .team-trigger-caret {
+    font-size: 11px;
+    opacity: 0.85;
+    transition: transform 0.2s;
+  }
+  .team-trigger[aria-expanded="true"] .team-trigger-caret { transform: rotate(180deg); }
+  /* Hide the caret when there's only one team (or none) — the trigger
+     still shows the team name but the dropdown wouldn't have anywhere
+     useful to go. Toggled by JS via .single-team class on the host. */
+  .team-switcher-host.single-team .team-trigger-caret { display: none; }
+  .team-switcher-host.single-team .team-trigger { cursor: default; }
+  .team-switcher-host.single-team .team-trigger:hover { transform: none; box-shadow: var(--shadow-soft); }
+
+  /* Dropdown menu of teams. Positioned absolutely below the trigger.
+     Hidden by default; .open shows it. */
+  .team-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 240px;
+    max-width: 320px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--white);
+    border: 2px solid var(--pink-soft);
+    border-radius: 16px;
+    box-shadow: var(--shadow-deep);
+    padding: 6px;
+    z-index: 360;
+    display: none;
+    animation: fade-in 0.15s ease;
+  }
+  .team-menu.open { display: block; }
+  .team-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .team-menu-item:hover { background: var(--bg-2); }
+  .team-menu-item.active {
+    background: linear-gradient(135deg, var(--pink-soft) 0%, var(--lavender-soft) 100%);
+    color: var(--pink-deep);
+  }
+  .team-menu-item.active::before {
+    content: '●';
+    margin-right: 8px;
+    color: var(--pink-deep);
+  }
+  .team-menu-empty {
+    padding: 14px 16px;
+    color: var(--ink-light);
+    font-size: 13px;
+    text-align: center;
   }
 
   .topbar-right {
@@ -794,6 +865,130 @@
     align-items: center;
     gap: 12px;
   }
+  .topbar-icons-desktop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Hamburger button — hidden on desktop, shown ≤1080px. The red dot
+     surfaces unread state from items inside (currently just bell). */
+  .hamburger-btn {
+    display: none;
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--bg-2);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .hamburger-btn:hover { background: var(--pink-soft); }
+  .hamburger-bars {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 20px;
+  }
+  .hamburger-bars span {
+    display: block;
+    height: 2.5px;
+    background: var(--ink);
+    border-radius: 2px;
+  }
+  .hamburger-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--pink-deep);
+    border: 2px solid var(--white);
+    display: none;
+  }
+  .hamburger-dot.visible { display: block; }
+
+  /* Hamburger menu panel — drops down from the top-right corner.
+     Fixed position so it overlays the board cleanly. */
+  .hamburger-menu {
+    position: fixed;
+    top: 64px;
+    right: 12px;
+    width: 260px;
+    max-width: calc(100vw - 24px);
+    background: var(--white);
+    border: 2px solid var(--pink-soft);
+    border-radius: 18px;
+    box-shadow: var(--shadow-deep);
+    padding: 8px;
+    z-index: 360;
+    display: none;
+    animation: fade-in 0.18s ease;
+  }
+  .hamburger-menu.open { display: block; }
+  .hamburger-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    background: var(--bg-3);
+    border-radius: 12px;
+  }
+  .hamburger-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .hamburger-item:hover { background: var(--bg-2); }
+  .hamburger-item .hamburger-icon {
+    width: 28px;
+    text-align: center;
+    font-size: 16px;
+  }
+  .hamburger-item-danger { color: var(--pink-deep); }
+  .hamburger-item-danger:hover { background: var(--pink-soft); }
+  .hamburger-sep {
+    height: 1px;
+    margin: 6px 12px;
+    background: var(--pink-soft);
+  }
+  .hamburger-badge {
+    margin-left: auto;
+    background: var(--pink-deep);
+    color: var(--white);
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 22px;
+    text-align: center;
+    display: none;
+  }
+  .hamburger-badge.visible { display: inline-block; }
+
+  /* Backdrop click-catcher behind the hamburger menu so taps outside
+     close it. Invisible but covers the whole viewport. */
+  .menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 358;
+    display: none;
+  }
+  .menu-backdrop.open { display: block; }
 
   .user-chip {
     display: flex;
@@ -5261,14 +5456,15 @@
 
   /* ----- Phone (≤640px) ----- */
   @media (max-width: 640px) {
-    /* Topbar: tighter, allow wrap so right-side buttons drop below brand */
-    .topbar { padding: 10px 14px; gap: 10px; flex-wrap: wrap; }
+    /* Topbar: tighter; no wrap needed now that the team switcher is a
+       single trigger button and the right-side icons collapse into a
+       hamburger. */
+    .topbar { padding: 10px 14px; gap: 10px; }
     .brand { font-size: 20px; }
     .brand-icon { font-size: 22px; }
-    .team-switcher { order: 3; flex-basis: 100%; }
     .topbar-right { gap: 8px; }
-    .user-chip { padding: 4px 10px 4px 4px; font-size: 13px; }
-    .avatar { width: 28px; height: 28px; }
+    .team-trigger { font-size: 13px; padding: 7px 12px; }
+    .team-trigger-name { max-width: 140px; }
 
     /* Board area: tighter padding */
     .board-area { padding: 14px; }
@@ -5354,6 +5550,15 @@
     .modal { padding: 26px; }
   }
 
+  /* ----- Hamburger swap (≤1080px) -----
+     Collapses the topbar's icon row (bell, A−/A+, theme, settings, user
+     chip, sign out) into a single hamburger button on phones and small
+     tablets. Desktop (≥1081px) keeps the original icon row visible. */
+  @media (max-width: 1080px) {
+    .topbar-icons-desktop { display: none; }
+    .hamburger-btn { display: inline-flex; }
+  }
+
   /* ----- Short viewport (iPhone landscape, small notebooks) ----- */
   /* Independent of width — fires whenever the viewport is shorter than
      480px. iPhone landscape (~390px tall) is the main target. Trims
@@ -5408,11 +5613,7 @@
     /* Buttons & pills */
     .icon-btn:hover { background: var(--bg-2); transform: none; }
     .btn-action:hover { transform: none; }
-    .team-pill:hover { background: var(--bg-2); color: var(--ink-soft); }
-    .team-pill.active:hover {
-      background: linear-gradient(135deg, var(--pink) 0%, var(--lavender) 100%);
-      color: var(--white);
-    }
+    .team-trigger:hover { transform: none; box-shadow: var(--shadow-soft); }
     .task-card-urgency-dot:hover { transform: none; }
     /* Music player + poke characters */
     .music-player:hover { box-shadow: 0 6px 20px rgba(180, 120, 160, 0.25); }
@@ -5556,31 +5757,95 @@
       <span class="brand-icon">🌸</span>
       <span>Teams</span>
     </div>
-    <div class="team-switcher" id="teamSwitcher"></div>
+    <!-- Team switcher: a single button showing the active team name with
+         a dropdown caret. Tapping opens #teamMenu below. Replaces the old
+         horizontal pill row, which couldn't fit on phones and forced wrap. -->
+    <div class="team-switcher-host">
+      <button class="team-trigger" id="teamTrigger" type="button" onclick="toggleTeamMenu(event)" aria-expanded="false" aria-haspopup="menu">
+        <span class="team-trigger-name" id="teamTriggerName">—</span>
+        <span class="team-trigger-caret">▾</span>
+      </button>
+      <div class="team-menu" id="teamMenu" role="menu" aria-hidden="true"></div>
+    </div>
     <div class="topbar-right">
       <button class="chat-fab" id="chatFab" title="Team Chat" onclick="toggleChatPanel()">
         💬
         <span class="unread-badge" id="chatUnreadBadge">0</span>
       </button>
-      <button class="bell-btn" id="bellBtn" title="Notifications" onclick="toggleNotificationsPanel()">
-        <img id="bellImg" src="" alt="🔔" style="display:none;" />
-        <span id="bellFallback">🔔</span>
-        <span class="unread-badge" id="bellUnreadBadge">0</span>
-      </button>
-      <button class="icon-btn" id="fontDecBtn" onclick="adjustFontScale(-1)" title="Decrease text size">A−</button>
-      <button class="icon-btn" id="fontIncBtn" onclick="adjustFontScale(1)" title="Increase text size">A+</button>
-      <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Light/Dark mode">🌙</button>
-      <button class="icon-btn" id="settingsBtn" onclick="openSettings()" title="Settings">⚙️</button>
-      <div class="user-chip">
-        <div class="avatar" id="myAvatar">?</div>
-        <div class="user-info">
-          <div class="user-name" id="myName">—</div>
-          <div class="user-role" id="myRole">—</div>
+      <!-- Desktop-only icon row. Hidden under 1080px in favor of the
+           hamburger menu below. -->
+      <div class="topbar-icons-desktop">
+        <button class="bell-btn" id="bellBtn" title="Notifications" onclick="toggleNotificationsPanel()">
+          <img id="bellImg" src="" alt="🔔" style="display:none;" />
+          <span id="bellFallback">🔔</span>
+          <span class="unread-badge" id="bellUnreadBadge">0</span>
+        </button>
+        <button class="icon-btn" id="fontDecBtn" onclick="adjustFontScale(-1)" title="Decrease text size">A−</button>
+        <button class="icon-btn" id="fontIncBtn" onclick="adjustFontScale(1)" title="Increase text size">A+</button>
+        <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Light/Dark mode">🌙</button>
+        <button class="icon-btn" id="settingsBtn" onclick="openSettings()" title="Settings">⚙️</button>
+        <div class="user-chip">
+          <div class="avatar" id="myAvatar">?</div>
+          <div class="user-info">
+            <div class="user-name" id="myName">—</div>
+            <div class="user-role" id="myRole">—</div>
+          </div>
         </div>
+        <button class="btn-action secondary" onclick="signOut()" title="Sign out" style="padding: 8px 14px; font-size: 13px;">⤴ Sign Out</button>
       </div>
-      <button class="btn-action secondary" onclick="signOut()" title="Sign out" style="padding: 8px 14px; font-size: 13px;">⤴ Sign Out</button>
+      <!-- Hamburger (mobile/tablet ≤1080px). Opens #hamburgerMenu below. -->
+      <button class="hamburger-btn" id="hamburgerBtn" type="button" onclick="toggleHamburgerMenu(event)" aria-label="Menu">
+        <span class="hamburger-bars">
+          <span></span><span></span><span></span>
+        </span>
+        <!-- Red dot when any item inside has unread (currently the bell). -->
+        <span class="hamburger-dot" id="hamburgerDot"></span>
+      </button>
     </div>
   </div>
+
+  <!-- Hamburger menu panel — anchored top-right, opens beneath the topbar.
+       Mirrors the desktop icon row's actions but laid out as a tap-friendly
+       list. Closes when clicking outside or selecting an item. -->
+  <div class="hamburger-menu" id="hamburgerMenu" role="menu" aria-hidden="true">
+    <div class="hamburger-user">
+      <div class="avatar" id="myAvatarMobile">?</div>
+      <div class="user-info">
+        <div class="user-name" id="myNameMobile">—</div>
+        <div class="user-role" id="myRoleMobile">—</div>
+      </div>
+    </div>
+    <button class="hamburger-item" onclick="hamburgerAction('notifications')">
+      <span class="hamburger-icon">🔔</span>
+      <span>Notifications</span>
+      <span class="hamburger-badge" id="hamburgerBellBadge">0</span>
+    </button>
+    <button class="hamburger-item" onclick="hamburgerAction('font-')">
+      <span class="hamburger-icon">A−</span>
+      <span>Decrease text size</span>
+    </button>
+    <button class="hamburger-item" onclick="hamburgerAction('font+')">
+      <span class="hamburger-icon">A+</span>
+      <span>Increase text size</span>
+    </button>
+    <button class="hamburger-item" onclick="hamburgerAction('theme')">
+      <span class="hamburger-icon" id="hamburgerThemeIcon">🌙</span>
+      <span id="hamburgerThemeLabel">Light/Dark mode</span>
+    </button>
+    <button class="hamburger-item" onclick="hamburgerAction('settings')">
+      <span class="hamburger-icon">⚙️</span>
+      <span>Settings</span>
+    </button>
+    <div class="hamburger-sep"></div>
+    <button class="hamburger-item hamburger-item-danger" onclick="hamburgerAction('signout')">
+      <span class="hamburger-icon">⤴</span>
+      <span>Sign out</span>
+    </button>
+  </div>
+
+  <!-- Invisible click-catcher that closes the team menu / hamburger menu
+       when the user taps anywhere outside. Toggled visible alongside them. -->
+  <div class="menu-backdrop" id="menuBackdrop" onclick="closeAllTopbarMenus()"></div>
 
   <div class="board-area">
     <div class="board-header">
@@ -7135,6 +7400,9 @@ function updateBellUnreadBadge() {
   } else {
     badge.classList.remove('visible');
   }
+  // Mirror to the hamburger button's red dot for ≤1080px viewports
+  // where the bell is hidden inside the menu.
+  updateHamburgerUnreadDot();
 }
 
 function toggleNotificationsPanel() {
@@ -7607,7 +7875,7 @@ function switchTeam(teamId) {
     boardArea.classList.add('board-fading');
   }
 
-  // Update the team-switcher pill highlight immediately — it lives in
+  // Update the team-switcher trigger immediately — it lives in
   // the topbar, not the board, so the user sees instant feedback that
   // their click registered while the board fades.
   state.activeTeamId = teamId;
@@ -7885,19 +8153,170 @@ function renderTopbar() {
 }
 
 function renderTeamSwitcher() {
-  const wrap = el('teamSwitcher');
-  wrap.innerHTML = '';
+  // The trigger button shows the active team's name; the menu lists all
+  // teams. Both are populated here. Called from switchTeam() and whenever
+  // the teams collection updates.
+  const host = document.querySelector('.team-switcher-host');
+  const nameEl = el('teamTriggerName');
+  const menu = el('teamMenu');
+  if (!host || !nameEl || !menu) return;
+
   if (state.teams.length === 0) {
-    wrap.innerHTML = '<div style="color: var(--ink-light); font-size: 13px; padding: 8px;">No teams yet</div>';
+    nameEl.textContent = 'No teams';
+    host.classList.add('single-team');     // hide caret + disable click
+    menu.innerHTML = '<div class="team-menu-empty">No teams yet</div>';
     return;
   }
+
+  // Active team name (or a placeholder if none active yet)
+  const active = state.teams.find(t => t.id === state.activeTeamId);
+  nameEl.textContent = active ? active.name : 'Pick a team';
+
+  // Hide the caret when there's only one team — no need for a dropdown.
+  host.classList.toggle('single-team', state.teams.length <= 1);
+
+  // Build the menu items
+  menu.innerHTML = '';
   state.teams.forEach(t => {
-    const pill = document.createElement('button');
-    pill.className = 'team-pill' + (t.id === state.activeTeamId ? ' active' : '');
-    pill.textContent = t.name;
-    pill.onclick = () => switchTeam(t.id);
-    wrap.appendChild(pill);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'team-menu-item' + (t.id === state.activeTeamId ? ' active' : '');
+    item.textContent = t.name;
+    item.onclick = (e) => {
+      e.stopPropagation();
+      closeTeamMenu();
+      // Only switch if it's a different team — switchTeam already no-ops
+      // on same-team but checking here saves the fade-out flicker.
+      if (t.id !== state.activeTeamId) switchTeam(t.id);
+    };
+    menu.appendChild(item);
   });
+}
+
+/* ============================================
+   Topbar menus: team picker + hamburger
+   Each opens via a click on its trigger and closes via:
+   - clicking the trigger again (toggle)
+   - clicking outside (the .menu-backdrop catches this)
+   - selecting an item
+   The two menus are mutually exclusive — opening one closes the other.
+============================================ */
+function toggleTeamMenu(e) {
+  if (e) e.stopPropagation();
+  const host = document.querySelector('.team-switcher-host');
+  const menu = el('teamMenu');
+  if (!host || !menu) return;
+  // Single-team users have no menu to open — caret is hidden, no-op.
+  if (host.classList.contains('single-team')) return;
+  if (menu.classList.contains('open')) {
+    closeTeamMenu();
+  } else {
+    closeHamburgerMenu();
+    menu.classList.add('open');
+    el('teamTrigger').setAttribute('aria-expanded', 'true');
+    el('menuBackdrop').classList.add('open');
+  }
+}
+function closeTeamMenu() {
+  const menu = el('teamMenu');
+  if (!menu) return;
+  menu.classList.remove('open');
+  const trigger = el('teamTrigger');
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  // Only hide the backdrop if hamburger also isn't open
+  if (!isHamburgerOpen()) el('menuBackdrop').classList.remove('open');
+}
+
+function toggleHamburgerMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = el('hamburgerMenu');
+  if (!menu) return;
+  if (menu.classList.contains('open')) {
+    closeHamburgerMenu();
+  } else {
+    closeTeamMenu();
+    refreshHamburgerMenuState();      // sync user info, theme icon, badges
+    menu.classList.add('open');
+    el('menuBackdrop').classList.add('open');
+  }
+}
+function closeHamburgerMenu() {
+  const menu = el('hamburgerMenu');
+  if (!menu) return;
+  menu.classList.remove('open');
+  if (!isTeamMenuOpen()) el('menuBackdrop').classList.remove('open');
+}
+function isHamburgerOpen() {
+  const m = el('hamburgerMenu');
+  return !!(m && m.classList.contains('open'));
+}
+function isTeamMenuOpen() {
+  const m = el('teamMenu');
+  return !!(m && m.classList.contains('open'));
+}
+function closeAllTopbarMenus() {
+  closeTeamMenu();
+  closeHamburgerMenu();
+}
+
+// Sync mutable bits inside the hamburger menu just before it opens:
+// user avatar/name/role, current theme icon, bell unread badge count.
+// Kept in one place so we don't risk stale state from multiple update
+// paths (the desktop topbar updates these via different selectors).
+function refreshHamburgerMenuState() {
+  // Mirror the desktop user-chip fields into the mobile menu header.
+  const myAvatar = el('myAvatar');
+  const myAvatarMobile = el('myAvatarMobile');
+  if (myAvatar && myAvatarMobile) {
+    myAvatarMobile.textContent = myAvatar.textContent;
+    myAvatarMobile.style.background = myAvatar.style.background;
+  }
+  const myName = el('myName');
+  const myNameMobile = el('myNameMobile');
+  if (myName && myNameMobile) myNameMobile.textContent = myName.textContent;
+  const myRole = el('myRole');
+  const myRoleMobile = el('myRoleMobile');
+  if (myRole && myRoleMobile) myRoleMobile.textContent = myRole.textContent;
+
+  // Theme icon flips between 🌙 (currently light, will switch to dark)
+  // and ☀️ (currently dark, will switch to light) to match desktop.
+  const themeIcon = el('hamburgerThemeIcon');
+  if (themeIcon) {
+    themeIcon.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+  }
+
+  // Bell badge — same logic as the desktop bell badge.
+  const badge = el('hamburgerBellBadge');
+  if (badge) {
+    const count = getUnreadNotifCount();
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.add('visible');
+    } else {
+      badge.classList.remove('visible');
+    }
+  }
+}
+
+// Reflect bell unread state on the hamburger button itself with a red
+// dot, since the bell icon is hidden inside the menu on small screens.
+function updateHamburgerUnreadDot() {
+  const dot = el('hamburgerDot');
+  if (!dot) return;
+  const count = getUnreadNotifCount();
+  dot.classList.toggle('visible', count > 0);
+}
+
+function hamburgerAction(action) {
+  closeHamburgerMenu();
+  switch (action) {
+    case 'notifications': toggleNotificationsPanel(); break;
+    case 'font-':         adjustFontScale(-1);        break;
+    case 'font+':         adjustFontScale(1);         break;
+    case 'theme':         toggleTheme();              break;
+    case 'settings':      openSettings();             break;
+    case 'signout':       signOut();                  break;
+  }
 }
 
 /* ============================================
