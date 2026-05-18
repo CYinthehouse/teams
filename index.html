@@ -698,8 +698,19 @@
     color: #8b5a00;
     border: 1px solid #f0c884;
   }
+  .contact-kind-badge.lc {
+    background: #ffe1ec;
+    color: #a02050;
+    border: 1px solid #f5a8c4;
+  }
   .contact-card-eop {
     border-color: #f0c884;
+  }
+  .contact-card-lc {
+    border-color: #f5a8c4;
+  }
+  .contact-card-lc:hover {
+    border-color: #e07ea4;
   }
   .contact-card-eop:hover {
     border-color: #d8a655;
@@ -6694,6 +6705,84 @@
   </div>
 </div>
 
+<!-- Late Check popup. Fires 5 min after class start for any student with
+     no attendance record OR marked absent. Two-view modal: (1) info with
+     who-to-call list and a copy-canned-message button, (2) signoff form
+     with Discord + Call checkboxes per student. Mirrors attContactModal
+     structurally so styles auto-apply. -->
+<div id="lateCheckModal" class="modal-backdrop hidden" style="z-index: 480;">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-head">
+      <div class="modal-title">📞 Late Check — Call Students</div>
+    </div>
+
+    <!-- VIEW 1: info / call to action -->
+    <div id="lateCheckInfoView" class="modal-body">
+      <div class="reminder-popup-headline">
+        Class started 5 min ago! Check Discord first.<br>
+        If these students aren't in class, please call them.
+      </div>
+      <div class="att-contact-callout-red">
+        ⚠️ They're already 5 minutes late — get them in class now!
+      </div>
+      <div id="lateCheckSubtitle" class="att-contact-subtitle">—</div>
+
+      <div id="lateCheckStudentList" class="att-contact-students-wrap"></div>
+
+      <div class="att-contact-buttons">
+        <button class="btn-action secondary" onclick="openLateCheckCannedMessage()">📋 View &amp; Copy Message</button>
+        <button class="btn-action primary" onclick="showLateCheckSignoffView()">✍️ Sign Off and Close</button>
+      </div>
+    </div>
+
+    <!-- VIEW 2: signoff form -->
+    <div id="lateCheckSignoffView" class="modal-body" style="display:none;">
+      <div class="reminder-popup-instruction">
+        Confirm you've contacted each student on Discord and by phone call.
+        All boxes must be checked, and you must type your name below to sign off.
+      </div>
+      <table class="att-contact-signoff-table">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Student</th>
+            <th style="text-align:center;">Discord ✓</th>
+            <th style="text-align:center;">Called ✓</th>
+          </tr>
+        </thead>
+        <tbody id="lateCheckSignoffRows"></tbody>
+      </table>
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Type your name to sign</label>
+        <input type="text" id="lateCheckSignName" class="form-input" placeholder="Your full name…" />
+      </div>
+      <div style="display:flex; gap:8px; justify-content:space-between; margin-top:8px;">
+        <button class="btn-action secondary" onclick="backToLateCheckInfoView()">← Back</button>
+        <button class="btn-action primary" id="lateCheckSubmitBtn" onclick="submitLateCheckSignoff()" disabled>✍️ Submit &amp; Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Late Check canned message sub-modal. -->
+<div id="lateCheckCannedSubModal" class="modal-backdrop hidden" style="z-index: 490;">
+  <div class="modal" style="max-width: 540px;">
+    <div class="modal-head">
+      <div class="modal-title">📋 Late Check Message</div>
+      <button class="modal-close" onclick="hide('lateCheckCannedSubModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size: 12px; color: var(--ink-soft); margin-top: 0;">
+        Fill in the student's name where it says "Hi !" and paste this into Discord and/or text.
+      </p>
+      <div id="lateCheckCannedBox" class="reminder-popup-message"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="hide('lateCheckCannedSubModal')">Close</button>
+      <button class="btn-action primary" id="lateCheckCannedCopyBtn" onclick="copyLateCheckCannedMessage()">📋 Copy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Reminder Program modal — Boss/Mgr picks an assignee -->
 <!-- Test Reminder modal — Boss/Mgr picks day + time + recipient,
      fires a one-off test popup on the recipient's device -->
@@ -6715,6 +6804,7 @@
         <label>Reminder type</label>
         <select id="testReminderType" class="form-input">
           <option value="class_10min_before">📢 Class reminder (10 min before)</option>
+          <option value="class_late_check">⏰ Late check (5 min after start)</option>
           <option value="class_end_attendance_contact">📞 Attendance contact (after class)</option>
           <option value="class_end_program_contact">🎓 End-of-program contact (final class)</option>
         </select>
@@ -6999,8 +7089,12 @@ try {
 // string here if your functions live elsewhere — e.g. 'us-east1').
 const functions = firebase.app().functions();
 
-// VAPID public key from Firebase Console
-const VAPID_PUBLIC_KEY = 'BKRJTaQYvdvN_FrhsiwTEJcCwanT2Xi9DFAHDJ0cD4dzvOrIFRHzve2ZtnzKFMA_uVl9qU-TccdecCyUKUzHs8Y';
+// VAPID public key from Firebase Console → Project Settings → Cloud
+// Messaging → Web configuration → "Web Push certificates". You generate
+// this once per project; the same key works on every device.
+// REPLACE THIS PLACEHOLDER before deploying. Until it's set, registration
+// will fail and the in-app status will show the reason.
+const VAPID_PUBLIC_KEY = 'REPLACE_WITH_VAPID_KEY_FROM_FIREBASE_CONSOLE';
 
 // Secondary Firebase app pointing at the korean-ta-evaluator project, where
 // scheduler_classes, scheduler_students, and scheduler_teachers live.
@@ -7084,6 +7178,12 @@ const state = {
   progContactsFired: new Set(),     // in-memory dedupe (prog__classId__week)
   pendingProgContact: null,         // currently-displayed end-of-program popup
   progContactSignoffStudents: [],   // signoff working state, mirrors attContact
+  // Late Check reminder (fourth type) — fires 5 min after class start for
+  // any student in the roster who has no attendance record OR is marked
+  // absent. Same signoff shape as attContact (Discord + Call columns).
+  lateCheckFired: new Set(),        // in-memory dedupe (lc__classId__week)
+  pendingLateCheck: null,           // currently-displayed late-check popup
+  lateCheckSignoffStudents: [],     // signoff working state
   // Stage 4
   feedbackBenefits: [''],
   feedbackImprovements: [''],
@@ -8303,6 +8403,13 @@ auth.onAuthStateChanged(async (user) => {
     if (!el('progContactModal').classList.contains('hidden')) {
       hide('progContactModal');
     }
+    // Late-check cleanup
+    state.lateCheckFired = new Set();
+    state.pendingLateCheck = null;
+    state.lateCheckSignoffStudents = [];
+    if (!el('lateCheckModal').classList.contains('hidden')) {
+      hide('lateCheckModal');
+    }
     if (!el('progCannedMessageSubModal').classList.contains('hidden')) {
       hide('progCannedMessageSubModal');
     }
@@ -8411,6 +8518,7 @@ auth.onAuthStateChanged(async (user) => {
     checkAndFireReminders();
     checkAndFireAttendanceContacts();
     checkAndFireProgramContacts();
+    checkAndFireLateCheck();
   }, 3000);
 
   // Stage 3: start periodic tick (30 seconds) to refresh timer pills and detect expiries
@@ -8429,6 +8537,8 @@ auth.onAuthStateChanged(async (user) => {
     checkAndFireAttendanceContacts();
     // Check whether any end-of-program contact reminder is due (30 min after final class).
     checkAndFireProgramContacts();
+    // Late check: fires 5 min after class start for no-record / absent students.
+    checkAndFireLateCheck();
   }, 30 * 1000); // every 30 seconds
 
   // Subscribe to teams I'm on (or all teams if Boss)
@@ -9339,23 +9449,50 @@ function buildClassContactsColumn() {
       }).join(', ');
       const studentsCount = (c.students || []).length;
       const isEOP = c.kind === 'end_of_program';
-      const headerIcon = isEOP ? '🎓' : '📞';
+      const isLC = c.kind === 'late_check';
+      const headerIcon = isEOP ? '🎓' : (isLC ? '⏰' : '📞');
       const kindLabel = isEOP
         ? `<span class="contact-kind-badge eop">End of Program</span>`
-        : `<span class="contact-kind-badge att">Attendance</span>`;
-      // Body block differs between the two kinds (EOP has no Loom/HW lines).
+        : (isLC
+            ? `<span class="contact-kind-badge lc">Late Check</span>`
+            : `<span class="contact-kind-badge att">Attendance</span>`);
+      // Body block differs across kinds. EOP and LC have no Loom/HW
+      // (those are attendance-contact specific). LC labels the second
+      // checkbox "Called" instead of "Texted" — students were marked late
+      // by phone call, not by text, even though the underlying field is
+      // the same `contactedText` for schema reuse.
       const hwLabel = c.homeworkKind === 'pdf' ? 'Absolute HW PDF'
         : c.homeworkKind === 'discord' ? 'Discord chat HW'
         : 'no HW link';
+      // For LC cards, re-render the student tag list with phone (📞) in
+      // place of text (📱) so the "what was done" semantics match.
+      const studentsListLC = (c.students || []).map(s => {
+        const tags = [];
+        if (s.contactedDiscord) tags.push('🎮');
+        if (s.contactedText) tags.push('📞'); // called, not texted
+        return `${escapeHtml(s.name)} ${tags.join('')}`;
+      }).join(', ');
       const detailsBody = isEOP
         ? `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
            <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`
+        : isLC
+        ? `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
+           <div class="contact-card-detail"><strong>Contacted (Discord + Call):</strong> ${escapeHtml(studentsListLC) || '—'}</div>`
         : `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
            <div class="contact-card-detail"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(safeHref(c.homeworkUrl)) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
            <div class="contact-card-detail"><strong>Loom:</strong> <a href="${escapeHtml(safeHref(c.loomUrl))}" target="_blank" rel="noopener">link</a></div>
            <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`;
+      // Delete affordance — Boss/Manager only. Hard delete from
+      // attendance_contact_signoffs. We render the button inline at the
+      // end of the details body so non-Boss/Mgr users don't see it.
+      const canDelete = isBossOrManager(state.profile.role);
+      const deleteBtnHtml = canDelete
+        ? `<div class="contact-card-detail" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--ink-muted);">
+             <button class="btn-action danger contact-delete-btn" data-signoff-id="${escapeHtml(c.id)}" data-week="${escapeHtml(String(c.week || ''))}" data-class-day="${escapeHtml(c.classDay || '')}" style="padding: 4px 12px; font-size: 11px;">🗑 Delete signoff</button>
+           </div>`
+        : '';
       return `
-        <details class="contact-card${isEOP ? ' contact-card-eop' : ''}">
+        <details class="contact-card${isEOP ? ' contact-card-eop' : (isLC ? ' contact-card-lc' : '')}">
           <summary>
             <div class="contact-card-line1">
               ${headerIcon} <strong>${escapeHtml(c.classDay || '')} · ${escapeHtml(c.classTime || '')}</strong> ${kindLabel}
@@ -9368,6 +9505,7 @@ function buildClassContactsColumn() {
           </summary>
           <div class="contact-card-details">
             ${detailsBody}
+            ${deleteBtnHtml}
           </div>
         </details>
       `;
@@ -9387,6 +9525,34 @@ function buildClassContactsColumn() {
       ${bodyHtml}
     </div>
   `;
+
+  // Delegated click handler for delete buttons. Uses click capture to
+  // intercept before the <details> summary's default toggle, so clicking
+  // the button inside an open <details> doesn't accidentally collapse it.
+  col.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.contact-delete-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isBossOrManager(state.profile.role)) return; // safety net
+    const signoffId = btn.dataset.signoffId;
+    if (!signoffId) return;
+    const day = btn.dataset.classDay || '';
+    const week = btn.dataset.week || '';
+    const label = day && week ? `the ${day} (Wk ${week}) signoff` : 'this signoff';
+    if (!confirm(`Delete ${label}?\n\nThis only removes the Class Contacts record. It does NOT contact anyone or undo the original work.`)) return;
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    try {
+      await db.collection('attendance_contact_signoffs').doc(signoffId).delete();
+      // Snapshot listener will refresh the column automatically.
+    } catch (err) {
+      console.error('Delete signoff failed:', err);
+      alert('Could not delete: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = '🗑 Delete signoff';
+    }
+  });
 
   return col;
 }
@@ -12474,8 +12640,18 @@ function getClassCurrentWeek(cls) {
 // Lead time AFTER class end before the contact reminder fires.
 const ATT_CONTACT_GRACE_MIN = 15;
 // How long after the target time we'll still fire a missed contact reminder.
-// Long window because signoffs are once-per-class and may be opened a day late.
-const ATT_CONTACT_LATE_WINDOW_MIN = 24 * 60; // 24 hours
+// Was 24 hours; tightened to 7 hours so a missed reminder doesn't get
+// re-presented the next day in confusing contexts.
+const ATT_CONTACT_LATE_WINDOW_MIN = 7 * 60; // 7 hours
+
+// Hard floor for attendance / program contact reminders. NEVER fire for
+// class occurrences that ended before this instant. Set to start-of-day
+// May 18 2026 NY time (the day the new cutoff logic shipped) so we don't
+// flood with months of historical absences when first deployed. Updates
+// to this floor should be rare; the per-program createdAt is the more
+// granular control. May 18 2026 00:00:00 America/New_York = 1779076800000
+// (which is 2026-05-18T04:00:00Z; NY is UTC-4 in May during EDT).
+const ATT_HARD_FLOOR_MS = 1779076800000;
 
 /* ============================================
    End of Program contact reminder
@@ -12489,7 +12665,20 @@ const ATT_CONTACT_LATE_WINDOW_MIN = 24 * 60; // 24 hours
      program ended for everyone.
 */
 const PROG_CONTACT_FIRE_OFFSET_MIN = 30; // minutes after class end
-const PROG_CONTACT_LATE_WINDOW_MIN = 24 * 60;
+const PROG_CONTACT_LATE_WINDOW_MIN = 7 * 60; // 7 hours (was 24)
+
+/* ============================================
+   Late Check reminder
+   - Fires 5 min after class STARTS.
+   - Only stays firable for 7 min after that (i.e. between +5 and +12 min
+     from class start). This is intentionally tight because the popup
+     exists to prompt an immediate call — it has no value an hour later.
+   - Target list = students with no attendance record OR marked 'absent'.
+============================================ */
+const LATE_CHECK_FIRE_OFFSET_MIN = 5;
+const LATE_CHECK_LATE_WINDOW_MIN = 7;
+// Verbatim per Calvin: copy-to-clipboard message for the popup.
+const LATE_CHECK_CANNED_MESSAGE = 'Hi , your class has started! Please join us for class in Discord.';
 // Default total weeks per program. Matches the slot manager's
 // CLASS_TYPE_WEEKS default of 6 for all levels.
 const PROG_DEFAULT_WEEKS = 6;
@@ -12861,6 +13050,11 @@ function startReminderAlarm() {
   };
   playBeep();
   state.reminderSoundLoop = setInterval(playBeep, 1500);
+  // Auto-stop after 5 seconds. The popup stays open and visible; only the
+  // beeping stops. If you stand up and walk away, you'll still see the
+  // popup when you're back — but you won't drive everyone in earshot
+  // crazy in the meantime.
+  setTimeout(stopReminderAlarmLoop, 5000);
 }
 
 function stopReminderAlarmLoop() {
@@ -12956,6 +13150,18 @@ async function checkAndFireAttendanceContacts() {
   );
   if (myPrograms.length === 0) return;
 
+  // Hard cutoff: never fire for classes that ended before the program was
+  // assigned. Per-program cutoff = max(program.createdAt, ATT_HARD_FLOOR_MS).
+  // The hard floor prevents pre-existing programs from flooding with old
+  // absences when this code first ships. If a program lacks createdAt
+  // (very old / legacy), the floor still applies. Take the EARLIEST cutoff
+  // across all my matching programs so multiple programs don't double-suppress.
+  const programCutoffMs = myPrograms.reduce((min, p) => {
+    const created = (p.createdAt && p.createdAt.toMillis) ? p.createdAt.toMillis() : 0;
+    const eff = Math.max(created, ATT_HARD_FLOOR_MS);
+    return Math.min(min, eff);
+  }, Infinity);
+
   // Pull all active classes once.
   let classes;
   try {
@@ -12970,21 +13176,25 @@ async function checkAndFireAttendanceContacts() {
 
   const now = Date.now();
   const todayNy = nyParts(new Date(now));
-  const yesterdayNy = nyParts(new Date(now - 24 * 3600 * 1000));
 
   for (const cls of classes) {
-    // Match class.day to today or yesterday (so a Saturday class can still
-    // fire its popup early Sunday morning if missed).
-    let useDate = null;
-    if (cls.day === todayNy.weekday) useDate = todayNy;
-    else if (cls.day === yesterdayNy.weekday) useDate = yesterdayNy;
-    else continue;
+    // Only fire for TODAY's classes in NY time. Previous behavior also
+    // matched yesterday's classes (so a Sat class could fire Sun morning),
+    // but that conflated weekdays across mid-program assignments — fixed.
+    if (cls.day !== todayNy.weekday) continue;
+    const useDate = todayNy;
 
     const range = parseClassTimeRange(cls.time);
     if (!range) continue;
     const startMs = nyDateTimeToUtcMs(useDate.year, useDate.month, useDate.day, range.startStr);
     if (!startMs) continue;
     const endMs = startMs + range.durationMin * 60 * 1000;
+
+    // Assignment cutoff: if the class's END time was before the earliest
+    // matching program's createdAt, skip. Prevents the "I assigned a
+    // reminder Monday and got popups for last week's classes" bug.
+    if (endMs < programCutoffMs) continue;
+
     const targetMs = endMs + ATT_CONTACT_GRACE_MIN * 60 * 1000;
     const lateBy = now - targetMs;
     if (lateBy < 0) continue;
@@ -13049,6 +13259,15 @@ async function checkAndFireProgramContacts() {
   );
   if (myPrograms.length === 0) return;
 
+  // Same cutoff logic as the attendance-contact engine — per-program
+  // cutoff = max(createdAt, ATT_HARD_FLOOR_MS), taking the earliest
+  // across this user's matching programs. See attendance engine comment.
+  const programCutoffMs = myPrograms.reduce((min, p) => {
+    const created = (p.createdAt && p.createdAt.toMillis) ? p.createdAt.toMillis() : 0;
+    const eff = Math.max(created, ATT_HARD_FLOOR_MS);
+    return Math.min(min, eff);
+  }, Infinity);
+
   let classes;
   try {
     const snap = await taDb.collection('scheduler_classes')
@@ -13062,19 +13281,21 @@ async function checkAndFireProgramContacts() {
 
   const now = Date.now();
   const todayNy = nyParts(new Date(now));
-  const yesterdayNy = nyParts(new Date(now - 24 * 3600 * 1000));
 
   for (const cls of classes) {
-    let useDate = null;
-    if (cls.day === todayNy.weekday) useDate = todayNy;
-    else if (cls.day === yesterdayNy.weekday) useDate = yesterdayNy;
-    else continue;
+    // Today (NY) only — same change as the attendance engine.
+    if (cls.day !== todayNy.weekday) continue;
+    const useDate = todayNy;
 
     const range = parseClassTimeRange(cls.time);
     if (!range) continue;
     const startMs = nyDateTimeToUtcMs(useDate.year, useDate.month, useDate.day, range.startStr);
     if (!startMs) continue;
     const endMs = startMs + range.durationMin * 60 * 1000;
+
+    // Assignment cutoff guard (see attendance engine).
+    if (endMs < programCutoffMs) continue;
+
     const targetMs = endMs + PROG_CONTACT_FIRE_OFFSET_MIN * 60 * 1000;
     const lateBy = now - targetMs;
     if (lateBy < 0) continue;
@@ -13119,6 +13340,339 @@ async function checkAndFireProgramContacts() {
       students: fullList,
     });
     return;
+  }
+}
+
+/* ============================================
+   Late Check engine — mirrors checkAndFireAttendanceContacts but:
+   - Fires 5 min after class STARTS (not after class ends).
+   - Only stays firable for 7 min after the fire-target.
+   - Target list = students with no record OR marked 'absent'
+     (same criteria as the attendance-contact engine, just earlier in
+     the class). collectAbsentStudents is reused unchanged.
+============================================ */
+async function checkAndFireLateCheck() {
+  if (!state.user || !state.profile) return;
+  if (!state.taAccessReady) return;
+  if (state.pendingReminder) return;
+  if (state.pendingAttContact) return;
+  if (state.pendingProgContact) return;
+  if (state.pendingLateCheck) return;
+
+  const myPrograms = state.reminderPrograms.filter(p =>
+    p.active && p.type === 'class_late_check' && p.assigneeId === state.user.uid
+  );
+  if (myPrograms.length === 0) return;
+
+  // Same cutoff rule as attendance-contact engine: never fire for class
+  // occurrences whose start was before the program's effective cutoff
+  // (= max(createdAt, ATT_HARD_FLOOR_MS)). Take the EARLIEST cutoff so
+  // multiple programs don't double-suppress.
+  const programCutoffMs = myPrograms.reduce((min, p) => {
+    const created = (p.createdAt && p.createdAt.toMillis) ? p.createdAt.toMillis() : 0;
+    const eff = Math.max(created, ATT_HARD_FLOOR_MS);
+    return Math.min(min, eff);
+  }, Infinity);
+
+  let classes;
+  try {
+    const snap = await taDb.collection('scheduler_classes')
+      .where('status', '==', 'active').get();
+    classes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('checkAndFireLateCheck: classes read failed:', err);
+    return;
+  }
+  if (classes.length === 0) return;
+
+  const now = Date.now();
+  const todayNy = nyParts(new Date(now));
+
+  for (const cls of classes) {
+    // Today (NY) only.
+    if (cls.day !== todayNy.weekday) continue;
+    const useDate = todayNy;
+
+    const range = parseClassTimeRange(cls.time);
+    if (!range) continue;
+    const startMs = nyDateTimeToUtcMs(useDate.year, useDate.month, useDate.day, range.startStr);
+    if (!startMs) continue;
+
+    // Assignment cutoff: skip if class started before the program was
+    // assigned. Uses startMs (not endMs) since this fires DURING class.
+    if (startMs < programCutoffMs) continue;
+
+    // Fires at start + 5 min, stays firable for 7 more minutes.
+    const targetMs = startMs + LATE_CHECK_FIRE_OFFSET_MIN * 60 * 1000;
+    const lateBy = now - targetMs;
+    if (lateBy < 0) continue;
+    if (lateBy > LATE_CHECK_LATE_WINDOW_MIN * 60 * 1000) continue;
+
+    // Which week is this class in? Same getter as the attendance engine.
+    const week = getClassCurrentWeek(cls);
+    if (!week || week < 1) continue;
+
+    const occKey = `lc__${cls.id}__${week}`;
+    if (state.lateCheckFired.has(occKey)) continue;
+    state.lateCheckFired.add(occKey);
+
+    // Persistent dedupe: someone already signed off on the late check?
+    // Late-check signoffs share the attendance_contact_signoffs collection
+    // (distinguished by `kind === 'late_check'`), so docId can't collide
+    // with attendance docs (those use `${classId}__${week}`).
+    let alreadySigned = false;
+    try {
+      const sigDoc = await db.collection('attendance_contact_signoffs').doc(occKey).get();
+      if (sigDoc.exists) alreadySigned = true;
+    } catch (e) {}
+    if (alreadySigned) continue;
+
+    const studentRefs = Array.isArray(cls.students) ? cls.students : [];
+    if (studentRefs.length === 0) continue;
+    const lateList = await collectAbsentStudents(cls, week, studentRefs);
+    if (lateList.length === 0) continue;
+
+    showLateCheckPopup({
+      classId: cls.id,
+      classLevel: cls.level,
+      classDay: cls.day,
+      classTime: cls.time,
+      week,
+      occKey,
+      programId: myPrograms[0].id,
+      lateStudents: lateList,
+    });
+    return;
+  }
+}
+
+/* ---- Late Check popup (visually mirrors att-contact, different copy) ---- */
+
+function showLateCheckPopup(payload) {
+  state.pendingLateCheck = payload;
+  state.lateCheckSignoffStudents = payload.lateStudents.map(s => ({
+    studentId: s.studentId,
+    name: s.name,
+    discord: s.discord,
+    phone: s.phone,
+    contactedDiscord: false,
+    contactedText: false, // reused as "called" — column header says so
+  }));
+
+  // Fan out to other devices via FCM.
+  if (!payload.testMode) {
+    writeReminderOutbox({
+      occKey: payload.occKey,
+      assigneeId: state.user && state.user.uid,
+      type: 'class_late_check',
+      lateCount: payload.lateStudents.length,
+    });
+  }
+
+  renderLateCheckInfoView();
+  show('lateCheckModal');
+
+  // Same alarm/focus logic as other reminder popups.
+  startReminderAlarm();
+  if (document.hasFocus()) stopReminderAlarmLoop();
+  window.addEventListener('focus', stopReminderAlarmLoop, { once: true });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) stopReminderAlarmLoop();
+  }, { once: true });
+}
+
+function renderLateCheckInfoView() {
+  const payload = state.pendingLateCheck;
+  if (!payload) return;
+  el('lateCheckInfoView').style.display = '';
+  el('lateCheckSignoffView').style.display = 'none';
+
+  const levelName = ({
+    absolute: 'Absolute Beginner', novice: 'Novice',
+    beginner: 'Beginner', advanced: 'Advanced Beginner',
+  })[payload.classLevel] || payload.classLevel || '—';
+
+  const titleEl = document.querySelector('#lateCheckModal .modal-title');
+  if (titleEl) {
+    titleEl.textContent = payload.testMode
+      ? '🧪 TEST · 📞 Late Check — Call Students'
+      : '📞 Late Check — Call Students';
+  }
+
+  const classChip =
+    `<div class="att-contact-classchip">` +
+      `<span class="att-contact-classchip-day">${escapeHtml(payload.classDay)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-time">${escapeHtml(payload.classTime)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-level">${escapeHtml(levelName)}</span>` +
+      `<span class="att-contact-classchip-sep">·</span>` +
+      `<span class="att-contact-classchip-week">Week ${payload.week}</span>` +
+    `</div>`;
+
+  if (payload.testMode) {
+    el('lateCheckSubtitle').innerHTML =
+      `<div class="att-contact-testbanner">🧪 Test sent by ${escapeHtml(payload.testSenderName || '—')}. Submitting won't write a real signoff.</div>` +
+      classChip;
+  } else {
+    el('lateCheckSubtitle').innerHTML = classChip;
+  }
+
+  // Per-student rows.
+  const listEl = el('lateCheckStudentList');
+  listEl.innerHTML = state.lateCheckSignoffStudents.map(s => {
+    const discordLabel = s.discord
+      ? `🎮 <span class="att-contact-copy" data-copy="${escapeHtml(s.discord)}" title="Click to copy">${escapeHtml(s.discord)}</span>`
+      : `<span style="color: var(--ink-light); font-style: italic;">no Discord</span>`;
+    const phoneLabel = s.phone
+      ? `📱 <span class="att-contact-copy" data-copy="${escapeHtml(s.phone)}" title="Click to copy">${escapeHtml(s.phone)}</span>`
+      : `<span style="color: var(--ink-light); font-style: italic;">no phone</span>`;
+    return `
+      <div class="att-contact-student">
+        <div class="att-contact-student-name">${escapeHtml(s.name)}</div>
+        <div class="att-contact-student-meta">${discordLabel} &nbsp;·&nbsp; ${phoneLabel}</div>
+      </div>
+    `;
+  }).join('');
+  listEl.querySelectorAll('.att-contact-copy').forEach(span => {
+    span.addEventListener('click', () => {
+      const text = span.dataset.copy;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = span.textContent;
+        span.textContent = '✓ Copied!';
+        setTimeout(() => { span.textContent = orig; }, 1200);
+      }).catch(() => {});
+    });
+  });
+}
+
+function openLateCheckCannedMessage() {
+  el('lateCheckCannedBox').textContent = LATE_CHECK_CANNED_MESSAGE;
+  show('lateCheckCannedSubModal');
+}
+
+async function copyLateCheckCannedMessage() {
+  try {
+    await navigator.clipboard.writeText(LATE_CHECK_CANNED_MESSAGE);
+    const btn = el('lateCheckCannedCopyBtn');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  } catch (e) {
+    alert('Could not copy. Select the message manually and copy.');
+  }
+}
+
+function showLateCheckSignoffView() {
+  el('lateCheckInfoView').style.display = 'none';
+  el('lateCheckSignoffView').style.display = '';
+  renderLateCheckSignoffRows();
+}
+
+function backToLateCheckInfoView() {
+  renderLateCheckInfoView();
+}
+
+function renderLateCheckSignoffRows() {
+  const tbody = el('lateCheckSignoffRows');
+  tbody.innerHTML = state.lateCheckSignoffStudents.map((s, i) => `
+    <tr>
+      <td>${escapeHtml(s.name)}</td>
+      <td style="text-align:center;"><input type="checkbox" data-lc-row="${i}" data-lc-field="discord" ${s.contactedDiscord ? 'checked' : ''} /></td>
+      <td style="text-align:center;"><input type="checkbox" data-lc-row="${i}" data-lc-field="text" ${s.contactedText ? 'checked' : ''} /></td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = parseInt(cb.dataset.lcRow, 10);
+      const field = cb.dataset.lcField;
+      if (field === 'discord') state.lateCheckSignoffStudents[idx].contactedDiscord = cb.checked;
+      else if (field === 'text') state.lateCheckSignoffStudents[idx].contactedText = cb.checked;
+      updateLateCheckSubmitState();
+    });
+  });
+
+  // Name input also gates submit.
+  const nameInput = el('lateCheckSignName');
+  nameInput.value = '';
+  nameInput.addEventListener('input', updateLateCheckSubmitState);
+  updateLateCheckSubmitState();
+}
+
+function updateLateCheckSubmitState() {
+  const allChecked = state.lateCheckSignoffStudents.every(
+    s => s.contactedDiscord && s.contactedText
+  );
+  const typedName = (el('lateCheckSignName').value || '').trim();
+  el('lateCheckSubmitBtn').disabled = !(allChecked && typedName);
+}
+
+async function submitLateCheckSignoff() {
+  const payload = state.pendingLateCheck;
+  if (!payload) return;
+  const allChecked = state.lateCheckSignoffStudents.every(
+    s => s.contactedDiscord && s.contactedText
+  );
+  const typedName = (el('lateCheckSignName').value || '').trim();
+  if (!allChecked || !typedName) return;
+
+  const submitBtn = el('lateCheckSubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Saving…';
+  try {
+    if (payload.testMode) {
+      if (payload.testRequestId) {
+        try {
+          await db.collection('reminder_test_requests').doc(payload.testRequestId).delete();
+        } catch (e) {
+          console.warn('test request delete failed:', e);
+        }
+      }
+    } else {
+      await db.collection('attendance_contact_signoffs').doc(payload.occKey).set({
+        classId: payload.classId,
+        classLevel: payload.classLevel,
+        classDay: payload.classDay,
+        classTime: payload.classTime,
+        week: payload.week,
+        programId: payload.programId,
+        signedBy: state.user.uid,
+        signedByName: state.profile.name || '—',
+        signedNameTyped: typedName,
+        signedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        // `kind` distinguishes late-check signoffs from attendance and EOP
+        // signoffs in the same collection. The Class Contacts column reads
+        // this to render a different badge.
+        kind: 'late_check',
+        students: state.lateCheckSignoffStudents.map(s => ({
+          studentId: s.studentId,
+          name: s.name,
+          discord: s.discord,
+          phone: s.phone,
+          contactedDiscord: !!s.contactedDiscord,
+          // Reused field name to match the existing signoff doc shape.
+          // The UI labels this as "Called ✓" for late-check rows.
+          contactedText: !!s.contactedText,
+        })),
+      });
+    }
+    state.pendingLateCheck = null;
+    state.lateCheckSignoffStudents = [];
+    stopReminderAlarmLoop();
+    hide('lateCheckModal');
+    setTimeout(() => {
+      if (!state.pendingReminder && !state.pendingAttContact && !state.pendingProgContact
+          && !state.pendingLateCheck && unsubs.reminderTestRequests) {
+        subscribeReminderTestRequests();
+      }
+    }, 100);
+  } catch (err) {
+    console.error('late check signoff failed:', err);
+    alert('Could not save signoff: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '✍️ Submit & Close';
   }
 }
 
@@ -13818,6 +14372,9 @@ async function handleIncomingTestRequest(requestId, data) {
   if (requestType === 'class_end_program_contact') {
     return handleIncomingTestProgContact(requestId, data);
   }
+  if (requestType === 'class_late_check') {
+    return handleIncomingTestLateCheck(requestId, data);
+  }
   // Otherwise: original 10-min-before class-reminder test flow.
   if (!state.taAccessReady) {
     showReminderPopup({
@@ -13966,6 +14523,89 @@ async function handleIncomingTestAttContact(requestId, data) {
   }
 }
 
+// Test-mode equivalent for late check. Same roster logic as
+// handleIncomingTestAttContact (since collectAbsentStudents is shared),
+// just routes to showLateCheckPopup instead.
+async function handleIncomingTestLateCheck(requestId, data) {
+  console.info('[test-latecheck] handling request', requestId, data);
+  if (!state.taAccessReady) {
+    showLateCheckPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      classId: data.classId,
+      classLevel: 'absolute',
+      classDay: data.day || 'Saturday',
+      classTime: data.time || '6:30 PM',
+      week: data.week || 1,
+      occKey: `__test__${requestId}`,
+      programId: '__test__',
+      lateStudents: [
+        { studentId: 'demo1', name: 'Demo Student (no class data)', discord: 'demo#1234', phone: '555-0100' },
+      ],
+    });
+    return;
+  }
+  try {
+    const classDoc = await taDb.collection('scheduler_classes').doc(data.classId).get();
+    if (!classDoc.exists) {
+      try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
+      return;
+    }
+    const cls = { id: classDoc.id, ...classDoc.data() };
+    const week = data.week || 1;
+    const studentRefs = Array.isArray(cls.students) ? cls.students : [];
+    let lateList = [];
+    if (studentRefs.length > 0) {
+      lateList = await collectAbsentStudents(cls, week, studentRefs);
+    }
+    if (lateList.length === 0 && studentRefs.length > 0) {
+      // Sample first 2 from roster as demo.
+      const sample = studentRefs.slice(0, Math.min(2, studentRefs.length));
+      const ids = sample.map(s => s.id).filter(Boolean);
+      const fullStudents = {};
+      if (ids.length > 0) {
+        try {
+          const qSnap = await taDb.collection('scheduler_students')
+            .where(firebase.firestore.FieldPath.documentId(), 'in', ids).get();
+          qSnap.docs.forEach(d => { fullStudents[d.id] = d.data(); });
+        } catch (e) {}
+      }
+      lateList = sample.map(s => {
+        const full = fullStudents[s.id] || {};
+        return {
+          studentId: s.id,
+          name: full.name || s.name || '—',
+          discord: (full.discord || full.discordName || '').trim() || null,
+          phone: (full.phone || full.phoneNumber || '').trim() || null,
+        };
+      });
+    }
+    if (lateList.length === 0) {
+      lateList = [
+        { studentId: 'demo1', name: 'Test Student A', discord: 'student_a', phone: '555-0100' },
+        { studentId: 'demo2', name: 'Test Student B', discord: 'student_b', phone: '555-0101' },
+      ];
+    }
+    showLateCheckPopup({
+      testMode: true,
+      testRequestId: requestId,
+      testSenderName: data.senderName || '—',
+      classId: cls.id,
+      classLevel: cls.level || 'absolute',
+      classDay: cls.day || data.day,
+      classTime: cls.time || data.time,
+      week,
+      occKey: `__test__${requestId}`,
+      programId: '__test__',
+      lateStudents: lateList,
+    });
+  } catch (err) {
+    console.error('[test-latecheck] handler failed:', err);
+    try { await db.collection('reminder_test_requests').doc(requestId).delete(); } catch (e) {}
+  }
+}
+
 // Test-mode equivalent for end-of-program contact. Pulls the FULL class
 // roster (no attendance filtering). Falls back to demo students if the
 // class has no roster.
@@ -14042,6 +14682,7 @@ async function createReminderProgram(assigneeId, programType) {
   // Friendly type label for messages
   const typeLabel = ({
     class_10min_before: 'class reminders',
+    class_late_check: 'late check',
     class_end_attendance_contact: 'attendance contact',
     class_end_program_contact: 'end-of-program contact',
   })[programType] || programType;
@@ -14098,6 +14739,7 @@ function renderReminderProgramsSection() {
   // Friendly labels per program type.
   const TYPE_LABELS = {
     class_10min_before: { icon: '📢', name: 'Class reminders (10 min before)' },
+    class_late_check: { icon: '⏰', name: 'Late check (5 min after start)' },
     class_end_attendance_contact: { icon: '📞', name: 'Attendance contact (after class)' },
     class_end_program_contact: { icon: '🎓', name: 'End-of-program contact (after final class)' },
   };
@@ -14131,6 +14773,7 @@ function renderReminderProgramsSection() {
     <div class="reminder-programs-list">${listHtml}</div>
     <div class="reminder-action-row">
       <button class="btn-action primary" data-add-prog-type="class_10min_before">+ Class Reminders (10 min before)</button>
+      <button class="btn-action primary" data-add-prog-type="class_late_check">+ Late Check (5 min after start)</button>
       <button class="btn-action primary" data-add-prog-type="class_end_attendance_contact">+ Attendance Contact (after class)</button>
       <button class="btn-action primary" data-add-prog-type="class_end_program_contact">+ End-of-Program Contact (final class)</button>
     </div>
@@ -14178,6 +14821,13 @@ function openAddReminderProgramModal(programType) {
       'class of each 6-week program. They\'ll contact every student in the ' +
       'class on Discord and via text using a pre-written message about ' +
       'continuing in the academy, then sign off in the popup.';
+  } else if (_pendingProgramType === 'class_late_check') {
+    if (titleEl) titleEl.textContent = '⏰ Assign Late Check';
+    if (helpEl) helpEl.textContent =
+      'The selected person will get a noisy popup 5 minutes after every class ' +
+      'starts, listing students who have no attendance record OR are marked ' +
+      'absent. They\'ll message on Discord and call each one, then sign off in ' +
+      'the popup. The popup only stays available for 7 minutes after firing.';
   } else {
     if (titleEl) titleEl.textContent = '📢 Assign Class Reminders';
     if (helpEl) helpEl.textContent =
@@ -14231,7 +14881,9 @@ function openTestReminderModal() {
   const typeSel = el('testReminderType');
   const updateTypeUI = () => {
     const t = typeSel.value;
-    const showWeek = t === 'class_end_attendance_contact' || t === 'class_end_program_contact';
+    const showWeek = t === 'class_end_attendance_contact'
+                  || t === 'class_end_program_contact'
+                  || t === 'class_late_check';
     el('testReminderWeekWrap').style.display = showWeek ? '' : 'none';
   };
   typeSel.value = 'class_10min_before';
