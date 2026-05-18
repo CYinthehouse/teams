@@ -84,6 +84,26 @@
   body.font-large  { zoom: 1.1; }
   body.font-xlarge { zoom: 1.25; }
 
+  /* Portrait-mode shrink: applied via JS to the body when the user is on
+     a phone or tablet in portrait orientation (≤1080px AND portrait).
+     Matches the user's request to scale the UI down "a bit" so things
+     don't feel cramped at narrow widths. Companion to the breathing-room
+     padding bumps and column stacking applied via media queries below.
+
+     The font-scale combo overrides keep the combinations from compounding
+     into something illegible (e.g. font-small + portrait would naively be
+     0.9 × 0.9 = 0.81, too small). Each combination is set explicitly:
+       portrait alone           → 0.90
+       portrait + font-small    → 0.85 (a bit smaller than each alone)
+       portrait + font-large    → 1.00 (portrait cancels the upscale)
+       portrait + font-xlarge   → 1.15 (slightly less than xlarge alone)
+     Order matters: these come AFTER the .font-* rules so they win on
+     equal specificity. */
+  body.portrait-shrink             { zoom: 0.90; }
+  body.portrait-shrink.font-small  { zoom: 0.85; }
+  body.portrait-shrink.font-large  { zoom: 1.00; }
+  body.portrait-shrink.font-xlarge { zoom: 1.15; }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -810,12 +830,13 @@
   .team-switcher-host.single-team .team-trigger { cursor: default; }
   .team-switcher-host.single-team .team-trigger:hover { transform: none; box-shadow: var(--shadow-soft); }
 
-  /* Dropdown menu of teams. Positioned absolutely below the trigger.
-     Hidden by default; .open shows it. */
+  /* Dropdown menu of teams. Positioned `fixed` (not absolute) so it
+     escapes the topbar's stacking context — the topbar has z-index:50
+     which would otherwise trap an absolute child below the .menu-backdrop
+     (z=358) regardless of the menu's own z-index. JS sets top/left on
+     open by reading the trigger's bounding rect. */
   .team-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
+    position: fixed;
     min-width: 240px;
     max-width: 320px;
     max-height: 60vh;
@@ -5559,6 +5580,57 @@
     .hamburger-btn { display: inline-flex; }
   }
 
+  /* ============================================
+     Portrait-only overlay (≤1080px AND orientation: portrait)
+     Three things happen exclusively in this combination:
+     1. Horizontal scroll is forbidden — the board fits within viewport
+        width and individual cards/columns can't push it sideways.
+     2. Columns stack vertically. On phones the small-screen block above
+        already stacks; this rule extends the same behavior to TABLET
+        portrait (iPad mini/10.9"/Air/Pro at 744–1032px, Honor Pad 9 at
+        ~800px). Side-by-side gets too cramped past 3+ columns regardless
+        of tablet size.
+     3. Extra outer padding for breathing room — addresses the "containers
+        touch the edges" feedback. The board-area padding goes up roughly
+        10% relative to viewport so columns aren't kissing the sides.
+     Landscape on the same devices is intentionally NOT affected — wide
+     viewports keep horizontal scroll so you can drag a card to an
+     offscreen column, and the original column widths stay correct.
+  ============================================ */
+  @media (max-width: 1080px) and (orientation: portrait) {
+    /* No horizontal scroll, period. Applied to body and the board area
+       since either could overflow if a child gets too wide. */
+    html, body { overflow-x: hidden; }
+    .board-area { overflow-x: hidden; }
+
+    /* Stack columns vertically on every portrait device in this range.
+       (The phone block at ≤640px also does this — duplicated here so
+       tablet portrait, which wouldn't match ≤640px, gets the same
+       treatment.) */
+    .columns {
+      flex-direction: column;
+      width: 100%;
+      max-width: 100%;
+      gap: 14px;
+    }
+    .column {
+      flex: 1 1 100%;
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      /* Cap column height so a tall column doesn't push other columns
+         off-screen — internal .col-tasks scrolls instead. */
+      max-height: 60vh;
+    }
+
+    /* Outer breathing room (the +10% the user asked for). The values
+       are tuned to leave roughly 5-6% of viewport width on each side
+       across phone (~20px on 390px = 5.1%) and tablet (~28px on 820px
+       = 3.4%, but visually balanced against the bigger viewport). */
+    .board-area { padding: 20px 22px 32px; }
+    .topbar { padding: 12px 20px; }
+  }
+
   /* ----- Short viewport (iPhone landscape, small notebooks) ----- */
   /* Independent of width — fires whenever the viewport is shorter than
      480px. iPhone landscape (~390px tall) is the main target. Trims
@@ -5709,6 +5781,33 @@
     else if (fs === 1) document.body.classList.add('font-large');
     else if (fs >= 2) document.body.classList.add('font-xlarge');
   } catch (e) { /* localStorage may be unavailable in private modes */ }
+
+  // Portrait-shrink: toggle body.portrait-shrink when the viewport is
+  // ≤1080px wide AND in portrait orientation. This drives the zoom: 0.90
+  // rule (with font-scale combo overrides) defined in the stylesheet.
+  // Runs once now (so the initial render is correct) and re-runs on
+  // resize / orientationchange. Defined here in the preload script so
+  // the class is set before first paint — avoids a layout flash.
+  //
+  // Why JS instead of a media-query-only solution? Applying `zoom` from
+  // inside a media query interacts oddly with the dynamic viewport
+  // during orientation transitions, and we also need to combine it with
+  // the font-scale classes which are JS-driven. Doing both in JS keeps
+  // the state authoritative in one place.
+  function updatePortraitShrink() {
+    try {
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      // "Portrait" = taller than wide; "narrow" = ≤1080px (the same cap
+      // as the small-tablet bucket so we never apply on iPad landscape
+      // or desktop). Both must be true for the shrink to fire.
+      var isPortraitNarrow = (h > w) && (w <= 1080);
+      document.body.classList.toggle('portrait-shrink', isPortraitNarrow);
+    } catch (e) { /* defensive */ }
+  }
+  updatePortraitShrink();
+  window.addEventListener('resize', updatePortraitShrink);
+  window.addEventListener('orientationchange', updatePortraitShrink);
 })();
 </script>
 
@@ -7721,6 +7820,16 @@ auth.onAuthStateChanged(async (user) => {
   el('musicPlayer').classList.remove('hidden');
 
   state.user = user;
+
+  // Reset font-scale to default on every fresh login. Each device should
+  // start at the baseline size; a user who bumped A+ on a phone last
+  // session probably doesn't want that to carry into a desktop session
+  // (or vice versa). They can re-bump if they want — the buttons are
+  // still accessible via the hamburger / topbar.
+  try { localStorage.setItem('fontScale', '0'); } catch (e) {}
+  applyFontScale(0);
+  refreshFontButtons();
+
   hide('authScreen');
   show('loadingScreen');
 
@@ -8212,11 +8321,39 @@ function toggleTeamMenu(e) {
     closeTeamMenu();
   } else {
     closeHamburgerMenu();
+    positionTeamMenu();
     menu.classList.add('open');
     el('teamTrigger').setAttribute('aria-expanded', 'true');
     el('menuBackdrop').classList.add('open');
   }
 }
+
+// Anchor the (position: fixed) team menu under the trigger button. We
+// can't use `position: absolute` because the topbar creates a stacking
+// context (z-index:50) that traps the menu below the backdrop. With
+// fixed positioning the menu needs explicit top/left coordinates
+// computed from the trigger's viewport position.
+function positionTeamMenu() {
+  const trigger = el('teamTrigger');
+  const menu = el('teamMenu');
+  if (!trigger || !menu) return;
+  const rect = trigger.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 6) + 'px';
+  // Clamp left edge so a wide menu near the right edge of the screen
+  // doesn't overflow the viewport.
+  const menuWidthGuess = 280;
+  const maxLeft = window.innerWidth - menuWidthGuess - 8;
+  menu.style.left = Math.max(8, Math.min(rect.left, maxLeft)) + 'px';
+}
+
+// Close any open topbar menus on viewport resize. The team menu is
+// position: fixed and anchored to the trigger's rect at the moment of
+// open — a resize could move the trigger, leaving the menu in a stale
+// location. Closing is simpler than recomputing. (Orientation changes
+// fire resize too, so this also covers device rotation.)
+window.addEventListener('resize', () => {
+  if (isTeamMenuOpen() || isHamburgerOpen()) closeAllTopbarMenus();
+});
 function closeTeamMenu() {
   const menu = el('teamMenu');
   if (!menu) return;
@@ -8360,6 +8497,19 @@ function renderBoard() {
   const members = memberIds
     .map(id => state.allUsers.find(u => u.uid === id))
     .filter(Boolean);
+
+  // Put the logged-in user first in the member list so their own column
+  // is always the leftmost on desktop / topmost in portrait. Other
+  // members keep whatever relative order they had from memberIds. This
+  // is purely a display preference; the underlying team.memberIds in
+  // Firestore is not reordered.
+  if (state.user) {
+    const meIdx = members.findIndex(m => m.uid === state.user.uid);
+    if (meIdx > 0) {
+      const me = members.splice(meIdx, 1)[0];
+      members.unshift(me);
+    }
+  }
 
   // Identify ghost users: tasks pointing to a uid not in current team's memberIds
   const taskAssignees = new Set(state.tasks.map(t => t.assigneeId).filter(Boolean));
