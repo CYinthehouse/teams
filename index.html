@@ -4714,10 +4714,20 @@
   .thoughts-list {
     flex: 1;
     overflow-y: auto;
+    /* min-height:0 is required for a flex child with overflow:auto to
+       actually constrain to its parent's flex space — without it, the
+       child can grow indefinitely, taking the panel offscreen and making
+       its scroll unreachable. Especially noticeable in landscape phones
+       where the panel is fixed top/bottom and the list is supposed to
+       fill remaining flex space. */
+    min-height: 0;
     padding: 10px 14px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    /* Legacy iOS support for momentum scroll inside fixed-position
+       panels. Newer iOS doesn't need it but it does no harm. */
+    -webkit-overflow-scrolling: touch;
   }
   .thoughts-empty {
     text-align: center;
@@ -6021,54 +6031,10 @@
     </div>
   </div>
 
-  <!-- Hamburger menu panel — anchored top-right, opens beneath the topbar.
-       Mirrors the desktop icon row's actions but laid out as a tap-friendly
-       list. Closes when clicking outside or selecting an item. -->
-  <div class="hamburger-menu" id="hamburgerMenu" role="menu" aria-hidden="true">
-    <div class="hamburger-user">
-      <div class="avatar" id="myAvatarMobile">?</div>
-      <div class="user-info">
-        <div class="user-name" id="myNameMobile">—</div>
-        <div class="user-role" id="myRoleMobile">—</div>
-      </div>
-    </div>
-    <button class="hamburger-item" onclick="hamburgerAction('notifications')">
-      <span class="hamburger-icon">🔔</span>
-      <span>Notifications</span>
-      <span class="hamburger-badge" id="hamburgerBellBadge">0</span>
-    </button>
-    <button class="hamburger-item" onclick="hamburgerAction('font-')">
-      <span class="hamburger-icon">A−</span>
-      <span>Decrease text size</span>
-    </button>
-    <button class="hamburger-item" onclick="hamburgerAction('font+')">
-      <span class="hamburger-icon">A+</span>
-      <span>Increase text size</span>
-    </button>
-    <button class="hamburger-item" onclick="hamburgerAction('theme')">
-      <span class="hamburger-icon" id="hamburgerThemeIcon">🌙</span>
-      <span id="hamburgerThemeLabel">Light/Dark mode</span>
-    </button>
-    <button class="hamburger-item" onclick="hamburgerAction('settings')">
-      <span class="hamburger-icon">⚙️</span>
-      <span>Settings</span>
-    </button>
-    <div class="hamburger-sep"></div>
-    <button class="hamburger-item hamburger-item-danger" onclick="hamburgerAction('signout')">
-      <span class="hamburger-icon">⤴</span>
-      <span>Sign out</span>
-    </button>
-  </div>
-
-  <!-- Invisible click-catcher that closes the team menu / hamburger menu
-       when the user taps anywhere outside. Toggled visible alongside them. -->
-  <div class="menu-backdrop" id="menuBackdrop" onclick="closeAllTopbarMenus()"></div>
-
-  <!-- Team menu lives here (NOT inside .topbar) so it isn't trapped in
-       .topbar's stacking context (z-index:50). Sitting at this level it
-       can use its own z-index:360 to render above the .menu-backdrop
-       (z-index:358). JS positions it under the trigger via getBoundingClientRect. -->
-  <div class="team-menu" id="teamMenu" role="menu" aria-hidden="true"></div>
+  <!-- (Hamburger menu, menu backdrop, and team menu all live OUTSIDE
+       #app at the body root — see below — so their z-indexes can compete
+       with music player and poke strip. Inside #app they'd be trapped
+       at #app's z=1 level.) -->
 
   <div class="board-area">
     <div class="board-header">
@@ -6092,6 +6058,55 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Topbar menu support (all at body root level, NOT inside #app, so
+     their z-indexes actually win against music player and poke strip):
+     - menu-backdrop catches outside-clicks for both menus below
+     - team menu drops down from the team-name pill (JS positions it)
+     - hamburger menu opens from the top-right hamburger button -->
+<div class="menu-backdrop" id="menuBackdrop" onclick="closeAllTopbarMenus()"></div>
+<div class="team-menu" id="teamMenu" role="menu" aria-hidden="true"></div>
+
+<!-- Hamburger menu panel — lives OUTSIDE #app at body root level so its
+     z-index:400 actually wins against the music player (z=380) and poke
+     strip (z=300). Inside #app (which has z-index:1) it would have been
+     trapped — same stacking-context trap that the team menu hit earlier.
+     Anchored top-right via fixed positioning. -->
+<div class="hamburger-menu" id="hamburgerMenu" role="menu" aria-hidden="true">
+  <div class="hamburger-user">
+    <div class="avatar" id="myAvatarMobile">?</div>
+    <div class="user-info">
+      <div class="user-name" id="myNameMobile">—</div>
+      <div class="user-role" id="myRoleMobile">—</div>
+    </div>
+  </div>
+  <button class="hamburger-item" onclick="hamburgerAction('notifications')">
+    <span class="hamburger-icon">🔔</span>
+    <span>Notifications</span>
+    <span class="hamburger-badge" id="hamburgerBellBadge">0</span>
+  </button>
+  <button class="hamburger-item" onclick="hamburgerAction('font-')">
+    <span class="hamburger-icon">A−</span>
+    <span>Decrease text size</span>
+  </button>
+  <button class="hamburger-item" onclick="hamburgerAction('font+')">
+    <span class="hamburger-icon">A+</span>
+    <span>Increase text size</span>
+  </button>
+  <button class="hamburger-item" onclick="hamburgerAction('theme')">
+    <span class="hamburger-icon" id="hamburgerThemeIcon">🌙</span>
+    <span id="hamburgerThemeLabel">Light/Dark mode</span>
+  </button>
+  <button class="hamburger-item" onclick="hamburgerAction('settings')">
+    <span class="hamburger-icon">⚙️</span>
+    <span>Settings</span>
+  </button>
+  <div class="hamburger-sep"></div>
+  <button class="hamburger-item hamburger-item-danger" onclick="hamburgerAction('signout')">
+    <span class="hamburger-icon">⤴</span>
+    <span>Sign out</span>
+  </button>
 </div>
 
 <!-- Toast notifications stack -->
@@ -18241,12 +18256,25 @@ try {
 
 // Close the notifications panel on outside click. The bell button itself
 // toggles the panel, so we need to ignore clicks on it (otherwise toggle
-// + close would race and leave the panel closed).
+// + close would race and leave the panel closed). On mobile/tablet the
+// bell is hidden inside the hamburger menu, so we also need to ignore
+// clicks inside the hamburger menu — without that exemption, opening
+// notifications from the hamburger would have the click bubble up here
+// and immediately close the panel that just opened.
 document.addEventListener('click', (e) => {
   if (!state.notificationsOpen) return;
   const panel = el('notificationsPanel');
   const bell = el('bellBtn');
-  if (panel && !panel.contains(e.target) && bell && !bell.contains(e.target)) {
+  const hamburgerMenu = el('hamburgerMenu');
+  const hamburgerBtn = el('hamburgerBtn');
+  // Ignore clicks inside the panel, the bell, or anywhere in the
+  // hamburger menu / its trigger.
+  const inside =
+    (panel && panel.contains(e.target)) ||
+    (bell && bell.contains(e.target)) ||
+    (hamburgerMenu && hamburgerMenu.contains(e.target)) ||
+    (hamburgerBtn && hamburgerBtn.contains(e.target));
+  if (!inside) {
     state.notificationsOpen = false;
     panel.classList.remove('open');
   }
