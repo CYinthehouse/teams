@@ -5857,14 +5857,13 @@
       <span>Teams</span>
     </div>
     <!-- Team switcher: a single button showing the active team name with
-         a dropdown caret. Tapping opens #teamMenu below. Replaces the old
-         horizontal pill row, which couldn't fit on phones and forced wrap. -->
+         a dropdown caret. Tapping opens #teamMenu (which lives at the end
+         of the body, not here — see comment below). -->
     <div class="team-switcher-host">
       <button class="team-trigger" id="teamTrigger" type="button" onclick="toggleTeamMenu(event)" aria-expanded="false" aria-haspopup="menu">
         <span class="team-trigger-name" id="teamTriggerName">—</span>
         <span class="team-trigger-caret">▾</span>
       </button>
-      <div class="team-menu" id="teamMenu" role="menu" aria-hidden="true"></div>
     </div>
     <div class="topbar-right">
       <button class="chat-fab" id="chatFab" title="Team Chat" onclick="toggleChatPanel()">
@@ -5945,6 +5944,12 @@
   <!-- Invisible click-catcher that closes the team menu / hamburger menu
        when the user taps anywhere outside. Toggled visible alongside them. -->
   <div class="menu-backdrop" id="menuBackdrop" onclick="closeAllTopbarMenus()"></div>
+
+  <!-- Team menu lives here (NOT inside .topbar) so it isn't trapped in
+       .topbar's stacking context (z-index:50). Sitting at this level it
+       can use its own z-index:360 to render above the .menu-backdrop
+       (z-index:358). JS positions it under the trigger via getBoundingClientRect. -->
+  <div class="team-menu" id="teamMenu" role="menu" aria-hidden="true"></div>
 
   <div class="board-area">
     <div class="board-header">
