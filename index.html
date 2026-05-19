@@ -629,21 +629,21 @@
     margin-bottom: 8px;
     overflow: hidden;
     box-shadow: var(--shadow-card);
-    transition: transform 0.12s, box-shadow 0.12s;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    cursor: pointer;
   }
   .contact-card:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--lavender);
   }
-  .contact-card summary {
-    list-style: none;
-    cursor: pointer;
+  .contact-card:focus-visible {
+    outline: 2px solid var(--pink);
+    outline-offset: 2px;
+  }
+  .contact-card-summary {
     padding: 10px 12px;
     user-select: none;
-  }
-  .contact-card summary::-webkit-details-marker { display: none; }
-  .contact-card[open] summary {
-    border-bottom: 1px dashed var(--bg-2);
   }
   .contact-card-line1 {
     font-size: 13px;
@@ -664,19 +664,94 @@
     font-size: 10px;
     color: var(--ink-light);
   }
-  .contact-card-details {
-    padding: 10px 12px;
-    background: var(--bg-3);
-    font-size: 11px;
+  /* Detail modal — opens when a contact card is clicked. */
+  .contact-detail-classchip {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--lavender-soft);
+    border-radius: 10px;
+    font-size: 13px;
     color: var(--ink);
-    line-height: 1.5;
+    margin-bottom: 14px;
   }
-  .contact-card-detail {
+  .contact-detail-classchip-sep {
+    color: var(--ink-light);
+  }
+  .contact-detail-section {
+    margin-bottom: 14px;
+  }
+  .contact-detail-section:last-child {
+    margin-bottom: 0;
+  }
+  .contact-detail-section-head {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  .contact-detail-row {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink);
     margin-bottom: 4px;
     word-break: break-word;
   }
-  .contact-card-detail:last-child { margin-bottom: 0; }
-  .contact-card-detail a { color: var(--ink); text-decoration: underline; }
+  .contact-detail-row a {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+  .contact-detail-student {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--bg-3);
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+  .contact-detail-student:last-child { margin-bottom: 0; }
+  .contact-detail-student-name {
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 600;
+    flex: 1;
+  }
+  .contact-detail-student-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .contact-detail-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .contact-detail-tag.on {
+    background: #d8f5d8;
+    color: #1d6f1d;
+    border: 1px solid #a8e0a8;
+  }
+  .contact-detail-tag.off {
+    background: var(--bg-2);
+    color: var(--ink-light);
+    border: 1px solid var(--bg-2);
+  }
+  .contact-detail-empty {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-style: italic;
+    padding: 12px;
+    text-align: center;
+    background: var(--bg-3);
+    border-radius: 8px;
+  }
   /* Kind badge inline next to the day/time (Attendance vs End-of-Program) */
   .contact-kind-badge {
     display: inline-block;
@@ -801,7 +876,12 @@
   }
 
   .brand-icon {
-    font-size: 26px;
+    /* Logo image — sized to match the previous 26px emoji line so layout
+       doesn't shift. The image is square-ish; height controls overall size. */
+    height: 30px;
+    width: auto;
+    display: block;
+    vertical-align: middle;
   }
 
   /* Team switcher — a single button that shows the active team's name
@@ -2161,7 +2241,11 @@
   }
 
   .loading-emoji {
-    font-size: 48px;
+    /* Was a font-sized emoji; now an img logo. Height matches the old
+       font-size visual weight so the bounce animation lands the same. */
+    height: 64px;
+    width: auto;
+    display: block;
     animation: bounce 1.2s ease-in-out infinite;
   }
 
@@ -3699,6 +3783,12 @@
     justify-content: center;
   }
   .chat-channel .ch-unread.visible { display: flex; }
+  .chat-channel-icon {
+    height: 16px;
+    width: auto;
+    display: inline-block;
+    vertical-align: middle;
+  }
 
   .chat-disclosure {
     margin-top: 10px;
@@ -5571,7 +5661,7 @@
        hamburger. */
     .topbar { padding: 10px 14px; gap: 10px; }
     .brand { font-size: 20px; }
-    .brand-icon { font-size: 22px; }
+    .brand-icon { height: 26px; }
     .topbar-right { gap: 8px; }
     .team-trigger { font-size: 13px; padding: 7px 12px; }
     .team-trigger-name { max-width: 140px; }
@@ -5968,7 +6058,7 @@
 
 <!-- Loading screen -->
 <div id="loadingScreen" class="loading-screen">
-  <div class="loading-emoji">🌸</div>
+  <img class="loading-emoji" src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Justice-Gravity-Fitness-Calvin-Yim-Small-Logo.png?v=1667516099" alt="Loading" />
   <div class="loading-text">Loading...</div>
 </div>
 
@@ -6008,7 +6098,7 @@
 <div id="app" class="app hidden">
   <div class="topbar">
     <div class="brand">
-      <span class="brand-icon">🌸</span>
+      <img class="brand-icon" src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Justice-Gravity-Fitness-Calvin-Yim-Small-Logo.png?v=1667516099" alt="" />
       <span>Teams</span>
     </div>
     <!-- Team switcher: a single button showing the active team name with
@@ -6336,7 +6426,7 @@
     </div>
     <div class="chat-channels">
       <button class="chat-channel active" id="channelTeam" onclick="switchChatChannel('team')">
-        🌸 Team Chat
+        <img class="chat-channel-icon" src="https://cdn.shopify.com/s/files/1/0674/6747/7282/files/Justice-Gravity-Fitness-Calvin-Yim-Small-Logo.png?v=1667516099" alt="" /> Team Chat
         <span class="ch-unread" id="unreadTeam">0</span>
       </button>
       <button class="chat-channel" id="channelWorkers" onclick="switchChatChannel('workers')">
@@ -9500,12 +9590,6 @@ function buildClassContactsColumn() {
         absolute: 'Absolute Beginner', novice: 'Novice',
         beginner: 'Beginner', advanced: 'Advanced Beginner',
       })[c.classLevel] || c.classLevel || '—';
-      const studentsList = (c.students || []).map(s => {
-        const tags = [];
-        if (s.contactedDiscord) tags.push('🎮');
-        if (s.contactedText) tags.push('📱');
-        return `${escapeHtml(s.name)} ${tags.join('')}`;
-      }).join(', ');
       const studentsCount = (c.students || []).length;
       const isEOP = c.kind === 'end_of_program';
       const isLC = c.kind === 'late_check';
@@ -9515,44 +9599,12 @@ function buildClassContactsColumn() {
         : (isLC
             ? `<span class="contact-kind-badge lc">Late Check</span>`
             : `<span class="contact-kind-badge att">Attendance</span>`);
-      // Body block differs across kinds. EOP and LC have no Loom/HW
-      // (those are attendance-contact specific). LC labels the second
-      // checkbox "Called" instead of "Texted" — students were marked late
-      // by phone call, not by text, even though the underlying field is
-      // the same `contactedText` for schema reuse.
-      const hwLabel = c.homeworkKind === 'pdf' ? 'Absolute HW PDF'
-        : c.homeworkKind === 'discord' ? 'Discord chat HW'
-        : 'no HW link';
-      // For LC cards, re-render the student tag list with phone (📞) in
-      // place of text (📱) so the "what was done" semantics match.
-      const studentsListLC = (c.students || []).map(s => {
-        const tags = [];
-        if (s.contactedDiscord) tags.push('🎮');
-        if (s.contactedText) tags.push('📞'); // called, not texted
-        return `${escapeHtml(s.name)} ${tags.join('')}`;
-      }).join(', ');
-      const detailsBody = isEOP
-        ? `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
-           <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`
-        : isLC
-        ? `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
-           <div class="contact-card-detail"><strong>Contacted (Discord + Call):</strong> ${escapeHtml(studentsListLC) || '—'}</div>`
-        : `<div class="contact-card-detail"><strong>Signed name:</strong> ${escapeHtml(c.signedNameTyped || '—')}</div>
-           <div class="contact-card-detail"><strong>Homework:</strong> ${escapeHtml(hwLabel)}${c.homeworkUrl ? ' — <a href="' + escapeHtml(safeHref(c.homeworkUrl)) + '" target="_blank" rel="noopener">link</a>' : ''}</div>
-           <div class="contact-card-detail"><strong>Loom:</strong> <a href="${escapeHtml(safeHref(c.loomUrl))}" target="_blank" rel="noopener">link</a></div>
-           <div class="contact-card-detail"><strong>Contacted:</strong> ${escapeHtml(studentsList) || '—'}</div>`;
-      // Delete affordance — Boss/Manager only. Hard delete from
-      // attendance_contact_signoffs. We render the button inline at the
-      // end of the details body so non-Boss/Mgr users don't see it.
-      const canDelete = isBossOrManager(state.profile.role);
-      const deleteBtnHtml = canDelete
-        ? `<div class="contact-card-detail" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--ink-muted);">
-             <button class="btn-action danger contact-delete-btn" data-signoff-id="${escapeHtml(c.id)}" data-week="${escapeHtml(String(c.week || ''))}" data-class-day="${escapeHtml(c.classDay || '')}" style="padding: 4px 12px; font-size: 11px;">🗑 Delete signoff</button>
-           </div>`
-        : '';
+      // Cards are now flat clickable summaries. Click → opens detail modal
+      // with full info (signed name, homework, loom, students, delete).
+      // Old <details>/expand pattern dropped per Calvin's request.
       return `
-        <details class="contact-card${isEOP ? ' contact-card-eop' : (isLC ? ' contact-card-lc' : '')}">
-          <summary>
+        <div class="contact-card${isEOP ? ' contact-card-eop' : (isLC ? ' contact-card-lc' : '')}" data-signoff-id="${escapeHtml(c.id)}" role="button" tabindex="0">
+          <div class="contact-card-summary">
             <div class="contact-card-line1">
               ${headerIcon} <strong>${escapeHtml(c.classDay || '')} · ${escapeHtml(c.classTime || '')}</strong> ${kindLabel}
             </div>
@@ -9561,12 +9613,8 @@ function buildClassContactsColumn() {
               ✓ <strong>${escapeHtml(c.signedByName || '—')}</strong> · ${studentsCount} student${studentsCount === 1 ? '' : 's'}
             </div>
             <div class="contact-card-line4">${escapeHtml(when)}</div>
-          </summary>
-          <div class="contact-card-details">
-            ${detailsBody}
-            ${deleteBtnHtml}
           </div>
-        </details>
+        </div>
       `;
     }).join('');
   }
@@ -9585,35 +9633,171 @@ function buildClassContactsColumn() {
     </div>
   `;
 
-  // Delegated click handler for delete buttons. Uses click capture to
-  // intercept before the <details> summary's default toggle, so clicking
-  // the button inside an open <details> doesn't accidentally collapse it.
-  col.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.contact-delete-btn');
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isBossOrManager(state.profile.role)) return; // safety net
-    const signoffId = btn.dataset.signoffId;
-    if (!signoffId) return;
-    const day = btn.dataset.classDay || '';
-    const week = btn.dataset.week || '';
-    const label = day && week ? `the ${day} (Wk ${week}) signoff` : 'this signoff';
-    if (!confirm(`Delete ${label}?\n\nThis only removes the Class Contacts record. It does NOT contact anyone or undo the original work.`)) return;
-    btn.disabled = true;
-    btn.textContent = 'Deleting…';
-    try {
-      await db.collection('attendance_contact_signoffs').doc(signoffId).delete();
-      // Snapshot listener will refresh the column automatically.
-    } catch (err) {
-      console.error('Delete signoff failed:', err);
-      alert('Could not delete: ' + err.message);
-      btn.disabled = false;
-      btn.textContent = '🗑 Delete signoff';
-    }
-  });
+  // Delegated click: open detail modal for the clicked signoff. Uses
+  // dataset.signoffId set on the card root. Keyboard activation (Enter/Space)
+  // also works because cards have role=button + tabindex=0.
+  const openHandler = (e) => {
+    const card = e.target.closest('.contact-card[data-signoff-id]');
+    if (!card) return;
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+    if (e.type === 'keydown') e.preventDefault();
+    openClassContactDetail(card.dataset.signoffId);
+  };
+  col.addEventListener('click', openHandler);
+  col.addEventListener('keydown', openHandler);
 
   return col;
+}
+
+/* ---- Class Contacts detail modal ---- */
+// Renders a full-detail view of one signoff in a modal. Boss/Manager
+// sees a Delete button; everyone else just sees Close. The signoff doc
+// is looked up by id from state.attContactsHistory (already in memory
+// from the snapshot listener), so this is a synchronous read with no
+// Firestore hit.
+function openClassContactDetail(signoffId) {
+  const c = (state.attContactsHistory || []).find(x => x.id === signoffId);
+  if (!c) {
+    alert('That signoff is no longer available.');
+    return;
+  }
+
+  const isEOP = c.kind === 'end_of_program';
+  const isLC = c.kind === 'late_check';
+  const headerIcon = isEOP ? '🎓' : (isLC ? '⏰' : '📞');
+  const kindName = isEOP ? 'End of Program'
+                  : (isLC ? 'Late Check' : 'Attendance Contact');
+  const levelName = ({
+    absolute: 'Absolute Beginner', novice: 'Novice',
+    beginner: 'Beginner', advanced: 'Advanced Beginner',
+  })[c.classLevel] || c.classLevel || '—';
+
+  const when = c.signedAt && c.signedAt.toMillis
+    ? new Date(c.signedAt.toMillis()).toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      })
+    : '—';
+
+  // Per-student rows. For Late Check, the "second" checkbox semantically
+  // means "called" rather than "texted" (same field, different label).
+  const secondTagEmoji = isLC ? '📞' : '📱';
+  const secondTagWord  = isLC ? 'Called' : 'Texted';
+  const studentRowsHtml = (c.students || []).length === 0
+    ? `<div class="contact-detail-empty">No students recorded.</div>`
+    : (c.students || []).map(s => {
+        const discordOk = s.contactedDiscord;
+        const textOk = s.contactedText;
+        return `
+          <div class="contact-detail-student">
+            <div class="contact-detail-student-name">${escapeHtml(s.name || '—')}</div>
+            <div class="contact-detail-student-tags">
+              <span class="contact-detail-tag ${discordOk ? 'on' : 'off'}">
+                🎮 Discord ${discordOk ? '✓' : '—'}
+              </span>
+              <span class="contact-detail-tag ${textOk ? 'on' : 'off'}">
+                ${secondTagEmoji} ${escapeHtml(secondTagWord)} ${textOk ? '✓' : '—'}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+  // Homework / Loom block — attendance-contact only, since the other two
+  // kinds don't carry these fields.
+  let hwLoomHtml = '';
+  if (!isEOP && !isLC) {
+    const hwLabel = c.homeworkKind === 'pdf' ? 'Absolute HW PDF'
+                  : c.homeworkKind === 'discord' ? 'Discord chat HW'
+                  : 'no HW link';
+    const hwLine = c.homeworkUrl
+      ? `${escapeHtml(hwLabel)} — <a href="${escapeHtml(safeHref(c.homeworkUrl))}" target="_blank" rel="noopener">open link</a>`
+      : escapeHtml(hwLabel);
+    const loomLine = c.loomUrl
+      ? `<a href="${escapeHtml(safeHref(c.loomUrl))}" target="_blank" rel="noopener">open Loom</a>`
+      : '—';
+    hwLoomHtml = `
+      <div class="contact-detail-row"><strong>Homework:</strong> ${hwLine}</div>
+      <div class="contact-detail-row"><strong>Loom:</strong> ${loomLine}</div>
+    `;
+  }
+
+  const canDelete = isBossOrManager(state.profile.role);
+  const deleteBtnHtml = canDelete
+    ? `<button class="btn-action danger" id="contactDetailDeleteBtn">🗑 Delete signoff</button>`
+    : '';
+
+  // Build & show modal. Inline HTML so we don't have to maintain a
+  // separate template block in the markup section.
+  const existing = document.getElementById('contactDetailModal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'contactDetailModal';
+  modal.className = 'modal-backdrop';
+  modal.style.zIndex = '470';
+  modal.innerHTML = `
+    <div class="modal" style="max-width: 560px;">
+      <div class="modal-head">
+        <div class="modal-title">${headerIcon} ${escapeHtml(kindName)}</div>
+        <button class="modal-close" id="contactDetailCloseBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="contact-detail-classchip">
+          <span><strong>${escapeHtml(c.classDay || '—')}</strong> · ${escapeHtml(c.classTime || '—')}</span>
+          <span class="contact-detail-classchip-sep">·</span>
+          <span>${escapeHtml(levelName)}</span>
+          <span class="contact-detail-classchip-sep">·</span>
+          <span>Week ${escapeHtml(String(c.week || '—'))}</span>
+        </div>
+
+        <div class="contact-detail-section">
+          <div class="contact-detail-row"><strong>Signed by:</strong> ${escapeHtml(c.signedByName || '—')}${c.signedNameTyped && c.signedNameTyped !== c.signedByName ? ' <span style="color:var(--ink-soft);">(typed: ' + escapeHtml(c.signedNameTyped) + ')</span>' : ''}</div>
+          <div class="contact-detail-row"><strong>Signed at:</strong> ${escapeHtml(when)}</div>
+          ${hwLoomHtml}
+        </div>
+
+        <div class="contact-detail-section">
+          <div class="contact-detail-section-head">Students (${(c.students || []).length})</div>
+          ${studentRowsHtml}
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; gap: 8px;">
+        ${deleteBtnHtml}
+        <button class="btn-action primary" id="contactDetailDoneBtn" style="margin-left: auto;">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Close handlers
+  const close = () => {
+    modal.remove();
+  };
+  el('contactDetailCloseBtn').onclick = close;
+  el('contactDetailDoneBtn').onclick = close;
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) close();
+  });
+
+  // Delete (Boss/Mgr only)
+  if (canDelete) {
+    const delBtn = el('contactDetailDeleteBtn');
+    delBtn.onclick = async () => {
+      const label = c.classDay && c.week ? `the ${c.classDay} (Wk ${c.week}) signoff` : 'this signoff';
+      if (!confirm(`Delete ${label}?\n\nThis only removes the Class Contacts record. It does NOT contact anyone or undo the original work.`)) return;
+      delBtn.disabled = true;
+      delBtn.textContent = 'Deleting…';
+      try {
+        await db.collection('attendance_contact_signoffs').doc(signoffId).delete();
+        close(); // snapshot listener will refresh the column
+      } catch (err) {
+        console.error('Delete signoff failed:', err);
+        alert('Could not delete: ' + err.message);
+        delBtn.disabled = false;
+        delBtn.textContent = '🗑 Delete signoff';
+      }
+    };
+  }
 }
 
 function buildTaskCard(task) {
