@@ -6048,29 +6048,34 @@
   .tut-popup {
     position: absolute;
     background: var(--white);
-    border: 2px solid var(--pink);
-    border-radius: 16px;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
-    padding: 22px 22px 18px;
-    max-width: 380px;
+    border: 3px solid var(--pink-deep);
+    border-radius: 18px;
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.95),
+      0 0 0 6px var(--pink-deep),
+      0 20px 60px rgba(74, 53, 80, 0.45),
+      0 6px 16px rgba(0, 0, 0, 0.18);
+    padding: 28px 30px 24px;
+    max-width: 520px;
     pointer-events: auto;
   }
   .tut-popup-title {
     font-family: var(--font-display);
-    font-size: 18px;
+    font-size: 24px;
     color: var(--pink-deep);
-    margin-bottom: 8px;
+    margin-bottom: 14px;
     line-height: 1.3;
+    text-shadow: 0 1px 0 var(--white);
   }
   .tut-popup-body {
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 17px;
+    line-height: 1.55;
     color: var(--ink);
-    margin-bottom: 14px;
+    margin-bottom: 18px;
   }
-  .tut-popup-body.tut-small { font-size: 12.5px; line-height: 1.5; }
+  .tut-popup-body.tut-small { font-size: 15px; line-height: 1.55; }
   .tut-popup-body ol {
-    margin: 6px 0 8px 20px;
+    margin: 8px 0 10px 22px;
     padding: 0;
   }
   .tut-popup-body ol li { margin-bottom: 2px; }
@@ -6080,8 +6085,8 @@
     gap: 8px;
   }
   .tut-popup-actions .btn-action {
-    padding: 8px 24px;
-    font-size: 14px;
+    padding: 10px 32px;
+    font-size: 16px;
   }
   /* Glowing-target highlight. Position is set inline based on the
      target element's bounding rect; updates on resize/scroll. */
@@ -6176,54 +6181,57 @@
     left: 50%;
     transform: translateX(-50%);
     bottom: 7%;
-    width: min(92vw, 420px);
+    width: min(92vw, 480px);
   }
   .tut-pos-right-side {
     /* desktop/landscape — right side, vertically centered with the column */
     right: 4%;
     top: 40%;
     transform: translateY(-50%);
-    width: 340px;
+    width: 460px;
   }
   .tut-pos-top {
     /* portrait — top of screen */
     left: 50%;
     transform: translateX(-50%);
     top: 5%;
-    width: min(92vw, 420px);
+    width: min(92vw, 480px);
   }
   .tut-pos-bottom-center {
     /* desktop landscape — bottom center */
     left: 50%;
     transform: translateX(-50%);
     bottom: 5%;
-    width: min(92vw, 420px);
+    width: min(92vw, 520px);
   }
   .tut-pos-center {
     /* dead-center, used for welcome/end/blur-focus steps */
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: min(92vw, 420px);
+    width: min(92vw, 520px);
   }
   .tut-pos-near-settings {
     /* desktop step 6 — popup positioned to gesture toward the settings
        button in the top-right corner. JS will recalculate this exactly. */
     right: 24px;
-    top: 68px;
-    width: 320px;
+    top: 76px;
+    width: 420px;
   }
   .tut-pos-near-hamburger {
     /* mobile step 6 — same idea but for the hamburger button */
     right: 18px;
     top: 60px;
-    width: min(80vw, 320px);
+    width: min(80vw, 360px);
   }
-  /* Compact popup tweaks at small screens. */
+  /* Compact popup tweaks at small screens. Base styles above are sized for
+     desktop; phones get scaled down here so they don't dominate the viewport. */
   @media (max-width: 640px) {
-    .tut-popup { padding: 18px 18px 14px; }
-    .tut-popup-title { font-size: 16px; }
-    .tut-popup-body { font-size: 13px; }
+    .tut-popup { padding: 20px 20px 16px; }
+    .tut-popup-title { font-size: 18px; margin-bottom: 10px; }
+    .tut-popup-body { font-size: 14px; margin-bottom: 14px; }
+    .tut-popup-body.tut-small { font-size: 13px; }
+    .tut-popup-actions .btn-action { padding: 8px 22px; font-size: 14px; }
     .tut-mockup { padding: 14px; max-width: 92vw; }
   }
 </style>
@@ -6884,9 +6892,6 @@
       <div class="reminder-popup-headline">
         These students were absent! Contact them now with:<br>
         1) The class recording &nbsp; 2) Their homework assignment.
-      </div>
-      <div class="att-contact-callout-red">
-        ⚠️ Please call them if they are not in class 5 minutes after class begins!
       </div>
       <div id="attContactSubtitle" class="att-contact-subtitle">—</div>
 
@@ -20136,14 +20141,17 @@ function buildTutorialSteps() {
       showMockupOnAction: true,
     },
     // 5. Enable notifications — center, NO blur (so the user can see the
-    //    glowing settings button in the corner)
+    //    glowing settings button in the corner). Advances when the user
+    //    clicks the glowing button (settings gear desktop / hamburger
+    //    mobile), NOT via an OK button — clicking the target IS the action.
     {
       id: 'enable-notifs',
       blur: false,
       posClass: 'tut-pos-center',
       title: 'Enable notifications',
       body: `You'll need to enable notifications for this app. This will notify you of your tasks and reminders. Go to settings.`,
-      buttonLabel: 'OK',
+      hideButton: true,
+      advanceOnTargetClick: true,
       // Target: the settings gear (desktop) or hamburger (mobile)
       target: () => {
         // Find whichever is currently visible
@@ -20224,6 +20232,13 @@ function startTutorial() {
 
 function endTutorial() {
   if (!tutorialState.active) return;
+  // Detach any pending target-click handler so it doesn't fire after the
+  // tutorial has been closed.
+  if (tutorialState._targetClickHandler) {
+    const { target, handler } = tutorialState._targetClickHandler;
+    try { target.removeEventListener('click', handler, true); } catch (e) {}
+    tutorialState._targetClickHandler = null;
+  }
   const root = tutorialState.rootEl;
   if (root) {
     root.classList.remove('active');
@@ -20250,6 +20265,13 @@ function endTutorial() {
 function renderCurrentStep(initial) {
   const root = tutorialState.rootEl;
   if (!root) return;
+  // Detach any stale "advance on target click" handler from a previous step
+  // (or a prior render of the same step after rotation).
+  if (tutorialState._targetClickHandler) {
+    const { target, handler } = tutorialState._targetClickHandler;
+    try { target.removeEventListener('click', handler, true); } catch (e) {}
+    tutorialState._targetClickHandler = null;
+  }
   const step = tutorialState.steps[tutorialState.step];
   if (!step) { endTutorial(); return; }
 
@@ -20278,9 +20300,11 @@ function renderCurrentStep(initial) {
       <div class="tut-popup ${step.posClass}">
         <div class="tut-popup-title">${step.title}</div>
         <div class="tut-popup-body ${step.smallBody ? 'tut-small' : ''}">${step.body}</div>
-        <div class="tut-popup-actions">
-          <button class="btn-action primary" id="tutPrimaryBtn">${escapeHtml(step.buttonLabel || 'OK')}</button>
-        </div>
+        ${step.hideButton ? '' : `
+          <div class="tut-popup-actions">
+            <button class="btn-action primary" id="tutPrimaryBtn">${escapeHtml(step.buttonLabel || 'OK')}</button>
+          </div>
+        `}
       </div>
     `;
 
@@ -20306,6 +20330,33 @@ function renderCurrentStep(initial) {
 }
 
 function wireStepButtons(step) {
+  // Steps that advance on target-click instead of an OK button (e.g. step
+  // 5: clicking the settings gear / hamburger IS the action). Attach a
+  // one-time click listener that lets the click pass through normally,
+  // then advances on the next tick.
+  if (step.advanceOnTargetClick && tutorialState.glowTarget) {
+    const target = tutorialState.glowTarget;
+    const handler = () => {
+      target.removeEventListener('click', handler, true);
+      // Defer advance to next microtask so the original click handler
+      // (e.g. openSettings or toggleHamburgerMenu) runs first.
+      setTimeout(() => {
+        if (tutorialState.step >= tutorialState.steps.length - 1) {
+          endTutorial();
+        } else {
+          tutorialState.step++;
+          renderCurrentStep(false);
+        }
+      }, 0);
+    };
+    // Capture phase so we run before the normal bubbled click handlers
+    // detach us, but don't preventDefault — the click should still fire
+    // its real action.
+    target.addEventListener('click', handler, true);
+    // Stash for cleanup if tutorial ends early.
+    tutorialState._targetClickHandler = { target, handler };
+  }
+
   const btn = el('tutPrimaryBtn');
   if (!btn) return;
   btn.onclick = () => {
@@ -20335,9 +20386,6 @@ function buildMockupHtml(step) {
         <div class="tut-mockup-headline">
           These students were absent! Contact them now with:<br>
           1) The class recording &nbsp; 2) Their homework assignment.
-        </div>
-        <div class="tut-mockup-callout">
-          ⚠️ Please call them if they are not in class 5 minutes after class begins!
         </div>
         <div class="tut-mockup-chip">
           <strong>Sunday</strong> <span class="sep">·</span> <span>N/A</span>
