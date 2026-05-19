@@ -7910,22 +7910,9 @@ async function enablePushNotifications() {
     pushState.status = 'enabled';
     pushState.error = null;
 
-    // Foreground message handler — when the app IS open and visible, FCM
-    // doesn't show a system notification; it calls this instead. We
-    // surface it as the in-app toast we already have.
-    messaging.onMessage((payload) => {
-      const notif = payload.notification || {};
-      const data = payload.data || {};
-      showToast({
-        title: notif.title || 'Notification',
-        text: notif.body || '',
-        kind: data.kind === 'task_approved' ? 'morale'
-            : data.kind === 'class_reminder' ? 'warning'
-            : data.kind === 'task_sent_back' ? 'danger'
-            : 'default',
-        taskId: data.taskId || null,
-      });
-    });
+    // Attach foreground handler (idempotent — won't double-register if
+    // the user enables again later).
+    attachForegroundMessageHandler();
 
     showToast({
       title: '🔔 Notifications enabled',
@@ -7979,6 +7966,79 @@ async function touchPushTokenHeartbeat() {
         lastSeenAt: firebase.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
   } catch (e) {}
+}
+
+// Attach the foreground message handler. Idempotent — runs at most once
+// per page load even if called multiple times (from both enablePush and
+// the post-auth init flow). Without this guard, every reload would add a
+// new onMessage handler, so users see N copies of every notification
+// where N = times the page has been loaded since enable.
+//
+// We ALSO show an OS-level notification via the service worker so the
+// user gets a banner even when the app tab is foregrounded. FCM's default
+// behavior is to suppress OS notifications while the tab is visible
+// (instead, just calling onMessage) — but Calvin wants pushes on every
+// device regardless of focus state, so we manually trigger the system
+// notification ourselves. Tag-based dedupe prevents the SW from showing
+// the SAME notification twice when both foreground and background paths
+// would fire (e.g. partial visibility states).
+let _foregroundHandlerAttached = false;
+function attachForegroundMessageHandler() {
+  if (_foregroundHandlerAttached) return;
+  if (!messaging) return;
+  _foregroundHandlerAttached = true;
+  try {
+    messaging.onMessage(async (payload) => {
+      const notif = payload.notification || {};
+      const data = payload.data || {};
+      const title = notif.title || data.title || 'Notification';
+      const body = notif.body || data.body || '';
+      const tag = data.tag || data.kind || 'klrn-teams';
+
+      // 1) In-app toast (replaces the silent system notif when the tab
+      //    is fully focused — this is what users used to see only).
+      showToast({
+        title,
+        text: body,
+        kind: data.kind === 'task_approved' ? 'morale'
+            : data.kind === 'class_reminder' ? 'warning'
+            : data.kind === 'task_sent_back' ? 'danger'
+            : 'default',
+        taskId: data.taskId || null,
+      });
+
+      // 2) Also fire an OS notification via the service worker so it
+      //    shows up as a real banner even with the tab in focus. Use the
+      //    same `tag` as the background path so iOS/Android collapse
+      //    duplicates — if the SW already showed this exact notification,
+      //    the tagged showNotification call replaces it in place rather
+      //    than producing a second one.
+      try {
+        const reg = pushState.swRegistration
+                 || (await navigator.serviceWorker.getRegistration('/teams/'));
+        if (reg && reg.showNotification) {
+          await reg.showNotification(title, {
+            body,
+            icon: '/teams/icon-192.png',
+            badge: '/teams/icon-192.png',
+            tag,
+            data: {
+              url: data.url || '/teams/',
+              taskId: data.taskId || null,
+              kind: data.kind || null,
+            },
+          });
+        }
+      } catch (e) {
+        // Non-fatal — toast still shown above. SW might not be ready yet
+        // (rare) or the browser might forbid foreground SW notifications.
+        console.warn('Foreground showNotification failed:', e.message);
+      }
+    });
+  } catch (e) {
+    console.warn('Could not attach foreground message handler:', e.message);
+    _foregroundHandlerAttached = false; // allow retry
+  }
 }
 
 // Listen for messages from the service worker (clicking a notification
@@ -8584,21 +8644,9 @@ auth.onAuthStateChanged(async (user) => {
       } catch (e) {
         console.warn('FCM SDK prime failed (non-fatal):', e.message);
       }
-      try {
-        messaging.onMessage((payload) => {
-          const notif = payload.notification || {};
-          const data = payload.data || {};
-          showToast({
-            title: notif.title || 'Notification',
-            text: notif.body || '',
-            kind: data.kind === 'task_approved' ? 'morale'
-                : data.kind === 'class_reminder' ? 'warning'
-                : data.kind === 'task_sent_back' ? 'danger'
-                : 'default',
-            taskId: data.taskId || null,
-          });
-        });
-      } catch (e) {}
+      // Attach the foreground message handler (idempotent — guarded so
+      // we don't pile up handlers on reloads).
+      attachForegroundMessageHandler();
     }
     // Refresh settings UI if it happens to be open.
     if (!el('settingsModal').classList.contains('hidden')) renderAppSettings();
