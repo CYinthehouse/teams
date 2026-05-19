@@ -8560,11 +8560,30 @@ auth.onAuthStateChanged(async (user) => {
   // bring our status into sync with what's already stored for this user.
   // Permission prompting is gated on a button click, not done here.
   registerPushServiceWorker().catch(() => {});
-  refreshPushStatus().then(() => {
+  refreshPushStatus().then(async () => {
     // If we already have a token saved, bump its lastSeenAt and also
     // re-attach the foreground message handler so toasts show.
     if (pushState.status === 'enabled' && messaging) {
       touchPushTokenHeartbeat();
+      // IMPORTANT: prime the FCM SDK's internal SW cache by calling
+      // getToken with our explicit SW registration. Without this, later
+      // calls to httpsCallable() trigger the SDK's auto-registration of
+      // a "default" SW at /firebase-messaging-sw.js (origin root, not
+      // /teams/), which 404s on GitHub Pages project sites and throws.
+      // This is a known SDK quirk dating back to firebase-js-sdk #2527.
+      // Calling getToken once with the right SW makes the SDK reuse it
+      // for all subsequent operations including callable functions.
+      try {
+        const reg = await registerPushServiceWorker();
+        if (reg) {
+          await messaging.getToken({
+            vapidKey: VAPID_PUBLIC_KEY,
+            serviceWorkerRegistration: reg,
+          });
+        }
+      } catch (e) {
+        console.warn('FCM SDK prime failed (non-fatal):', e.message);
+      }
       try {
         messaging.onMessage((payload) => {
           const notif = payload.notification || {};
