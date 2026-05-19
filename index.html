@@ -6022,13 +6022,20 @@
     position: fixed;
     inset: 0;
     z-index: 9000;
-    pointer-events: none; /* enabled per-step via .active */
+    /* Root itself never catches clicks — only the popup and (if active)
+       the blur layer do. This means any "empty" area of the overlay lets
+       clicks pass through to the real page below. Steps that need to
+       block all interaction (welcome/mock/end) set .tut-blur on the root,
+       and the blur layer above catches the click. Steps that need the
+       user to interact with a specific element (e.g. step 5: click the
+       settings gear to proceed) leave .tut-blur off and the click flows
+       through naturally. */
+    pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease;
   }
   .tut-root.active {
     opacity: 1;
-    pointer-events: auto;
   }
   /* Full-screen darkening + blur (only when .tut-blur is set on the root).
      Cards behind the blur are still rendered, just out of focus. */
@@ -6039,10 +6046,14 @@
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     opacity: 0;
+    pointer-events: none;
     transition: opacity 0.2s ease;
   }
   .tut-root.tut-blur .tut-blur-layer {
     opacity: 1;
+    /* Block underlying clicks when blur is active — these are the
+       "focus on me" steps where the user must dismiss before continuing. */
+    pointer-events: auto;
   }
   /* Popup card. Position is controlled by per-step inline style. */
   .tut-popup {
