@@ -1112,8 +1112,9 @@
         <div class="field-row">
           <input type="text" id="avUrl" class="form-input" placeholder="https://www.youtube.com/watch?v=... or /shorts/..." />
           <button class="inline-btn" onclick="convertShortsUrl()">Shorts?</button>
+          <button class="inline-btn mint" id="avFetchBtn" onclick="fetchVideoStats()">⤓ Fetch stats</button>
         </div>
-        <div class="hint">Paste a normal watch link, or a /shorts/ link and tap <b>Shorts?</b> to convert it.</div>
+        <div class="hint">Paste a link, then tap <b>Fetch stats</b> to auto-fill the title, duration, views &amp; likes. Use <b>Shorts?</b> first if it's a /shorts/ link.</div>
         <div class="url-output" id="avUrlOutput"></div>
       </div>
       <div class="form-group" style="margin-bottom:0;">
@@ -1202,6 +1203,12 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+
+/* YouTube Data API v3 key — same key the Teams app uses. Referrer-restricted
+   to KoreanLearnin domains (cyinthehouse.github.io is in the allowed list) and
+   locked to the YouTube Data API. Used here only for videos.list (stats by
+   video ID), which costs 1 quota unit per call. */
+const YOUTUBE_API_KEY = "AIzaSyBXTiIo8AJLABiXyP-F9c2MUrMWa400FtI";
 
 /* Firestore collections used by this app:
      shorts_videos    — one doc per video {teacherId, teacherName, url, videoId,
@@ -1613,6 +1620,100 @@ function convertShortsUrl() {
     '" target="_blank" rel="noopener">' + escapeHtml(watchUrl) + '</a>' +
     '<br><span style="font-weight:500;color:var(--ink-soft);">Open this, then ⋯ → Show transcript to copy it.</span>';
   out.classList.add('show');
+}
+
+/* Converts YouTube's ISO 8601 duration (e.g. "PT1M30S", "PT48S") to a
+   friendly "1:30" / "0:48" string. */
+function formatYtDuration(iso) {
+  if (!iso) return '';
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return '';
+  const h = parseInt(m[1] || '0', 10);
+  const min = parseInt(m[2] || '0', 10);
+  const s = parseInt(m[3] || '0', 10);
+  const pad = n => (n < 10 ? '0' + n : '' + n);
+  if (h > 0) return h + ':' + pad(min) + ':' + pad(s);
+  return min + ':' + pad(s);
+}
+
+/* Adds thousands separators: 12500 -> "12,500". */
+function formatCount(n) {
+  if (n == null || n === '') return '';
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/* Pulls title, duration, views and likes from the YouTube Data API and
+   fills the Add Video fields. Transcript still has to be pasted manually. */
+async function fetchVideoStats() {
+  const input = el('avUrl').value.trim();
+  const out = el('avUrlOutput');
+  if (!input) { toast('Paste a YouTube link first.'); return; }
+  const id = extractVideoId(input);
+  if (!id) {
+    out.innerHTML = '⚠️ Could not find a video ID in that link.';
+    out.classList.add('show');
+    return;
+  }
+
+  const btn = el('avFetchBtn');
+  btn.disabled = true;
+  const btnLabel = btn.textContent;
+  btn.textContent = '…';
+  try {
+    const url = 'https://www.googleapis.com/youtube/v3/videos' +
+      '?part=snippet,statistics,contentDetails' +
+      '&id=' + encodeURIComponent(id) +
+      '&key=' + encodeURIComponent(YOUTUBE_API_KEY);
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      const reason = data && data.error && data.error.message
+        ? data.error.message : ('HTTP ' + resp.status);
+      throw new Error(reason);
+    }
+    if (!data.items || !data.items.length) {
+      throw new Error('No video found for that ID — is the link correct?');
+    }
+
+    const v = data.items[0];
+    const snip = v.snippet || {};
+    const stats = v.statistics || {};
+    const details = v.contentDetails || {};
+
+    // Only fill empty fields so a manual entry isn't clobbered.
+    if (!el('avTitle').value.trim() && snip.title) el('avTitle').value = snip.title;
+    if (!el('avDuration').value.trim()) {
+      const d = formatYtDuration(details.duration);
+      if (d) el('avDuration').value = d;
+    }
+    if (!el('avViews').value.trim() && stats.viewCount != null) {
+      el('avViews').value = formatCount(stats.viewCount);
+    }
+    // likeCount is often hidden by the creator — fill it only if returned.
+    let likesNote = '';
+    if (!el('avLikes').value.trim()) {
+      if (stats.likeCount != null) {
+        el('avLikes').value = formatCount(stats.likeCount);
+      } else {
+        likesNote = ' (likes are hidden on this video — enter manually if you have them)';
+      }
+    }
+
+    out.innerHTML = '✅ Stats filled in from YouTube.' +
+      (likesNote ? '<br><span style="font-weight:500;color:var(--ink-soft);">' +
+        escapeHtml(likesNote.trim()) + '</span>' : '');
+    out.classList.add('show');
+    toast('Stats fetched.');
+  } catch (err) {
+    console.error('fetchVideoStats failed:', err);
+    out.innerHTML = '⚠️ Could not fetch stats: ' + escapeHtml(err.message || 'unknown error') +
+      '<br><span style="font-weight:500;color:var(--ink-soft);">You can still type the fields in by hand.</span>';
+    out.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = btnLabel;
+  }
 }
 
 /* ============================================================
