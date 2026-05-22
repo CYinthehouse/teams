@@ -1422,6 +1422,27 @@
     color: var(--ink);
     transform: scale(1.08);
   }
+  /* Shorts Analyzer button — same shape; pink-soft on hover to read as
+     yet another distinct action. Opens shorts.html. */
+  .col-shorts-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    margin-right: 4px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+    color: var(--ink-soft);
+  }
+  .col-shorts-btn:hover {
+    background: var(--pink-soft);
+    color: var(--ink);
+    transform: scale(1.08);
+  }
 
   /* Instant-on hover tooltip — appears immediately above any element with
      `class="has-tooltip"` and `data-tooltip="..."`. Styled to match the
@@ -9653,18 +9674,22 @@ function buildMemberColumn(member, isGhost) {
     ? `<button class="col-quick-add has-tooltip" data-quick-add-uid="${escapeHtml(member.uid)}" data-tooltip="Create task">✏️</button>`
     : '';
 
-  // Scripts button — only on Calvin's column (matched by email so this
-  // works even if the team adds another Boss). Visible to Calvin himself
-  // and to any Boss or Manager (per spec: B/M can edit Calvin's scripts).
-  const isCalvinColumn = !isGhost
-    && member.email
-    && member.email.toLowerCase() === BOSS_EMAIL.toLowerCase();
-  const canSeeScripts = isCalvinColumn && (
-    member.uid === state.user.uid ||
-    isBossOrManager(state.profile.role)
-  );
+  // Scripts button — every column gets its own. Scripts are scoped by
+  // `ownerId` in the `scripts` collection, so each person manages their
+  // own set. The button passes this column's uid as the owner; anyone
+  // viewing the column opens that person's scripts. (Was previously
+  // restricted to Calvin's column + Boss/Manager only.)
+  const canSeeScripts = !isGhost;
   const scriptsBtn = canSeeScripts
     ? `<button class="col-scripts-btn has-tooltip" data-scripts-owner="${escapeHtml(member.uid)}" data-tooltip="Create / manage scripts">📄</button>`
+    : '';
+
+  // Shorts Analyzer button — every column gets it. Opens shorts.html (a
+  // separate page in the same repo, same Firebase project, same login).
+  // Not column-scoped: the analyzer has its own per-teacher libraries
+  // inside it, so the button just opens the tool.
+  const shortsBtn = !isGhost
+    ? `<button class="col-shorts-btn has-tooltip" data-tooltip="Shorts Analyzer">📊</button>`
     : '';
 
   col.innerHTML = `
@@ -9676,6 +9701,7 @@ function buildMemberColumn(member, isGhost) {
       </div>
       ${quickAddBtn}
       ${scriptsBtn}
+      ${shortsBtn}
       <div class="col-count">${tasks.length}</div>
     </div>
     <div class="col-tasks" data-drop-zone="member" data-user-id="${member.uid}" data-col-key="member:${escapeHtml(member.uid)}">
@@ -9711,6 +9737,17 @@ function buildMemberColumn(member, isGhost) {
     sc.addEventListener('click', (e) => {
       e.stopPropagation();
       openScriptManager(sc.dataset.scriptsOwner);
+    });
+  }
+
+  // Shorts Analyzer button — opens shorts.html (same repo, same login).
+  // Opened in the same tab; it's a sibling page so the back button
+  // returns to Teams.
+  const shBtn = col.querySelector('.col-shorts-btn');
+  if (shBtn) {
+    shBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.location.href = 'shorts.html';
     });
   }
 
