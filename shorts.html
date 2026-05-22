@@ -559,6 +559,56 @@
     gap: 8px;
   }
 
+  /* Section heading for the two video groups (My Created / Other Creators') */
+  .lib-section { margin-bottom: 26px; }
+  .lib-section:last-child { margin-bottom: 0; }
+  .lib-section-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px dashed var(--pink-soft);
+  }
+  .lib-section-title {
+    font-family: var(--font-display);
+    font-size: 19px;
+    color: var(--ink);
+  }
+  .lib-section-count {
+    background: var(--bg-2);
+    color: var(--ink-soft);
+    border-radius: 9px;
+    padding: 2px 9px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* Mine / Other-creators segmented toggle inside the Add Video modal */
+  .kind-toggle {
+    display: flex;
+    gap: 6px;
+    background: var(--bg-2);
+    padding: 5px;
+    border-radius: 14px;
+  }
+  .kind-opt {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-align: center;
+    transition: all 0.18s;
+  }
+  .kind-opt:hover { color: var(--ink); }
+  .kind-opt.active {
+    background: var(--white);
+    color: var(--pink-deep);
+    box-shadow: var(--shadow-soft);
+  }
+
   .video-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1051,6 +1101,13 @@
     </div>
     <div class="modal-body">
       <div class="form-group" style="margin-bottom:0;">
+        <label>Whose video is this?</label>
+        <div class="kind-toggle">
+          <button class="kind-opt active" id="avKindMine" onclick="setVideoKind('mine')">🎬 My Created Video</button>
+          <button class="kind-opt" id="avKindOther" onclick="setVideoKind('other')">🔭 Other Creator's Video</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
         <label>YouTube link</label>
         <div class="field-row">
           <input type="text" id="avUrl" class="form-input" placeholder="https://www.youtube.com/watch?v=... or /shorts/..." />
@@ -1254,6 +1311,7 @@ let CURRENT_USER = null;       // { uid, email, name }
 let TEACHERS = [];             // [{ id, name }]
 let VIDEOS = [];               // all shorts_videos docs
 let ACTIVE_TEACHER_ID = null;  // currently-viewed teacher
+let ADD_VIDEO_KIND = 'mine';   // toggle state in the Add Video modal
 
 /* ============================================================
    Auth
@@ -1377,6 +1435,12 @@ function videosForTeacher(teacherId) {
   return VIDEOS.filter(v => v.teacherId === teacherId);
 }
 
+/* Returns 'mine' or 'other'. Videos saved before this feature have no
+   `kind` field — treat those as the teacher's own ('mine'). */
+function videoKind(v) {
+  return v.kind === 'other' ? 'other' : 'mine';
+}
+
 /* ============================================================
    Render: teacher tabs
 ============================================================ */
@@ -1429,8 +1493,42 @@ function renderLibrary() {
     return;
   }
 
+  const mine = vids.filter(v => videoKind(v) === 'mine');
+  const other = vids.filter(v => videoKind(v) === 'other');
+
   grid.innerHTML = '';
-  vids.forEach(v => grid.appendChild(buildVideoCard(v)));
+  grid.appendChild(buildLibrarySection('🎬', 'My Created Videos', mine,
+    'Nothing here yet — add a video this teacher made.'));
+  grid.appendChild(buildLibrarySection('🔭', "Other Creators' Videos", other,
+    'Nothing here yet — add a video from another creator to study.'));
+}
+
+/* Builds one titled section (header + grid of cards, or an empty note). */
+function buildLibrarySection(icon, title, vids, emptyText) {
+  const section = document.createElement('div');
+  section.className = 'lib-section';
+
+  const head = document.createElement('div');
+  head.className = 'lib-section-head';
+  head.innerHTML = '<span class="lib-section-title">' + icon + ' ' +
+    escapeHtml(title) + '</span>' +
+    '<span class="lib-section-count">' + vids.length + '</span>';
+  section.appendChild(head);
+
+  if (!vids.length) {
+    const note = document.createElement('div');
+    note.className = 'empty-state';
+    note.style.padding = '32px 20px';
+    note.innerHTML = '<div class="es-sub">' + escapeHtml(emptyText) + '</div>';
+    section.appendChild(note);
+    return section;
+  }
+
+  const cards = document.createElement('div');
+  cards.className = 'video-grid';
+  vids.forEach(v => cards.appendChild(buildVideoCard(v)));
+  section.appendChild(cards);
+  return section;
 }
 
 function buildVideoCard(v) {
@@ -1524,11 +1622,19 @@ function openAddVideo() {
   if (!ACTIVE_TEACHER_ID) { toast('Add a teacher first.'); return; }
   ['avUrl','avTitle','avDuration','avViews','avLikes','avTranscript'].forEach(id => el(id).value = '');
   el('avUrlOutput').classList.remove('show');
+  setVideoKind('mine');
   const teacher = TEACHERS.find(t => t.id === ACTIVE_TEACHER_ID);
   el('addVideoModal').querySelector('.modal-title').textContent =
     '🎬 Add Video — ' + (teacher ? teacher.name : '');
   openModal('addVideoModal');
   setTimeout(() => el('avUrl').focus(), 50);
+}
+
+/* Mine / Other-creator toggle in the Add Video modal. */
+function setVideoKind(kind) {
+  ADD_VIDEO_KIND = (kind === 'other') ? 'other' : 'mine';
+  el('avKindMine').classList.toggle('active', ADD_VIDEO_KIND === 'mine');
+  el('avKindOther').classList.toggle('active', ADD_VIDEO_KIND === 'other');
 }
 
 async function saveVideo() {
@@ -1553,6 +1659,7 @@ async function saveVideo() {
     const doc = {
       teacherId: ACTIVE_TEACHER_ID,
       teacherName: teacher ? teacher.name : '',
+      kind: ADD_VIDEO_KIND,
       url,
       videoId: videoId || '',
       title, duration, views, likes, transcript,
@@ -1798,32 +1905,51 @@ function renderVideoAnalysis(v, a) {
 }
 
 /* ---------- Cross-library pattern analysis ---------- */
-function buildPatternsPrompt(teacher, vids) {
+function buildPatternsPrompt(teacher, own, refs) {
   const lines = [
-'You are a YouTube Shorts content strategist. Below is one teacher\'s full library of short-form videos for a Korean-language teaching channel.',
+'You are a YouTube Shorts content strategist. Below is one teacher\'s own library of short-form videos for a Korean-language teaching channel' +
+  (refs && refs.length ? ', followed by reference videos from OTHER creators that the teacher is studying.' : '.'),
 '',
-'Compare the videos against each other. Identify what the higher-performing videos (by views and likes) have in common, and what the weaker ones lack. Transcripts are auto-generated and may contain errors — treat exact wording as approximate and focus on patterns of structure, hooks, topics, pacing, and language.',
+'Compare the teacher\'s OWN videos against each other. Identify what their higher-performing videos (by views and likes) have in common, and what the weaker ones lack.' +
+  (refs && refs.length ? ' Then compare the teacher\'s videos against the other creators\' reference videos to see what those do differently.' : '') +
+  ' Transcripts are auto-generated and may contain errors — treat exact wording as approximate and focus on patterns of structure, hooks, topics, pacing, and language.',
 '',
 'TEACHER: ' + teacher.name,
-'VIDEO COUNT: ' + vids.length,
-''
+'',
+'=== ' + teacher.name.toUpperCase() + "'S OWN VIDEOS (" + own.length + ') ==='
   ];
-  vids.forEach((v, i) => {
-    lines.push('--- VIDEO ' + (i + 1) + ' ---');
+  own.forEach((v, i) => {
+    lines.push('--- OWN VIDEO ' + (i + 1) + ' ---');
     lines.push('Title: ' + (v.title || '(none)'));
     lines.push('Duration: ' + (v.duration || '(unknown)') +
       '  |  Views: ' + (v.views || '(unknown)') +
       '  |  Likes: ' + (v.likes || '(unknown)'));
-    const tr = (v.transcript || '').slice(0, 1200);
-    lines.push('Transcript (approx, truncated): ' + tr);
+    lines.push('Transcript (approx, truncated): ' + (v.transcript || '').slice(0, 1200));
     lines.push('');
   });
+
+  if (refs && refs.length) {
+    lines.push('=== OTHER CREATORS\' REFERENCE VIDEOS (' + refs.length + ') ===');
+    refs.forEach((v, i) => {
+      lines.push('--- REFERENCE VIDEO ' + (i + 1) + ' ---');
+      lines.push('Title: ' + (v.title || '(none)'));
+      lines.push('Duration: ' + (v.duration || '(unknown)') +
+        '  |  Views: ' + (v.views || '(unknown)') +
+        '  |  Likes: ' + (v.likes || '(unknown)'));
+      lines.push('Transcript (approx, truncated): ' + (v.transcript || '').slice(0, 1200));
+      lines.push('');
+    });
+  }
+
   lines.push('Respond ONLY with a JSON object — no preamble, no markdown fences. Use this exact shape, all values plain strings:');
   lines.push('{');
-  lines.push('  "overview": "2-3 sentences summarizing this teacher\'s library and overall performance spread.",');
-  lines.push('  "winners": "What the strongest videos share: hooks, topics, formats, pacing, length, language.",');
-  lines.push('  "weak_spots": "What the weaker videos have in common or are missing.",');
+  lines.push('  "overview": "2-3 sentences summarizing this teacher\'s own library and overall performance spread.",');
+  lines.push('  "winners": "What this teacher\'s strongest videos share: hooks, topics, formats, pacing, length, language.",');
+  lines.push('  "weak_spots": "What this teacher\'s weaker videos have in common or are missing.",');
   lines.push('  "hooks": "Patterns in how this teacher opens videos and which openings land best.",');
+  if (refs && refs.length) {
+    lines.push('  "vs_others": "What the other creators\' reference videos do differently from this teacher — techniques worth borrowing.",');
+  }
   lines.push('  "recommendations": "3-5 concrete, specific recommendations for this teacher\'s next videos."');
   lines.push('}');
   return lines.join('\n');
@@ -1832,26 +1958,31 @@ function buildPatternsPrompt(teacher, vids) {
 async function openPatternsAnalysis() {
   const teacher = TEACHERS.find(t => t.id === ACTIVE_TEACHER_ID);
   if (!teacher) { toast('Pick a teacher first.'); return; }
-  const vids = videosForTeacher(teacher.id);
-  if (vids.length < 2) {
-    toast('Add at least 2 videos for ' + teacher.name + ' to find patterns.');
+  const all = videosForTeacher(teacher.id);
+  const own = all.filter(v => videoKind(v) === 'mine');
+  const refs = all.filter(v => videoKind(v) === 'other');
+  if (own.length < 2) {
+    toast('Add at least 2 of ' + teacher.name + "'s own videos to find patterns.");
     return;
   }
   el('analysisTitle').textContent = '✨ Patterns — ' + teacher.name;
   openModal('analysisModal');
   el('analysisBody').innerHTML =
     '<div class="analysis-loading"><div class="spinner"></div>' +
-    'Comparing ' + vids.length + ' videos across ' + escapeHtml(teacher.name) +
-    '\'s library…<br><span style="font-size:12px;">This can take 20–30 seconds.</span></div>';
+    'Comparing ' + own.length + " of " + escapeHtml(teacher.name) +
+    "'s own videos" +
+    (refs.length ? ' against ' + refs.length + ' reference video' +
+      (refs.length === 1 ? '' : 's') : '') +
+    '…<br><span style="font-size:12px;">This can take 20–30 seconds.</span></div>';
   try {
-    const raw = await callClaude(buildPatternsPrompt(teacher, vids));
+    const raw = await callClaude(buildPatternsPrompt(teacher, own, refs));
     let parsed;
     try {
       parsed = JSON.parse(stripJsonFences(raw));
     } catch (pe) {
       throw new Error('Could not parse the patterns analysis. Try again.');
     }
-    renderPatternsAnalysis(teacher, vids, parsed);
+    renderPatternsAnalysis(teacher, own, refs, parsed);
   } catch (err) {
     console.error('patterns failed:', err);
     el('analysisBody').innerHTML =
@@ -1864,25 +1995,30 @@ async function openPatternsAnalysis() {
   }
 }
 
-function renderPatternsAnalysis(teacher, vids, a) {
+function renderPatternsAnalysis(teacher, own, refs, a) {
   const section = (icon, title, body) =>
     '<div class="analysis-section"><h4>' + icon + ' ' + title + '</h4>' +
     '<p>' + escapeHtml(body || '—') + '</p></div>';
 
+  const statLine = own.length + ' own video' + (own.length === 1 ? '' : 's') +
+    (refs.length ? '  ·  ' + refs.length + ' reference video' +
+      (refs.length === 1 ? '' : 's') : '');
+
   el('analysisBody').innerHTML =
-    '<div class="analysis-disclaimer">⚠️ Based on auto-generated transcripts across ' +
-    vids.length + ' videos — patterns are directional, not exact.</div>' +
+    '<div class="analysis-disclaimer">⚠️ Based on auto-generated transcripts of ' +
+    statLine + ' — patterns are directional, not exact.</div>' +
     '<div class="analysis-meta">' +
       '<div class="analysis-meta-thumb" style="display:flex;align-items:center;justify-content:center;font-size:30px;">👩‍🏫</div>' +
       '<div class="analysis-meta-info">' +
-        '<div class="analysis-meta-title">' + escapeHtml(teacher.name) + '\'s Library</div>' +
-        '<div class="analysis-meta-stats">' + vids.length + ' videos compared</div>' +
+        '<div class="analysis-meta-title">' + escapeHtml(teacher.name) + '\'s Created Videos</div>' +
+        '<div class="analysis-meta-stats">' + statLine + ' compared</div>' +
       '</div>' +
     '</div>' +
     section('🗺', 'Library Overview', a.overview) +
     section('🏆', 'What the Winners Share', a.winners) +
     section('⚠️', 'Weak Spots', a.weak_spots) +
     section('🪝', 'Hook Patterns', a.hooks) +
+    (refs.length ? section('🔭', 'vs. Other Creators', a.vs_others) : '') +
     section('💡', 'Recommendations', a.recommendations) +
     '<button class="btn-action secondary" style="margin-top:4px;" ' +
     'onclick="openPatternsAnalysis()">↻ Re-run patterns</button>';
