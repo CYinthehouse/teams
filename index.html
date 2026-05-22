@@ -1336,8 +1336,22 @@
     border-bottom: 2px dashed var(--bg-2);
     margin-bottom: 10px;
     display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  /* Row 1: avatar + name/role + task count. */
+  .col-head-identity {
+    display: flex;
     align-items: center;
     gap: 8px;
+  }
+  /* Row 2: action buttons (task / scripts / shorts), right-aligned so
+     they don't crowd the name. Only rendered if at least one button is
+     present. */
+  .col-head-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
   }
 
   .col-avatar {
@@ -1391,7 +1405,6 @@
     cursor: pointer;
     font-size: 12px;
     line-height: 1;
-    margin-right: 4px;
     flex-shrink: 0;
     transition: all 0.15s;
     color: var(--ink-soft);
@@ -1412,7 +1425,6 @@
     cursor: pointer;
     font-size: 12px;
     line-height: 1;
-    margin-right: 4px;
     flex-shrink: 0;
     transition: all 0.15s;
     color: var(--ink-soft);
@@ -1433,7 +1445,7 @@
     cursor: pointer;
     font-size: 12px;
     line-height: 1;
-    margin-right: 4px;
+    margin-right: 0;
     flex-shrink: 0;
     transition: all 0.15s;
     color: var(--ink-soft);
@@ -9694,15 +9706,17 @@ function buildMemberColumn(member, isGhost) {
 
   col.innerHTML = `
     <div class="col-head">
-      <div class="col-avatar" style="background: ${avatarColorFor(member.name)}">${avatarLetter(member.name)}</div>
-      <div class="col-info">
-        <div class="col-name">${escapeHtml(member.name)}${isGhost ? ' 👻' : ''}</div>
-        <div class="col-meta">${escapeHtml(member.role || '—')}${isGhost ? ' · not on team' : ''}</div>
+      <div class="col-head-identity">
+        <div class="col-avatar" style="background: ${avatarColorFor(member.name)}">${avatarLetter(member.name)}</div>
+        <div class="col-info">
+          <div class="col-name">${escapeHtml(member.name)}${isGhost ? ' 👻' : ''}</div>
+          <div class="col-meta">${escapeHtml(member.role || '—')}${isGhost ? ' · not on team' : ''}</div>
+        </div>
+        <div class="col-count">${tasks.length}</div>
       </div>
-      ${quickAddBtn}
-      ${scriptsBtn}
-      ${shortsBtn}
-      <div class="col-count">${tasks.length}</div>
+      ${(quickAddBtn || scriptsBtn || shortsBtn)
+        ? `<div class="col-head-actions">${quickAddBtn}${scriptsBtn}${shortsBtn}</div>`
+        : ''}
     </div>
     <div class="col-tasks" data-drop-zone="member" data-user-id="${member.uid}" data-col-key="member:${escapeHtml(member.uid)}">
       ${tasks.length === 0 ? `<div class="empty-col"><span class="emoji">☁️</span>All clear!</div>` : ''}
