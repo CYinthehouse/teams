@@ -957,29 +957,55 @@
     animation: fade-in 0.15s ease;
   }
   .team-menu.open { display: block; }
-  .team-menu-item {
+  /* Each team row: the name button (flex-grows) + a star toggle. The
+     .active highlight now lives on the row so it spans name + star. */
+  .team-menu-row {
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 10px 14px;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .team-menu-row:hover { background: var(--bg-2); }
+  .team-menu-row.active {
+    background: linear-gradient(135deg, var(--pink-soft) 0%, var(--lavender-soft) 100%);
+  }
+  .team-menu-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    padding: 10px 4px 10px 14px;
     border-radius: 10px;
     font-weight: 600;
     font-size: 14px;
     color: var(--ink);
     text-align: left;
     cursor: pointer;
-    transition: background 0.15s;
+    background: none;
+    border: none;
   }
-  .team-menu-item:hover { background: var(--bg-2); }
-  .team-menu-item.active {
-    background: linear-gradient(135deg, var(--pink-soft) 0%, var(--lavender-soft) 100%);
-    color: var(--pink-deep);
-  }
-  .team-menu-item.active::before {
+  .team-menu-row.active .team-menu-item { color: var(--pink-deep); }
+  .team-menu-row.active .team-menu-item::before {
     content: '●';
     margin-right: 8px;
     color: var(--pink-deep);
   }
+  /* Star toggle — sets this team as the login default. Filled ★ when on. */
+  .team-menu-star {
+    flex-shrink: 0;
+    width: 34px;
+    align-self: stretch;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--ink-light);
+    border-radius: 10px;
+    transition: color 0.15s, transform 0.1s;
+  }
+  .team-menu-star:hover { transform: scale(1.2); }
+  .team-menu-star.on { color: #f5b50a; }
   .team-menu-empty {
     padding: 14px 16px;
     color: var(--ink-light);
@@ -8980,12 +9006,16 @@ auth.onAuthStateChanged(async (user) => {
       ? all
       : all.filter(t => (t.memberIds || []).includes(user.uid));
 
-    // Pick active team if none yet
+    // Pick active team if none yet. Prefer the user's starred default
+    // team (if they still have access to it); otherwise fall back to the
+    // first team in the list.
     if (state.activeTeamId && !state.teams.find(t => t.id === state.activeTeamId)) {
       state.activeTeamId = null;
     }
     if (!state.activeTeamId && state.teams.length > 0) {
-      switchTeam(state.teams[0].id);
+      const starred = getDefaultTeamId();
+      const starredOk = starred && state.teams.find(t => t.id === starred);
+      switchTeam(starredOk ? starred : state.teams[0].id);
     } else {
       renderTeamSwitcher();
       renderBoard();
@@ -9347,6 +9377,27 @@ function renderTopbar() {
   // Settings is shown for everyone but content varies by role.
 }
 
+// Default ("starred") team. Stored per-user in localStorage — a personal
+// preference, so no Firestore write. On login, if the user has starred a
+// team they still have access to, we open straight into it instead of the
+// first team in the list.
+function defaultTeamKey() {
+  return state.user ? `defaultTeam_${state.user.uid}` : null;
+}
+function getDefaultTeamId() {
+  const k = defaultTeamKey();
+  if (!k) return null;
+  try { return localStorage.getItem(k) || null; } catch (e) { return null; }
+}
+function setDefaultTeamId(teamId) {
+  const k = defaultTeamKey();
+  if (!k) return;
+  try {
+    if (teamId) localStorage.setItem(k, teamId);
+    else localStorage.removeItem(k);
+  } catch (e) {}
+}
+
 function renderTeamSwitcher() {
   // The trigger button shows the active team's name; the menu lists all
   // teams. Both are populated here. Called from switchTeam() and whenever
@@ -9370,21 +9421,43 @@ function renderTeamSwitcher() {
   // Hide the caret when there's only one team — no need for a dropdown.
   host.classList.toggle('single-team', state.teams.length <= 1);
 
-  // Build the menu items
+  const defaultId = getDefaultTeamId();
+
+  // Build the menu items. Each row: team name (switches team) + a star
+  // toggle on the right (sets/clears this team as the login default).
   menu.innerHTML = '';
   state.teams.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'team-menu-row' + (t.id === state.activeTeamId ? ' active' : '');
+
     const item = document.createElement('button');
     item.type = 'button';
-    item.className = 'team-menu-item' + (t.id === state.activeTeamId ? ' active' : '');
+    item.className = 'team-menu-item';
     item.textContent = t.name;
     item.onclick = (e) => {
       e.stopPropagation();
       closeTeamMenu();
-      // Only switch if it's a different team — switchTeam already no-ops
-      // on same-team but checking here saves the fade-out flicker.
       if (t.id !== state.activeTeamId) switchTeam(t.id);
     };
-    menu.appendChild(item);
+
+    const star = document.createElement('button');
+    star.type = 'button';
+    const isDefault = t.id === defaultId;
+    star.className = 'team-menu-star' + (isDefault ? ' on' : '');
+    star.textContent = isDefault ? '★' : '☆';
+    star.title = isDefault
+      ? 'This team opens on login. Tap to unstar.'
+      : 'Star to make this your default team on login.';
+    star.onclick = (e) => {
+      e.stopPropagation();
+      // Toggle: starring a team clears any other star (one default only).
+      setDefaultTeamId(isDefault ? null : t.id);
+      renderTeamSwitcher(); // re-render to update stars
+    };
+
+    row.appendChild(item);
+    row.appendChild(star);
+    menu.appendChild(row);
   });
 }
 
