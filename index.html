@@ -6304,6 +6304,145 @@
     .tut-popup-actions .btn-action { padding: 8px 22px; font-size: 14px; }
     .tut-mockup { padding: 14px; max-width: 92vw; }
   }
+
+  /* ============================================
+     Team Calendar
+  ============================================ */
+  .cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+  .cal-nav .btn-action { padding: 6px 16px; font-size: 18px; }
+  .cal-month-label {
+    font-family: var(--font-display);
+    font-size: 18px;
+    color: var(--pink-deep);
+    min-width: 180px;
+    text-align: center;
+  }
+  .cal-legend {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+  .cal-legend span { display: flex; align-items: center; gap: 5px; }
+  .cal-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block;
+  }
+  .cal-dot-pto   { background: #f5879e; }
+  .cal-dot-block { background: #8b9cf5; }
+  .cal-grid-head {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  .cal-grid-head div {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    background: var(--bg-3);
+    border: 1.5px solid transparent;
+    padding: 4px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    transition: border-color 0.12s, transform 0.12s;
+    overflow: hidden;
+  }
+  .cal-cell:hover { border-color: var(--lavender); transform: translateY(-1px); }
+  .cal-cell.cal-empty {
+    background: transparent;
+    cursor: default;
+  }
+  .cal-cell.cal-empty:hover { border-color: transparent; transform: none; }
+  .cal-cell.cal-today {
+    border-color: var(--pink);
+    background: var(--pink-soft);
+  }
+  .cal-cell-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .cal-cell-dots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+  .cal-cell-more {
+    font-size: 9px;
+    color: var(--ink-light);
+  }
+  .cal-entry-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    background: var(--bg-3);
+    margin-bottom: 8px;
+  }
+  .cal-entry-row.editable { cursor: pointer; }
+  .cal-entry-row.editable:hover { background: var(--bg-2); }
+  .cal-entry-tag {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 3px 8px;
+    border-radius: 8px;
+  }
+  .cal-entry-tag.pto   { background: #ffd9e1; color: #b03a52; }
+  .cal-entry-tag.block { background: #dce0ff; color: #4250b0; }
+  .cal-entry-body { flex: 1; min-width: 0; }
+  .cal-entry-who {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .cal-entry-time {
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .cal-entry-note {
+    font-size: 12px;
+    color: var(--ink);
+    margin-top: 2px;
+    word-break: break-word;
+  }
+  .cal-day-empty {
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-style: italic;
+    padding: 16px;
+  }
+  @media (max-width: 640px) {
+    .cal-cell-num { font-size: 11px; }
+    .cal-month-label { font-size: 15px; min-width: 130px; }
+  }
 </style>
 </head>
 <body>
@@ -6421,6 +6560,7 @@
         <button class="icon-btn" id="fontDecBtn" onclick="adjustFontScale(-1)" title="Decrease text size">A−</button>
         <button class="icon-btn" id="fontIncBtn" onclick="adjustFontScale(1)" title="Increase text size">A+</button>
         <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Light/Dark mode">🌙</button>
+        <button class="icon-btn" id="calendarBtn" onclick="openCalendar()" title="Team Calendar">📅</button>
         <button class="icon-btn" id="settingsBtn" onclick="openSettings()" title="Settings">⚙️</button>
         <div class="user-chip">
           <div class="avatar" id="myAvatar">?</div>
@@ -6509,6 +6649,10 @@
     <span class="hamburger-icon" id="hamburgerThemeIcon">🌙</span>
     <span id="hamburgerThemeLabel">Light/Dark mode</span>
   </button>
+  <button class="hamburger-item" onclick="hamburgerAction('calendar')">
+    <span class="hamburger-icon">📅</span>
+    <span>Team Calendar</span>
+  </button>
   <button class="hamburger-item" onclick="hamburgerAction('settings')">
     <span class="hamburger-icon">⚙️</span>
     <span>Settings</span>
@@ -6518,6 +6662,86 @@
     <span class="hamburger-icon">⤴</span>
     <span>Sign out</span>
   </button>
+</div>
+
+<!-- Team Calendar modal — shared PTO + blocked-time across ALL teams. -->
+<div id="calendarModal" class="modal-backdrop hidden" style="z-index: 460;">
+  <div class="modal" style="max-width: 720px; width: 94vw;">
+    <div class="modal-head">
+      <div class="modal-title">📅 Team Calendar</div>
+      <button class="modal-close" onclick="hide('calendarModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="cal-nav">
+        <button class="btn-action secondary" id="calPrevBtn">‹</button>
+        <div class="cal-month-label" id="calMonthLabel">—</div>
+        <button class="btn-action secondary" id="calNextBtn">›</button>
+      </div>
+      <div class="cal-legend">
+        <span><span class="cal-dot cal-dot-pto"></span> PTO</span>
+        <span><span class="cal-dot cal-dot-block"></span> Blocked time</span>
+      </div>
+      <div class="cal-grid-head">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+        <div>Thu</div><div>Fri</div><div>Sat</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar day detail — opens when a day is clicked. -->
+<div id="calDayModal" class="modal-backdrop hidden" style="z-index: 465;">
+  <div class="modal" style="max-width: 480px;">
+    <div class="modal-head">
+      <div class="modal-title" id="calDayTitle">—</div>
+      <button class="modal-close" onclick="hide('calDayModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="calDayEntries"></div>
+      <button class="btn-action primary" id="calAddEntryBtn" style="margin-top: 12px; width: 100%;">+ Add my entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar add/edit entry form. -->
+<div id="calEntryModal" class="modal-backdrop hidden" style="z-index: 470;">
+  <div class="modal" style="max-width: 420px;">
+    <div class="modal-head">
+      <div class="modal-title" id="calEntryTitle">Add entry</div>
+      <button class="modal-close" onclick="hide('calEntryModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Type</label>
+        <select id="calEntryType" class="form-input">
+          <option value="pto">PTO (all day)</option>
+          <option value="block">Blocked time</option>
+        </select>
+      </div>
+      <div class="form-group" id="calEntryTimesWrap">
+        <label>Time range</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="time" id="calEntryStart" class="form-input" />
+          <span style="color:var(--ink-soft);">to</span>
+          <input type="time" id="calEntryEnd" class="form-input" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Note <span style="color:var(--pink-deep);">*required</span></label>
+        <input type="text" id="calEntryNote" class="form-input" maxlength="200"
+               placeholder="e.g. Vacation, focus time, task work…" />
+      </div>
+      <div id="calEntryError" class="form-error" style="display:none;"></div>
+    </div>
+    <div class="modal-footer" style="display:flex; justify-content:space-between; gap:8px;">
+      <button class="btn-action danger" id="calEntryDeleteBtn" style="display:none;">🗑 Delete</button>
+      <div style="display:flex; gap:8px; margin-left:auto;">
+        <button class="btn-action secondary" onclick="hide('calEntryModal')">Cancel</button>
+        <button class="btn-action primary" id="calEntrySaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Toast notifications stack -->
@@ -9610,6 +9834,7 @@ function hamburgerAction(action) {
     case 'font-':         adjustFontScale(-1);        break;
     case 'font+':         adjustFontScale(1);         break;
     case 'theme':         toggleTheme();              break;
+    case 'calendar':      openCalendar();             break;
     case 'settings':      openSettings();             break;
     case 'signout':       signOut();                  break;
   }
@@ -20656,6 +20881,288 @@ async function handleIncomingTutorialTrigger(requestId, data) {
   }
   startTutorial();
 }
+
+/* ============================================
+   Team Calendar — shared PTO + blocked-time across ALL teams.
+   Stored in the `calendar_entries` collection. Each doc:
+     { userId, userName, date: 'YYYY-MM-DD', type: 'pto'|'block',
+       startTime, endTime, note, createdAt }
+   Anyone reads all. Anyone writes their own; Boss/Mgr edit/delete any.
+============================================ */
+const calendarState = {
+  viewYear: null,
+  viewMonth: null,    // 0-11
+  entries: [],        // all calendar_entries docs
+  unsub: null,
+  selectedDate: null, // 'YYYY-MM-DD' currently open in day modal
+  editingId: null,    // entry id being edited, or null for new
+};
+
+// Format a Date as local YYYY-MM-DD (not UTC — avoids off-by-one).
+function calDateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function openCalendar() {
+  const now = new Date();
+  if (calendarState.viewYear == null) {
+    calendarState.viewYear = now.getFullYear();
+    calendarState.viewMonth = now.getMonth();
+  }
+  if (!calendarState.unsub) {
+    calendarState.unsub = db.collection('calendar_entries')
+      .onSnapshot(snap => {
+        calendarState.entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderCalendarGrid();
+        if (!el('calDayModal').classList.contains('hidden') && calendarState.selectedDate) {
+          renderCalendarDay(calendarState.selectedDate);
+        }
+      }, err => {
+        console.warn('calendar subscribe failed:', err.message);
+      });
+  }
+  renderCalendarGrid();
+  show('calendarModal');
+}
+
+function renderCalendarGrid() {
+  const grid = el('calGrid');
+  const label = el('calMonthLabel');
+  if (!grid || !label) return;
+
+  const y = calendarState.viewYear;
+  const m = calendarState.viewMonth;
+  const monthNames = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+  label.textContent = `${monthNames[m]} ${y}`;
+
+  const byDate = {};
+  calendarState.entries.forEach(e => {
+    if (!e.date) return;
+    (byDate[e.date] = byDate[e.date] || []).push(e);
+  });
+
+  const firstDay = new Date(y, m, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const todayKey = calDateKey(new Date());
+
+  let cells = '';
+  for (let i = 0; i < startWeekday; i++) {
+    cells += '<div class="cal-cell cal-empty"></div>';
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateKey = `${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayEntries = byDate[dateKey] || [];
+    const dots = dayEntries.slice(0, 6).map(e =>
+      `<span class="cal-dot ${e.type === 'pto' ? 'cal-dot-pto' : 'cal-dot-block'}"></span>`
+    ).join('');
+    const more = dayEntries.length > 6
+      ? `<span class="cal-cell-more">+${dayEntries.length - 6}</span>` : '';
+    cells += `
+      <div class="cal-cell ${dateKey === todayKey ? 'cal-today' : ''}" data-date="${dateKey}">
+        <div class="cal-cell-num">${day}</div>
+        <div class="cal-cell-dots">${dots}${more}</div>
+      </div>
+    `;
+  }
+  grid.innerHTML = cells;
+
+  grid.querySelectorAll('.cal-cell[data-date]').forEach(cell => {
+    cell.onclick = () => openCalendarDay(cell.dataset.date);
+  });
+}
+
+function openCalendarDay(dateKey) {
+  calendarState.selectedDate = dateKey;
+  renderCalendarDay(dateKey);
+  show('calDayModal');
+}
+
+function renderCalendarDay(dateKey) {
+  const titleEl = el('calDayTitle');
+  const listEl = el('calDayEntries');
+  if (!titleEl || !listEl) return;
+
+  const [yy, mm, dd] = dateKey.split('-').map(Number);
+  const dObj = new Date(yy, mm - 1, dd);
+  titleEl.textContent = '📅 ' + dObj.toLocaleDateString(undefined, {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
+
+  const entries = calendarState.entries
+    .filter(e => e.date === dateKey)
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'pto' ? -1 : 1;
+      return (a.startTime || '').localeCompare(b.startTime || '');
+    });
+
+  if (entries.length === 0) {
+    listEl.innerHTML = `<div class="cal-day-empty">Nothing scheduled. Add your PTO or blocked time below.</div>`;
+  } else {
+    const canEditAny = isBossOrManager(state.profile.role);
+    listEl.innerHTML = entries.map(e => {
+      const mine = e.userId === state.user.uid;
+      const canEdit = mine || canEditAny;
+      const timeStr = e.type === 'pto'
+        ? 'All day'
+        : `${e.startTime || '—'} – ${e.endTime || '—'}`;
+      return `
+        <div class="cal-entry-row ${canEdit ? 'editable' : ''}" ${canEdit ? `data-entry-id="${escapeHtml(e.id)}"` : ''}>
+          <span class="cal-entry-tag ${e.type === 'pto' ? 'pto' : 'block'}">
+            ${e.type === 'pto' ? 'PTO' : 'Blocked'}
+          </span>
+          <div class="cal-entry-body">
+            <div class="cal-entry-who">${escapeHtml(e.userName || 'Someone')}${mine ? ' (you)' : ''}</div>
+            <div class="cal-entry-time">${escapeHtml(timeStr)}</div>
+            <div class="cal-entry-note">${escapeHtml(e.note || '')}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    listEl.querySelectorAll('.cal-entry-row[data-entry-id]').forEach(row => {
+      row.onclick = () => openCalendarEntryForm(dateKey, row.dataset.entryId);
+    });
+  }
+
+  el('calAddEntryBtn').onclick = () => openCalendarEntryForm(dateKey, null);
+}
+
+function openCalendarEntryForm(dateKey, entryId) {
+  calendarState.selectedDate = dateKey;
+  calendarState.editingId = entryId;
+
+  const typeSel = el('calEntryType');
+  const startEl = el('calEntryStart');
+  const endEl = el('calEntryEnd');
+  const noteEl = el('calEntryNote');
+  const errEl = el('calEntryError');
+  const delBtn = el('calEntryDeleteBtn');
+  errEl.style.display = 'none';
+
+  if (entryId) {
+    const e = calendarState.entries.find(x => x.id === entryId);
+    if (!e) { alert('That entry no longer exists.'); return; }
+    el('calEntryTitle').textContent = 'Edit entry';
+    typeSel.value = e.type || 'pto';
+    startEl.value = e.startTime || '';
+    endEl.value = e.endTime || '';
+    noteEl.value = e.note || '';
+    delBtn.style.display = '';
+  } else {
+    el('calEntryTitle').textContent = 'Add entry';
+    typeSel.value = 'pto';
+    startEl.value = '';
+    endEl.value = '';
+    noteEl.value = '';
+    delBtn.style.display = 'none';
+  }
+
+  const syncTimeVisibility = () => {
+    el('calEntryTimesWrap').style.display = typeSel.value === 'block' ? '' : 'none';
+  };
+  typeSel.onchange = syncTimeVisibility;
+  syncTimeVisibility();
+
+  el('calEntrySaveBtn').onclick = () => saveCalendarEntry();
+  delBtn.onclick = () => deleteCalendarEntry();
+
+  show('calEntryModal');
+}
+
+async function saveCalendarEntry() {
+  const errEl = el('calEntryError');
+  const type = el('calEntryType').value;
+  const start = el('calEntryStart').value;
+  const end = el('calEntryEnd').value;
+  const note = el('calEntryNote').value.trim();
+  const dateKey = calendarState.selectedDate;
+
+  const fail = (msg) => {
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  };
+
+  if (!note) return fail('A note is required.');
+  if (type === 'block') {
+    if (!start || !end) return fail('Blocked time needs a start and end time.');
+    if (start >= end) return fail('End time must be after start time.');
+  }
+
+  const saveBtn = el('calEntrySaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+
+  const payload = {
+    userId: state.user.uid,
+    userName: state.profile.name || state.user.email,
+    date: dateKey,
+    type,
+    startTime: type === 'block' ? start : '',
+    endTime: type === 'block' ? end : '',
+    note,
+  };
+
+  try {
+    if (calendarState.editingId) {
+      const existing = calendarState.entries.find(x => x.id === calendarState.editingId);
+      if (existing) {
+        payload.userId = existing.userId;
+        payload.userName = existing.userName;
+      }
+      await db.collection('calendar_entries').doc(calendarState.editingId).update(payload);
+    } else {
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('calendar_entries').add(payload);
+    }
+    hide('calEntryModal');
+  } catch (err) {
+    fail('Could not save: ' + err.message);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+
+async function deleteCalendarEntry() {
+  if (!calendarState.editingId) return;
+  if (!confirm('Delete this calendar entry?')) return;
+  const delBtn = el('calEntryDeleteBtn');
+  delBtn.disabled = true;
+  delBtn.textContent = 'Deleting…';
+  try {
+    await db.collection('calendar_entries').doc(calendarState.editingId).delete();
+    hide('calEntryModal');
+  } catch (err) {
+    alert('Could not delete: ' + err.message);
+    delBtn.disabled = false;
+    delBtn.textContent = '🗑 Delete';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const prev = el('calPrevBtn');
+  const next = el('calNextBtn');
+  if (prev) prev.onclick = () => {
+    calendarState.viewMonth--;
+    if (calendarState.viewMonth < 0) {
+      calendarState.viewMonth = 11;
+      calendarState.viewYear--;
+    }
+    renderCalendarGrid();
+  };
+  if (next) next.onclick = () => {
+    calendarState.viewMonth++;
+    if (calendarState.viewMonth > 11) {
+      calendarState.viewMonth = 0;
+      calendarState.viewYear++;
+    }
+    renderCalendarGrid();
+  };
+});
 </script>
 </body>
 </html>
