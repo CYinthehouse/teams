@@ -13685,6 +13685,34 @@ async function writeReminderOutbox(payload) {
   }
 }
 
+// localStorage-backed "we showed this occurrence already on this device"
+// guard. Belt-and-suspenders dedup that survives page reloads, race
+// conditions, and Firestore write failures. Stored as a JSON map keyed
+// by occKey -> ISO timestamp. Pruned daily so it doesn't grow forever.
+const REMINDER_SHOWN_KEY = 'reminderShownLocal_v1';
+const REMINDER_SHOWN_TTL_MS = 3 * 24 * 3600 * 1000; // keep 3 days
+
+function _loadReminderShownMap() {
+  try {
+    return JSON.parse(localStorage.getItem(REMINDER_SHOWN_KEY) || '{}');
+  } catch (e) { return {}; }
+}
+function _saveReminderShownMap(m) {
+  try { localStorage.setItem(REMINDER_SHOWN_KEY, JSON.stringify(m)); } catch (e) {}
+}
+function reminderWasShownLocally(occKey) {
+  const m = _loadReminderShownMap();
+  return !!m[occKey];
+}
+function markReminderShownLocally(occKey) {
+  const m = _loadReminderShownMap();
+  m[occKey] = Date.now();
+  // Prune stale entries opportunistically (cheap).
+  const cutoff = Date.now() - REMINDER_SHOWN_TTL_MS;
+  Object.keys(m).forEach(k => { if (m[k] < cutoff) delete m[k]; });
+  _saveReminderShownMap(m);
+}
+
 // For each active program assigned to me, scan today + tomorrow's NY-local
 // classes and figure out which ones should be firing now (target time was
 // REMINDER_LEAD_MIN before class start, fire window = REMINDER_LATE_WINDOW_MIN).
@@ -13753,7 +13781,16 @@ async function checkAndFireReminders() {
       // In-memory de-dup: avoid spamming Firestore reads for ones we
       // already showed/handled this session.
       if (state.remindersFired.has(occKey)) continue;
+      // localStorage-backed dedup: survives page reloads and protects
+      // against any race where the in-memory set gets reset. If we ever
+      // showed this occurrence on this device, never show it again
+      // (cleared automatically by the daily prune below).
+      if (reminderWasShownLocally(occKey)) {
+        state.remindersFired.add(occKey);
+        continue;
+      }
       state.remindersFired.add(occKey);
+      markReminderShownLocally(occKey);
 
       // Persistent de-dup: check if an ack doc exists.
       let alreadyAcked = false;
@@ -13981,6 +14018,12 @@ async function dismissReminderPopup() {
   } else {
     // Real mode: write the ack so it doesn't fire again on this or any
     // other device, and so Boss/Mgr can see it was acknowledged.
+    // We also seed the in-memory `remindersFired` set with this occKey
+    // immediately so the engine's next tick (within the next 30s) doesn't
+    // re-fire while the Firestore write is still in flight. And we keep
+    // the alarm/popup state cleared up-front so even if the write fails,
+    // we don't leave the user stuck in a loop on the same device.
+    state.remindersFired.add(reminder.occKey);
     try {
       await db.collection('reminder_acks').doc(reminder.occKey).set({
         programId: reminder.programId,
@@ -13992,7 +14035,15 @@ async function dismissReminderPopup() {
         targetTime: reminder.targetMs,
       });
     } catch (err) {
-      console.error('reminder ack write failed:', err);
+      // Surface this loudly — if the write fails the popup will keep
+      // re-firing on other devices since the ack doc never lands.
+      console.error('reminder ack write FAILED for', reminder.occKey, err);
+      showToast({
+        title: '⚠️ Ack didn\'t save',
+        text: 'Your "I sent it" couldn\'t be recorded. ' + (err.message || ''),
+        kind: 'danger',
+        durationMs: 10000,
+      });
     }
   }
   state.pendingReminder = null;
