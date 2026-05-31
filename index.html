@@ -1393,6 +1393,16 @@
     font-size: 12px;
     flex-shrink: 0;
   }
+  /* Clickable avatar — column owner can edit their own, Boss/Mgr can
+     edit anyone's. Subtle hover/focus feedback to signal interactivity. */
+  .col-avatar-editable {
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  .col-avatar-editable:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px var(--pink);
+  }
 
   .col-info { flex: 1; min-width: 0; }
   .col-name {
@@ -10002,10 +10012,27 @@ function buildMemberColumn(member, isGhost) {
     ? `<button class="col-shorts-btn has-tooltip" data-tooltip="Shorts Analyzer">📊</button>`
     : '';
 
+  // Column avatar: shows the character image if set, else a letter
+  // fallback. Clickable for the column owner OR Boss/Manager so they
+  // can edit the character — quicker than navigating to Settings.
+  const canEditCharHere = !isGhost && (
+    member.uid === state.user.uid ||
+    isBossOrManager(state.profile.role)
+  );
+  const avatarInner = member.characterUrl
+    ? `<img src="${escapeHtml(member.characterUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+    : avatarLetter(member.name);
+  const avatarStyle = member.characterUrl
+    ? 'overflow:hidden; padding:0;'
+    : `background: ${avatarColorFor(member.name)};`;
+  const avatarHtml = canEditCharHere
+    ? `<div class="col-avatar col-avatar-editable" style="${avatarStyle}" data-edit-char-uid="${escapeHtml(member.uid)}" title="Edit character">${avatarInner}</div>`
+    : `<div class="col-avatar" style="${avatarStyle}">${avatarInner}</div>`;
+
   col.innerHTML = `
     <div class="col-head">
       <div class="col-head-identity">
-        <div class="col-avatar" style="background: ${avatarColorFor(member.name)}">${avatarLetter(member.name)}</div>
+        ${avatarHtml}
         <div class="col-info">
           <div class="col-name">${escapeHtml(member.name)}${isGhost ? ' 👻' : ''}</div>
           <div class="col-meta">${escapeHtml(member.role || '—')}${isGhost ? ' · not on team' : ''}</div>
@@ -10060,6 +10087,16 @@ function buildMemberColumn(member, isGhost) {
     shBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       window.location.href = 'shorts.html';
+    });
+  }
+
+  // Editable avatar (column owner OR Boss/Manager). Opens the character
+  // edit modal pre-targeted at this column's user.
+  const av = col.querySelector('.col-avatar-editable');
+  if (av) {
+    av.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditChar(av.dataset.editCharUid);
     });
   }
 
