@@ -7176,8 +7176,27 @@
       <div class="reminder-popup-channel" id="reminderPopupChannel">—</div>
     </div>
     <div class="modal-footer">
+      <button class="btn-action secondary" onclick="openClassReminderCannedMessage()">📋 View &amp; Copy Message</button>
       <button class="btn-action secondary" id="reminderCopyBtn" onclick="copyReminderMessage()">📋 Copy Message</button>
       <button class="btn-action primary" id="reminderDoneBtn" onclick="dismissReminderPopup()">Done — I sent it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Class Reminder canned-message sub-modal. Mirrors the late-check
+     pattern: per-student rows showing copyable Discord + phone, with
+     each student's personalized message in a copy box. -->
+<div id="classReminderCannedSubModal" class="modal-backdrop hidden" style="z-index: 490;">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-head">
+      <div class="modal-title">📋 Class Reminder Messages</div>
+      <button class="modal-close" onclick="hide('classReminderCannedSubModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="classReminderCannedList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-action secondary" onclick="hide('classReminderCannedSubModal')">Close</button>
     </div>
   </div>
 </div>
@@ -13804,6 +13823,7 @@ async function checkAndFireReminders() {
 
       // Fire the popup.
       const studentDiscords = await collectClassStudentDiscords(cls);
+      const studentsFull = await collectClassStudentsFull(cls);
       const lateMinutes = Math.floor(lateBy / 60000);
       showReminderPopup({
         programId: prog.id,
@@ -13812,6 +13832,7 @@ async function checkAndFireReminders() {
         teacherName: teacher.name,
         channelUrl,
         studentDiscords,
+        studentsFull,
         targetMs,
         lateMinutes,
         // For the push-notification title on phones.
@@ -13866,6 +13887,37 @@ async function collectClassStudentDiscords(cls) {
   return out;
 }
 
+// Like collectClassStudentDiscords, but returns the full per-student
+// payload (name + discord + phone) the new class-reminder canned-message
+// modal needs. The existing Discord-only fetcher stays unchanged because
+// the old "Copy Tagged Message" path still consumes that simpler list.
+async function collectClassStudentsFull(cls) {
+  const refs = Array.isArray(cls.students) ? cls.students : [];
+  if (refs.length === 0) return [];
+  const ids = refs.map(s => s.id).filter(Boolean);
+  const full = {};
+  const CHUNK = 30;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    try {
+      const qSnap = await taDb.collection('scheduler_students')
+        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+      qSnap.docs.forEach(d => { full[d.id] = d.data(); });
+    } catch (e) {
+      console.warn('collectClassStudentsFull chunk failed:', e);
+    }
+  }
+  return refs.map(s => {
+    const f = full[s.id] || {};
+    return {
+      studentId: s.id,
+      name: f.name || s.name || '—',
+      discord: (f.discord || f.discordName || '').trim() || null,
+      phone: (f.phone || f.phoneNumber || '').trim() || null,
+    };
+  });
+}
+
 // Pick the channel URL by day + teacher-name match.
 function pickReminderChannel(day, teacherName) {
   if (!day || !teacherName) return null;
@@ -13879,13 +13931,28 @@ function pickReminderChannel(day, teacherName) {
   return null;
 }
 
+// Format a teacher's name for student-facing reminders.
+//   - "Calvin Yim" / "calvin" / etc. → "Mr. Calvin"
+//   - "Wonjoo님" / "Wonjoo" / "Won Joo" etc. → "Miss Wonjoo"
+//   - Anyone else → first-name-only fallback (no honorific) so we don't
+//     pin a gendered title on someone whose preference we don't know.
+function formatTeacherName(name) {
+  if (!name) return '';
+  const cleaned = String(name).replace(/님/g, '').trim();
+  const first = cleaned.split(/\s+/)[0] || cleaned;
+  const lower = first.toLowerCase();
+  if (lower === 'calvin') return 'Mr. Calvin';
+  if (lower === 'wonjoo' || lower === 'won') return 'Miss Wonjoo';
+  return first;
+}
+
 // Construct the canned message for a reminder. Renders the Discord usernames,
 // teacher name, and channel link as plain text suitable for paste-to-Discord.
 function buildReminderMessage({ teacherName, channelUrl, studentDiscords }) {
   const mentions = studentDiscords.length > 0
     ? studentDiscords.map(d => '@' + d.replace(/^@/, '')).join(' ')
     : '[no Discord usernames found for this class]';
-  return `${mentions}  Your class will be held here with ${teacherName} in 10 minutes! Please click here to join :point_right: ${channelUrl}`;
+  return `${mentions}  Your class will be held here with ${formatTeacherName(teacherName)} in 10 minutes! Please click here to join :point_right: ${channelUrl}`;
 }
 
 /* ---- Reminder popup UI ---- */
@@ -13911,7 +13978,7 @@ function showReminderPopup(reminder) {
   }
 
   const message = buildReminderMessage(reminder);
-  el('reminderPopupTeacher').textContent = reminder.teacherName;
+  el('reminderPopupTeacher').textContent = formatTeacherName(reminder.teacherName);
   el('reminderPopupChannel').textContent = reminder.channelUrl;
   el('reminderPopupMessage').textContent = message;
 
@@ -14510,6 +14577,72 @@ async function copyLateCheckCannedMessage() {
   } catch (e) {
     alert('Could not copy. Select the message manually and copy.');
   }
+}
+
+// Build a personalized class-reminder message for one student. Uses the
+// teacher's formatted name (Mr. Calvin / Miss Wonjoo) and the channel URL
+// from the current pending reminder. If we have no Discord handle, the
+// greeting falls back to the student's display name so the message is
+// still usable.
+function buildClassReminderMessageForStudent(student) {
+  const r = state.pendingReminder;
+  if (!r) return '';
+  const teacher = formatTeacherName(r.teacherName);
+  const url = r.channelUrl || '';
+  const greetingTarget = student.discord
+    ? '@' + String(student.discord).replace(/^@/, '')
+    : (student.name || 'there');
+  return `Hi ${greetingTarget}! Your class with ${teacher} will be starting soon. Here is the link to join: ${url}`;
+}
+
+function openClassReminderCannedMessage() {
+  const list = el('classReminderCannedList');
+  const r = state.pendingReminder;
+  const students = (r && Array.isArray(r.studentsFull)) ? r.studentsFull : [];
+  if (students.length === 0) {
+    list.innerHTML = `<div class="cal-day-empty">No students found for this class.</div>`;
+  } else {
+    list.innerHTML = students.map((s, idx) => {
+      const discordLabel = s.discord
+        ? `🎮 <span class="att-contact-copy" data-copy="${escapeHtml(s.discord)}" title="Click to copy">${escapeHtml(s.discord)}</span>`
+        : `<span style="color: var(--ink-light); font-style: italic;">no Discord</span>`;
+      const phoneLabel = s.phone
+        ? `📱 <span class="att-contact-copy" data-copy="${escapeHtml(s.phone)}" title="Click to copy">${escapeHtml(s.phone)}</span>`
+        : `<span style="color: var(--ink-light); font-style: italic;">no phone</span>`;
+      const msg = buildClassReminderMessageForStudent(s);
+      return `
+        <div class="att-contact-student" style="margin-bottom: 10px;">
+          <div class="att-contact-student-name">${escapeHtml(s.name)}</div>
+          <div class="att-contact-student-meta" style="margin-bottom: 6px;">${discordLabel} &nbsp;·&nbsp; ${phoneLabel}</div>
+          <div class="reminder-popup-message" data-class-reminder-msg-idx="${idx}" style="cursor: pointer; font-size: 13px;" title="Click to copy">${escapeHtml(msg)}</div>
+        </div>
+      `;
+    }).join('');
+    // Wire copy chips (Discord + phone)
+    list.querySelectorAll('.att-contact-copy').forEach(span => {
+      span.addEventListener('click', () => {
+        const text = span.dataset.copy;
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = span.textContent;
+          span.textContent = '✓ Copied!';
+          setTimeout(() => { span.textContent = orig; }, 1200);
+        }).catch(() => {});
+      });
+    });
+    // Wire per-student message-box click-to-copy
+    list.querySelectorAll('[data-class-reminder-msg-idx]').forEach(box => {
+      box.addEventListener('click', () => {
+        const idx = parseInt(box.dataset.classReminderMsgIdx, 10);
+        const s = students[idx];
+        if (!s) return;
+        const text = buildClassReminderMessageForStudent(s);
+        navigator.clipboard.writeText(text).then(() => {
+          showToast({ title: '✓ Copied', text: `Message for ${s.name} copied.`, kind: 'morale', durationMs: 1500 });
+        }).catch(() => alert('Could not copy. Select the message manually and copy.'));
+      });
+    });
+  }
+  show('classReminderCannedSubModal');
 }
 
 function showLateCheckSignoffView() {
@@ -15365,6 +15498,7 @@ async function handleIncomingTestRequest(requestId, data) {
     const channelUrl = pickReminderChannel(cls.day, teacher.name)
       || '(no Discord channel mapping for this day/teacher — would skip in real reminders)';
     const studentDiscords = await collectClassStudentDiscords(cls);
+    const studentsFull = await collectClassStudentsFull(cls);
     showReminderPopup({
       testMode: true,
       testRequestId: requestId,
@@ -15372,6 +15506,7 @@ async function handleIncomingTestRequest(requestId, data) {
       teacherName: teacher.name,
       channelUrl,
       studentDiscords,
+      studentsFull,
     });
   } catch (err) {
     console.error('handleIncomingTestRequest failed:', err);
