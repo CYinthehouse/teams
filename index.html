@@ -631,6 +631,11 @@
     box-shadow: var(--shadow-card);
     transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
     cursor: pointer;
+    /* Defensive: ensure the card is tall enough to actually show all
+       four summary lines. Some recent edit somewhere is squishing these
+       cards to ~30px when they should be ~80px. min-height guarantees
+       the content has room regardless of any flex parent's distribution. */
+    min-height: 86px;
   }
   .contact-card:hover {
     transform: translateY(-1px);
