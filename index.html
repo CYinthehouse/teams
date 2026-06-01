@@ -13799,19 +13799,22 @@ async function checkAndFireReminders() {
 
       // In-memory de-dup: avoid spamming Firestore reads for ones we
       // already showed/handled this session.
-      if (state.remindersFired.has(occKey)) continue;
+      if (state.remindersFired.has(occKey)) {
+        console.log('[reminder] skip in-memory:', occKey);
+        continue;
+      }
       // localStorage-backed dedup: survives page reloads and protects
       // against any race where the in-memory set gets reset. If we ever
       // showed this occurrence on this device, never show it again
       // (cleared automatically by the daily prune below).
       if (reminderWasShownLocally(occKey)) {
+        console.log('[reminder] skip localStorage:', occKey);
         state.remindersFired.add(occKey);
         continue;
       }
-      state.remindersFired.add(occKey);
-      markReminderShownLocally(occKey);
-
-      // Persistent de-dup: check if an ack doc exists.
+      // Persistent de-dup: check if an ack doc exists. If yes, also seed
+      // this device's localStorage so subsequent ticks short-circuit at
+      // the cheap local check above instead of doing a Firestore read.
       let alreadyAcked = false;
       try {
         const ackSnap = await db.collection('reminder_acks').doc(occKey).get();
@@ -13819,7 +13822,17 @@ async function checkAndFireReminders() {
       } catch (e) {
         // ignore — we'll still fire
       }
-      if (alreadyAcked) continue;
+      if (alreadyAcked) {
+        console.log('[reminder] skip Firestore ack exists:', occKey);
+        state.remindersFired.add(occKey);
+        markReminderShownLocally(occKey);
+        continue;
+      }
+      // All dedup checks passed — record this fire BEFORE doing further
+      // async work so a concurrent tick can't pass the same checks.
+      state.remindersFired.add(occKey);
+      markReminderShownLocally(occKey);
+      console.log('[reminder] FIRING:', occKey, '| stored locally:', reminderWasShownLocally(occKey));
 
       // Fire the popup.
       const studentDiscords = await collectClassStudentDiscords(cls);
@@ -13957,7 +13970,24 @@ function buildReminderMessage({ teacherName, channelUrl, studentDiscords }) {
 
 /* ---- Reminder popup UI ---- */
 
+// Session-level set of occKeys whose popup has been opened in this tab,
+// EVER. Independent of state.remindersFired (engine-side dedup) — this
+// guards the popup function itself so no caller path can sneak a duplicate
+// open past us. Survives across the dismiss flow because we never remove
+// entries here once added.
+const _popupOpenedThisSession = new Set();
+
 function showReminderPopup(reminder) {
+  // Last-resort dedup: if this exact occurrence already had its popup
+  // opened in this browser tab session, refuse to show again. This is
+  // a backstop against any code path that bypasses the engine's checks.
+  // Skipped in test mode so manual tests still work after a real fire.
+  if (!reminder.testMode && reminder.occKey && _popupOpenedThisSession.has(reminder.occKey)) {
+    console.warn('[reminder] suppressing duplicate popup open for', reminder.occKey);
+    return;
+  }
+  if (reminder.occKey) _popupOpenedThisSession.add(reminder.occKey);
+
   // Stash so the engine doesn't pile up another popup on top.
   state.pendingReminder = reminder;
 
@@ -14580,19 +14610,18 @@ async function copyLateCheckCannedMessage() {
 }
 
 // Build a personalized class-reminder message for one student. Uses the
-// teacher's formatted name (Mr. Calvin / Miss Wonjoo) and the channel URL
-// from the current pending reminder. If we have no Discord handle, the
-// greeting falls back to the student's display name so the message is
-// still usable.
+// teacher's formatted name (Mr. Calvin / Miss Wonjoo) and the student's
+// first name in the greeting — not their Discord handle. (Discord is
+// still listed as a click-to-copy chip on the row in case the teacher
+// wants to mention them in chat, but the message body reads naturally
+// with a human name.)
 function buildClassReminderMessageForStudent(student) {
   const r = state.pendingReminder;
   if (!r) return '';
   const teacher = formatTeacherName(r.teacherName);
   const url = r.channelUrl || '';
-  const greetingTarget = student.discord
-    ? '@' + String(student.discord).replace(/^@/, '')
-    : (student.name || 'there');
-  return `Hi ${greetingTarget}! Your class with ${teacher} will be starting soon. Here is the link to join: ${url}`;
+  const firstName = (student.name || 'there').trim().split(/\s+/)[0] || 'there';
+  return `Hi ${firstName}! Your class with ${teacher} will be starting soon. Here is the link to join: ${url}`;
 }
 
 function openClassReminderCannedMessage() {
